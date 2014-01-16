@@ -57,3 +57,4 @@ int CorsixTH_lua_stacktrace(lua_State *L);
 int CorsixTH_lua_panic(lua_State *L);
 
 #endif // CORSIX_TH_MAIN_H_
+extern char* lua_game_path;

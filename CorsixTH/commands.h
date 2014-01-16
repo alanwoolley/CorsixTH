@@ -1,0 +1,30 @@
+#ifndef COMMANDS_H_
+#define COMMANDS_H_
+
+#ifndef NULL
+#define NULL 0
+#endif
+
+#include <jni.h>
+
+#define COMMAND_SHOW_MENU 0
+#define COMMAND_SHOW_LOAD_DIALOG 1
+#define COMMAND_SHOW_SAVE_DIALOG 2
+#define COMMAND_RESTART_GAME 3
+#define COMMAND_QUICK_LOAD 4
+#define COMMAND_QUICK_SAVE 5
+#define COMMAND_SHOW_KEYBOARD 6
+#define COMMAND_HIDE_KEYBOARD 7
+#define COMMAND_SHOW_ABOUT_DIALOG 8
+#define COMMAND_PAUSE_GAME 9
+#define COMMAND_SHOW_SETTINGS_DIALOG 10
+#define COMMAND_GAME_SPEED_UPDATED 11
+#define COMMAND_GAME_LOAD_ERROR 12
+#define COMMAND_HIDE_MENU 13
+#define COMMAND_START_VIBRATION 14
+#define COMMAND_STOP_VIBRATION 15
+
+int sendCommandInt(JavaVM* jvm, jint cmd, jint data);
+int sendCommand(JavaVM* jvm, jint cmd);
+
+#endif

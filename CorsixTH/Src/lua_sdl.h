@@ -37,6 +37,27 @@ SOFTWARE.
 // SDL USEREVENT_MOVIE_OVER - informs script of THMovie movie finishing
 #define SDL_USEREVENT_MOVIE_OVER (SDL_USEREVENT + 3)
 
+// Alan's Android Stuff
+#define SDL_USEREVENT_LOAD (SDL_USEREVENT + 5)
+#define SDL_USEREVENT_SAVE (SDL_USEREVENT + 6)
+#define SDL_USEREVENT_RESTART (SDL_USEREVENT + 7)
+#define SDL_USEREVENT_GAMESPEED (SDL_USEREVENT + 8)
+#define SDL_USEREVENT_AUTOSAVE (SDL_USEREVENT + 9)
+#define SDL_USEREVENT_CONFIGURATION (SDL_USEREVENT + 10)
+#define SDL_USEREVENT_SHOWCHEATS (SDL_USEREVENT + 11)
+
 int luaopen_sdl(lua_State *L);
+
+void set_fps_limit(int fps);
+
+typedef struct {
+	int fpsLimit, edgeScrollSize, edgeScrollSpeed;
+	enum controls_mode {
+		NORMAL = 1, DESKTOP = 2, TOUCHPAD = 3
+	} controlsMode;
+	unsigned char playSoundFx, playMusic, playAnnouncements, adviserEnabled,
+			edgeScroll;
+	char* originalFilesPath, *cthPath, *language;
+} Configuration;
 
 #endif // CORSIX_TH_LUA_SDL_H_

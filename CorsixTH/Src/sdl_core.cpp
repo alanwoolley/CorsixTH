@@ -23,15 +23,20 @@ SOFTWARE.
 #include "config.h"
 #include "lua_sdl.h"
 #include "th_lua.h"
+#include "SDL_framerate.h"
 #include <string.h>
+#include "../logging.h"
 #ifndef _MSC_VER
 #define stricmp strcasecmp
 #else
 #pragma warning (disable: 4996) // CRT deprecation
 #endif
 
-static int l_init(lua_State *L)
-{
+// Frame Limiter
+int fps = 0;
+FPSmanager fps_manager;
+
+static int l_init(lua_State *L) {
     Uint32 flags = 0;
     int i;
     int argc = lua_gettop(L);
@@ -78,9 +83,8 @@ struct fps_ctrl
     int frame_count;
     Uint32 frame_time[4096];
 
-    void init()
-    {
-        limit_fps = true;
+	void init() {
+		limit_fps = false;
         track_fps = true;
         q_front = 0;
         q_back = 0;
@@ -138,17 +142,50 @@ static void l_push_utf8(lua_State *L, uint32_t iCodePoint)
     lua_pushlstring(L, reinterpret_cast<char*>(aBytes), iNBytes);
 }
 
-static int l_mainloop(lua_State *L)
-{
+static void l_pushtablestring(lua_State *L, const char* k, char* v) {
+	lua_pushstring(L, k);
+	lua_pushstring(L, v);
+	lua_settable(L, -3);
+}
+
+static void l_pushtablebool(lua_State *L, const char* k, unsigned char v) {
+	lua_pushstring(L, k);
+	lua_pushboolean(L, (int) v);
+	lua_settable(L, -3);
+}
+
+static void l_pushtableint(lua_State *L, const char* k, int v) {
+	lua_pushstring(L, k);
+	lua_pushinteger(L, v);
+	lua_settable(L, -3);
+}
+
+void set_fps_limit(int newfps) {
+
+	fps = newfps;
+	if (fps != 0) {
+		SDL_initFramerate(&fps_manager);
+		SDL_setFramerate(&fps_manager, newfps);
+	}
+	printf("New framerate limit is %i \n", newfps);
+}
+
+static int l_mainloop(lua_State *L) {
     luaL_checktype(L, 1, LUA_TTHREAD);
     lua_State *dispatcher = lua_tothread(L, 1);
 
     fps_ctrl *fps_control = (fps_ctrl*)lua_touserdata(L, lua_upvalueindex(1));
     SDL_TimerID timer = SDL_AddTimer(30, timer_frame_callback, NULL);
+
+	SDL_initFramerate(&fps_manager);
+	if (fps != 0) {
+		SDL_setFramerate(&fps_manager, fps);
+	}
+
     SDL_Event e;
-    
-    while(SDL_WaitEvent(&e) != 0)
-    {
+	char buf[255];
+	char d[255];
+	while (SDL_WaitEvent(&e) != 0) {
         bool do_frame = false;
         bool do_timer = false;
         do
@@ -192,15 +229,108 @@ static int l_mainloop(lua_State *L)
                 lua_pushinteger(dispatcher, e.motion.yrel);
                 nargs = 5;
                 break;
+#if SDL_VERSION_ATLEAST(2,0,0)
+				case SDL_WINDOWEVENT:
+				switch (e.window.event) {
+					case SDL_WINDOWEVENT_FOCUS_GAINED:
+					lua_pushliteral(dispatcher, "active");
+					lua_pushinteger(dispatcher, 1);
+					nargs = 2;
+					break;
+					case SDL_WINDOWEVENT_FOCUS_LOST:
+					lua_pushliteral(dispatcher, "active");
+					lua_pushinteger(dispatcher, 0);
+					nargs = 2;
+					break;
+					default:
+					nargs = 0;
+					break;
+				}
+				break;
+#else
             case SDL_ACTIVEEVENT:
                 lua_pushliteral(dispatcher, "active");
                 lua_pushinteger(dispatcher, e.active.gain);
                 nargs = 2;
                 break;
+#endif
+
             case SDL_USEREVENT_MUSIC_OVER:
                 lua_pushliteral(dispatcher, "music_over");
                 nargs = 1;
                 break;
+			case SDL_USEREVENT_LOAD:
+				lua_pushliteral(dispatcher, "load");
+				strcpy(d, (const char*) e.user.data1);
+				sprintf(buf, "Loading %s", d);
+				LOG_INFO(buf);
+				lua_pushstring(dispatcher, (const char*) d);
+				nargs = 2;
+				break;
+			case SDL_USEREVENT_SAVE:
+				lua_pushliteral(dispatcher, "save");
+				strcpy(d, (const char*) e.user.data1);
+				sprintf(buf, "Saving %s", d);
+				LOG_INFO(buf);
+				lua_pushstring(dispatcher, (const char*) d);
+				nargs = 2;
+				break;
+			case SDL_USEREVENT_GAMESPEED:
+				lua_pushliteral(dispatcher, "gamespeed");
+				strcpy(d, (const char*) e.user.data1);
+				sprintf(buf, "Game speed: %s", d);
+				LOG_INFO(buf);
+				lua_pushstring(dispatcher, (const char*) d);
+				nargs = 2;
+				break;
+			case SDL_USEREVENT_RESTART:
+				lua_pushliteral(dispatcher, "restart");
+				nargs = 1;
+				break;
+			case SDL_USEREVENT_AUTOSAVE:
+				lua_pushliteral(dispatcher, "tryautosave");
+				strcpy(d, (const char*) e.user.data1);
+				lua_pushstring(dispatcher, (const char*) d);
+				nargs = 2;
+				break;
+
+			case SDL_USEREVENT_CONFIGURATION: {
+				lua_pushliteral(dispatcher, "configupdate");
+				Configuration *newConfig = (Configuration *) e.user.data1;
+				lua_newtable(dispatcher);
+				l_pushtablestring(dispatcher, "originalFilesPath",
+						newConfig->originalFilesPath);
+				l_pushtablestring(dispatcher, "cthPath", newConfig->cthPath);
+				l_pushtablestring(dispatcher, "language", newConfig->language);
+
+				l_pushtableint(dispatcher, "fpsLimit", newConfig->fpsLimit);
+				l_pushtableint(dispatcher, "edgeScrollSize",
+						newConfig->edgeScrollSize);
+				l_pushtableint(dispatcher, "edgeScrollSpeed",
+						newConfig->edgeScrollSpeed);
+				l_pushtableint(dispatcher, "controlsMode",
+						newConfig->controlsMode);
+				l_pushtablebool(dispatcher, "edgeScroll",
+						newConfig->edgeScroll);
+				l_pushtablebool(dispatcher, "playSoundFx",
+						newConfig->playSoundFx);
+				l_pushtablebool(dispatcher, "playMusic", newConfig->playMusic);
+				l_pushtablebool(dispatcher, "playAnnouncements",
+						newConfig->playAnnouncements);
+				l_pushtablebool(dispatcher, "adviserEnabled",
+						newConfig->adviserEnabled);
+
+				// Update FPS Limit
+				set_fps_limit(newConfig->fpsLimit);
+
+				nargs = 2;
+
+			}
+				break;
+			case SDL_USEREVENT_SHOWCHEATS:
+			    lua_pushliteral(dispatcher, "showcheats");
+			    nargs = 1;
+			    break;
             case SDL_USEREVENT_CPCALL:
                 if(luaT_cpcall(L, (lua_CFunction)e.user.data1, e.user.data2))
                 {
@@ -256,7 +386,18 @@ static int l_mainloop(lua_State *L)
                     goto leave_loop;
                 }
                 lua_settop(dispatcher, 0);
+
+				// Perform delay
+				if (fps != 0) {
+					SDL_framerateDelay(&fps_manager);
+				}
+
             } while(fps_control->limit_fps == false && SDL_PollEvent(NULL) == 0);
+		} else {
+			// Perform delay
+			if (fps != 0) {
+				SDL_framerateDelay(&fps_manager);
+			}
         }
 
         // No events pending - a good time to do a bit of garbage collection

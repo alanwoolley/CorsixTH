@@ -20,6 +20,8 @@ SOFTWARE. --]]
 
 local TH = require "TH"
 
+local ignore_next = false
+
 --! An `Entity` which occupies at least a single map tile and does not move.
 class "Object" (Entity)
 
@@ -660,6 +662,7 @@ function Object:onClick(ui, button, data)
     window:setOrientation(direction)
     self.orientation_before = self.direction
     ui:playSound("pickup.wav")
+    startvibration(2);
   end
 end
 

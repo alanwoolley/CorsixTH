@@ -22,6 +22,10 @@ SOFTWARE.
 
 #include "config.h"
 #include "lua.hpp"
+#include "../logging.h"
+#include "../commands.h"
+#include "main.h"
+
 extern "C" {
 #include "../../LFS/lfs.h"
 int luaopen_lpeg(lua_State *L);
@@ -40,17 +44,19 @@ int luaopen_random(lua_State *L);
 #endif
 // End of config file checking
 
-int CorsixTH_lua_main_no_eval(lua_State *L)
-{
-    // assert(_VERSION == LUA_VERSION)
-    size_t iLength;
-    lua_getglobal(L, "_VERSION");
-    const char* sVersion = lua_tolstring(L, -1, &iLength);
+extern JavaVM* jvm;
+
+int CorsixTH_lua_main_no_eval(lua_State *L) {
+	// assert(_VERSION == LUA_VERSION)
+	size_t iLength;
+	lua_getglobal(L, "_VERSION");
+	const char* sVersion = lua_tolstring(L, -1, &iLength);
     if(iLength != strlen(LUA_VERSION) || strcmp(sVersion, LUA_VERSION) != 0)
     {
         lua_pushliteral(L, "Linked against a version of Lua different to the "
             "one used when compiling.\nPlease recompile CorsixTH against the "
             "same Lua version it is linked against.");
+		sendCommand(jvm,COMMAND_GAME_LOAD_ERROR);
         return lua_error(L);
     }
     lua_pop(L, 1);
@@ -143,6 +149,19 @@ int CorsixTH_lua_main_no_eval(lua_State *L)
         }
     }
 
+    JNIEnv* jEnv;
+
+    	jvm->AttachCurrentThread(&jEnv, NULL);
+
+    	jclass cls = jEnv->FindClass("uk/co/armedpineapple/cth/SDLActivity");
+    	jmethodID method = jEnv->GetStaticMethodID(cls, "nativeGetGamePath",
+    			"()Ljava/lang/String;");
+
+    	jstring jpath = (jstring) jEnv->CallStaticObjectMethod(cls, method);
+
+    	const char* path = jEnv->GetStringUTFChars(jpath, 0);
+
+
     // Code to try several variations on finding CorsixTH.lua:
     // CorsixTH.lua
     // CorsixTH/CorsixTH.lua
@@ -153,9 +172,13 @@ int CorsixTH_lua_main_no_eval(lua_State *L)
     // ../../../CorsixTH.lua
     // ../../../CorsixTH/CorsixTH.lua
     // It is simpler to write this in Lua than in C.
-    const char sLuaCorsixTHLua[] =
+	std::string	sLuaCorsixTHLua(
     "local name, sep, code = \"CorsixTH.lua\", package.config:sub(1, 1)\n"
     "local root = (... or \"\"):match(\"^(.*[\"..sep..\"])\") or \"\"\n"
+					"code = loadfile(\"");
+	sLuaCorsixTHLua.append(path);
+	sLuaCorsixTHLua.append("\"..name)\n"
+					"if code then return code end\n"
 #ifdef __APPLE__ // Darrell: Search inside the bundle first.
                  // There's probably a better way of doing this.
 #if defined(IS_CORSIXTH_APP)
@@ -173,13 +196,16 @@ int CorsixTH_lua_main_no_eval(lua_State *L)
     "    if code then return code end \n"
     "  end \n"
     "end \n"
-    "return loadfile(name)";
+    "return loadfile(name)");
+
+	jEnv->ReleaseStringUTFChars(jpath, path);
+
 
     // return assert(loadfile"CorsixTH.lua")(...)
     if(!bGotScriptFile)
     {
         lua_getglobal(L, "assert");
-        luaL_loadbuffer(L, sLuaCorsixTHLua, strlen(sLuaCorsixTHLua),
+        luaL_loadbuffer(L, sLuaCorsixTHLua.c_str(), sLuaCorsixTHLua.length(),
             "@main.cpp (l_main bootstrap)");
         if(lua_gettop(L) == 2)
             lua_pushnil(L);
@@ -234,6 +260,8 @@ int CorsixTH_lua_panic(lua_State *L)
     fflush(stderr);
 
     // A stack trace would be nice, but they cannot be done in a panic.
+
+	sendCommand(jvm,COMMAND_GAME_LOAD_ERROR);
 
     return 0;
 }

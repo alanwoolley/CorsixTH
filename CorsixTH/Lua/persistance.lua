@@ -210,9 +210,19 @@ function SaveGame()
     random = math.randomdump(),
   }
   state.map:prepareForSave()
+  
+  -- Remove menu button and restore menu bar
+  TheApp.ui:removeWindow(TheApp.ui.menu_button)
+  TheApp.ui:addWindow(TheApp.ui.menu_bar)
+  
   --local status, res = xpcall(function()
   local result, err, obj = persist.dump(state, MakePermanentObjectsTable(false))
   state.map:afterSave()
+  
+  -- Put the menu button back
+  TheApp.ui:addWindow(TheApp.ui.menu_button)
+  TheApp.ui:removeWindow(TheApp.ui.menu_bar)
+  
   if not result then
     print(obj, NameOf(obj)) -- for debugging
     error(err)
@@ -256,6 +266,14 @@ function LoadGame(data)
   if not TheApp.world.user_actions_allowed then
     TheApp.video:setBlueFilterActive(true)
   end
+  
+  --Add menu button and hide menu bar
+  if (TheApp.ui.menu_button == nil) then
+    TheApp.ui.menu_button = UIMenuButton(TheApp.ui)
+  end
+  TheApp.ui:addWindow(TheApp.ui.menu_button)
+  TheApp.ui:removeWindow(TheApp.ui.menu_bar)
+  
 end
 
 function LoadGameFile(filename)

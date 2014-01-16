@@ -590,6 +590,9 @@ function World:createEarthquake()
   
   -- set a flag to indicate that we are now having an earthquake
   self.active_earthquake = true
+
+  -- Play the earthquake vibration
+  startvibration(3)
   return true
 end
 
@@ -597,6 +600,8 @@ function World:tickEarthquake()
   -- check if this is the day that the earthquake is supposed to stop
   if (self.day == self.earthquake_stop_day) then
     self.active_earthquake = false
+    -- Stop vibration
+    stopvibration()
     self.ui.tick_scroll_amount = false
     -- if the earthqake measured more than 7 on the richter scale, tell the user about it
     if (self.earthquake_size > 7) then
@@ -946,12 +951,16 @@ function World:setSpeed(speed)
   if speed == "Pause" then
     -- stop screen shaking if there was an earthquake in progress
     if self.active_earthquake then
+        stopvibration()
       self.ui.tick_scroll_amount = {x = 0, y = 0}
     end
     -- By default actions are not allowed when the game is paused.
     self.user_actions_allowed = TheApp.config.allow_user_actions_while_paused
   elseif self:getCurrentSpeed() == "Pause" then
     self.user_actions_allowed = true
+    if self.active_earthquake then
+        startvibration(3)
+    end
   end
   self.prev_speed = self:getCurrentSpeed()
   local numerator, denominator = unpack(tick_rates[speed])

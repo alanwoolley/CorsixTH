@@ -41,9 +41,11 @@ function GameUI:GameUI(app, local_hospital)
     self.adviser = UIAdviser(self)
     self.bottom_panel = UIBottomPanel(self)
     self.menu_bar = UIMenuBar(self)
+    self.menu_button = UIMenuButton(self)
     self.bottom_panel:addWindow(self.adviser)
     self:addWindow(self.bottom_panel)
-    self:addWindow(self.menu_bar)
+    self:addWindow(self.menu_button)
+    -- self:addWindow(self.menu_bar)
   end
 
   local scr_w = app.config.width
@@ -420,15 +422,18 @@ function GameUI:onMouseMove(x, y, dx, dy)
     return true
   end
   
-  local scroll_region_size
-  if self.app.config.fullscreen then
+  local scroll_region_size = self.app.config.scroll_region_size
+  local scroll_power = self.app.config.scroll_speed
+  
+  --if self.app.config.fullscreen then
     -- As the mouse is locked within the window, a 1px region feels a lot
     -- larger than it actually is.
-    scroll_region_size = 1
-  else
+  --  scroll_region_size = 1
+  --else
     -- In windowed mode, a reasonable size is needed, though not too large.
-    scroll_region_size = 8
-  end
+  --  scroll_region_size = 8
+  --end
+  
   if not self.app.config.prevent_edge_scrolling and (x < scroll_region_size
   or y < scroll_region_size or x >= self.app.config.width - scroll_region_size
   or y >= self.app.config.height - scroll_region_size) then

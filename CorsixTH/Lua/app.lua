@@ -50,7 +50,14 @@ function App:App()
     motion = self.onMouseMove,
     active = self.onWindowActive,
     music_over = self.onMusicOver,
-    movie_over = self.onMovieOver
+	movie_over = self.onMovieOver,
+    load = self.load,
+    restart = self.restart,
+    save = self.save,
+    gamespeed = self.gamespeed,
+    tryautosave = self.tryAutoSave,
+    configupdate = self.updateConfig,
+    showcheats = self.showCheats,
   }
   self.strings = {}
   self.savegame_version = SAVEGAME_VERSION
@@ -653,12 +660,12 @@ function App:fixConfig()
     end
     
     -- For resolution, check that resolution is at least 640x480
-    if key == "width" and type(value) == "number" and value < 640 then
-      self.config[key] = 640
+    if key == "width" and type(value) == "number" and value < 100 then
+      self.config[key] = 100
     end
     
-    if key == "height" and type(value) == "number" and value < 480 then
-      self.config[key] = 480
+    if key == "height" and type(value) == "number" and value < 100 then
+      self.config[key] = 100
     end
   end
 end
@@ -1150,6 +1157,7 @@ function App:getVersion(version)
 end
 
 function App:save(filename)
+  print "saving"
   return SaveGameFile(self.savegame_dir .. filename)
 end
 -- Omit the usual file extension so this file cannot be seen from the normal load and save screen and cannot be overwritten
@@ -1159,6 +1167,7 @@ function App:quickSave()
 end
 
 function App:load(filename)
+  print "loading"
   return LoadGameFile(self.savegame_dir .. filename)
 end
 
@@ -1172,8 +1181,68 @@ function App:quickLoad()
   end
 end
 
+function App:gamespeed(speed)
+  print "Changing speed"
+  if self.map then
+    return self.world:setSpeed(speed)
+  else
+    print "Trying to change gamespeed, but no map is loaded"
+  end
+end
+
+function App:tryAutoSave(filename)
+  print "Trying to Auto Save"
+  if self.map then
+    return SaveGameFile(self.savegame_dir .. filename)
+  else
+    print "Trying to save, but no map is loaded"
+  end
+end
+
+function App:showCheats()
+  print "Showing cheats menu"
+  self.ui:showCheatsWindow()
+end
+
+function App:updateConfig(newconfig)
+  print "New configuration!"
+  for k,v in pairs(newconfig) do print(k,v) end
+  
+ -- self.audio:setBackgroundVolume(newconfig["musicVol"])
+ -- self.audio:setSoundVolume(newconfig["sfxVol"])
+ -- self.audio:setAnnouncementVolume(newconfig["announcementsVol"])
+  
+  -- This is really inconsistent!
+  
+  self.audio:playSoundEffects(newconfig["playSoundFx"])
+  self.config.play_announcements = newconfig["playAnnouncements"]
+  
+  if newconfig["playMusic"] then
+  		local oldstate = self.config.play_music
+        self.config.play_music = true
+        
+        if not (oldstate == newconfig["playMusic"]) then
+        	self.audio:playRandomBackgroundTrack() -- play
+        end
+        
+      else
+        self.config.play_music = false
+        self.audio:stopBackgroundTrack() -- stop
+      end
+      
+  self.config.adviser_disabled = not newconfig["adviserEnabled"]
+  self.config.scroll_region_size = newconfig["edgeScrollSize"]
+  self.config.scroll_speed = newconfig["edgeScrollSpeed"]
+  self.config.prevent_edge_scrolling = not newconfig["edgeScroll"]
+   
+  self:saveConfig()
+end
+
+
+
 --! Restarts the current level (offers confirmation window first)
 function App:restart()
+  print "restarting"
   assert(self.map, "Trying to restart while no map is loaded.")
   self.ui:addWindow(UIConfirmDialog(self.ui, _S.confirmation.restart_level,
   --[[persistable:app_confirm_restart]] function()

@@ -639,6 +639,8 @@ function Button:handleClick(mouse_button)
   end
   if self.sound then
     self.ui:playSound(self.sound)
+    -- Play click vibration
+    startvibration(1)
   end
   local callback = mouse_button == "left" and self.on_click or self.on_rightclick
   if callback then
@@ -904,6 +906,7 @@ end
 function Textbox:setActive(active)
   local ui = self.panel.window.ui
   if active then
+	showkeyboard()
     -- Unselect any other textbox
     for _, textbox in ipairs(ui.textboxes) do
       if textbox ~= self and textbox.active then
@@ -919,6 +922,7 @@ function Textbox:setActive(active)
     -- Enable Keyboard repeat
     ui:enableKeyboardRepeat()
   else
+	hidekeyboard()
     self.cursor_state = false
     -- Disable Keyboard repeat
     ui:disableKeyboardRepeat()

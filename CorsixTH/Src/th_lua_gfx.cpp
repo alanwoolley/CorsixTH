@@ -579,15 +579,15 @@ static int l_surface_new(lua_State *L)
 #ifndef CORSIX_TH_USE_DX9_RENDERER
     if(SDL_WasInit(SDL_INIT_VIDEO))
     {
-        char *sTitle, *sIcon;
+        const char *sTitle, *sIcon;
         SDL_WM_GetCaption(&sTitle, &sIcon);
         if(sTitle) sTitle = strdup(sTitle);
         if(sIcon) sIcon = strdup(sIcon);
         SDL_QuitSubSystem(SDL_INIT_VIDEO);
         SDL_InitSubSystem(SDL_INIT_VIDEO);
         SDL_WM_SetCaption(sTitle, sIcon);
-        if(sTitle) free(sTitle);
-        if(sIcon) free(sIcon);
+        if(sTitle) free((void*)sTitle);
+        if(sIcon) free((void*)sIcon);
     }
 #endif
 
@@ -647,7 +647,12 @@ static int l_surface_nonoverlapping(lua_State *L)
 static int l_surface_set_blue_filter_active(lua_State *L)
 {
     THRenderTarget* pCanvas = luaT_testuserdata<THRenderTarget>(L);
-    pCanvas->setBlueFilterActive(lua_isnoneornil(L, 2) ? false : lua_toboolean(L, 2));
+    //pCanvas->setBlueFilterActive(lua_isnoneornil(L, 2) ? false : lua_toboolean(L, 2));
+	// Keep blue filter off for now. TODO - make this work properly
+
+	pCanvas->setBlueFilterActive(false);
+
+
     return 1;
 }
 

@@ -89,10 +89,14 @@ local config_defaults = {
  that can only be changed here.  Currently the player name is at the bottom of the list for the config
   as it this is where it always ends up when the file is recreated.
   for ease of reference I have also ordered the fields into the same order]]
+  scroll_region_size = 20,
+  scroll_speed = 15,
   fullscreen = false,
   width = 800,
   height = 600,
   language = [[English]],
+  theme_hospital_install = [[F:\ThemeHospital\hospital]],
+-- unicode_font
   audio = true,   
   free_build_mode = false,
   play_sounds = true, 
