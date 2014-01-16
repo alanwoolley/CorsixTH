@@ -92,6 +92,8 @@ function UI:initKeyAndButtonCodes()
     down = 274,
     right = 275,
     left = 276,
+    x = 120,
+    z = 122,
     f1 = 282,
     f2 = 283,
     f3 = 284,
@@ -878,6 +880,8 @@ function UI:makeScreenshot()
   local res, err = self.app.video:takeScreenshot(filename) -- Take screenshot
   if not res then
     print("Screenshot failed: " .. err)
+  else
+    self.app.audio:playSound("SNAPSHOT.WAV")
   end
 end
 
