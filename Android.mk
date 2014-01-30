@@ -73,7 +73,7 @@ LOCAL_SRC_FILES := $(SDL_PATH)/src/main/android/SDL_android_main.cpp \
 			$(LPEG_SRC)/lpeg.c
 			
 
-LOCAL_SHARED_LIBRARIES := libluajit libSDL libSDL_mixer libffmpeg
+LOCAL_SHARED_LIBRARIES := libLUA libSDL libSDL_mixer libffmpeg
 LOCAL_STATIC_LIBRARIES := libfreetype2 libSDL_gfx libAGG
 
 LOCAL_LDLIBS := -llog
