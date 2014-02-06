@@ -25,9 +25,15 @@ before_install:
  
 install:
  - cd $TRAVIS_BUILD_DIR
+ - mkdir fresh
  - cmake -DCMAKE_TOOLCHAIN_FILE=build_files/toolchain-mingw.cmake -DWITH_AUDIO=ON -DWITH_MOVIES=OFF -DSDL_LIBRARY="mingw32;~/libs/SDL-1.2.15/lib/libSDLmain.a;~/libs/SDL-1.2.15/lib/libSDL.dll.a;SDL;SDLmain" -DSDL_INCLUDE_DIR=~/libs/SDL-1.2.15/include/SDL -DSDLMAIN_LIBRARY=~/libs/SDL-1.2.15/lib/libSDLmain.a -DSDLMIXER_INCLUDE_DIR=~/libs/SDL_mixer-1.2.12/include -DSDLMIXER_LIBRARY=~/libs/SDL_mixer-1.2.12/include/ -DLUA_LIBRARY=~/libs/lua/lib/liblua.dll.a -DLUA_INCLUDE_DIR=~/libs/lua/include -DFREETYPE_INCLUDE_DIR_freetype2=~/libs/freetype/include/freetype2 -DFREETYPE_INCLUDE_DIR_ft2build=~/libs/freetype/include -DFREETYPE_LIBRARY=~/libs/freetype/lib/libfreetype.dll.a --build fresh --debug-output
+
+before_script:
  - cd fresh
- - make
+ 
+script: make
+
+after_script:
  - cat CMakeCache.txt
 
 
