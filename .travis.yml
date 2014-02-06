@@ -6,7 +6,7 @@ before_install:
  - mkdir ~/libs
  - cd ~/libs
  - wget http://ffmpeg.zeranoe.com/builds/win32/dev/ffmpeg-2.1.3-win32-dev.7z 
- - 7za x ffmpeg-2.1.3-win32-dev.7z
+ - /usr/bin/7za x ffmpeg-2.1.3-win32-dev.7z
  - mv ffmpeg-2.1.3-win32-dev ffmpeg-dev
  - wget http://mirror.ufs.ac.za/gnuwin32/freetype/2.3.5-1/freetype-2.3.5-1-lib.zip
  - unzip freetype-2.3.5-1-lib.zip -d freetype
@@ -17,7 +17,8 @@ before_install:
  
 install:
  - cd $TRAVIS_BUILD_DIR
- - cmake -DCMAKE_TOOLCHAIN_FILE=build_files/toolchain-mingw.cmake
+ - cmake -DCMAKE_TOOLCHAIN_FILE=build_files/toolchain-mingw.cmake 
+ 
 
  
  
