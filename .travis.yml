@@ -1,3 +1,5 @@
+language: cpp
+
 before_install:
  - sudo apt-get -qq update
  - sudo apt-get -qq install cmake p7zip-full build-essential libsdl1.2-dev libsdl-mixer1.2-dev libsdl-mixer1.2
@@ -23,7 +25,9 @@ before_install:
  
 install:
  - cd $TRAVIS_BUILD_DIR
- - cmake -DCMAKE_TOOLCHAIN_FILE=build_files/toolchain-mingw.cmake -DWITH_AUDIO=ON -DWITH_MOVIES=OFF -DSDL_LIBRARY="mingw32;~/libs/SDL-1.2.15/lib/libSDLmain.a;~/libs/SDL-1.2.15/lib/libSDL.dll.a;SDL;SDLmain" -DSDL_INCLUDE_DIR=~/libs/SDL-1.2.15/include/SDL -DSDLMAIN_LIBRARY=~/libs/SDL-1.2.15/lib/libSDLmain.a -DSDLMIXER_INCLUDE_DIR=~/libs/SDL_mixer-1.2.12/include -DSDLMIXER_LIBRARY=~/libs/SDL_mixer-1.2.12/include/ -DLUA_LIBRARY=~/libs/lua/lib/liblua.dll.a -DLUA_INCLUDE_DIR=~/libs/lua/include -DFREETYPE_INCLUDE_DIR_freetype2=~/libs/freetype/include/freetype2 -DFREETYPE_INCLUDE_DIR_ft2build=~/libs/freetype/include -DFREETYPE_LIBRARY=~/libs/freetype/lib/libfreetype.dll.a --debug-output
+ - cmake -DCMAKE_TOOLCHAIN_FILE=build_files/toolchain-mingw.cmake -DWITH_AUDIO=ON -DWITH_MOVIES=OFF -DSDL_LIBRARY="mingw32;~/libs/SDL-1.2.15/lib/libSDLmain.a;~/libs/SDL-1.2.15/lib/libSDL.dll.a;SDL;SDLmain" -DSDL_INCLUDE_DIR=~/libs/SDL-1.2.15/include/SDL -DSDLMAIN_LIBRARY=~/libs/SDL-1.2.15/lib/libSDLmain.a -DSDLMIXER_INCLUDE_DIR=~/libs/SDL_mixer-1.2.12/include -DSDLMIXER_LIBRARY=~/libs/SDL_mixer-1.2.12/include/ -DLUA_LIBRARY=~/libs/lua/lib/liblua.dll.a -DLUA_INCLUDE_DIR=~/libs/lua/include -DFREETYPE_INCLUDE_DIR_freetype2=~/libs/freetype/include/freetype2 -DFREETYPE_INCLUDE_DIR_ft2build=~/libs/freetype/include -DFREETYPE_LIBRARY=~/libs/freetype/lib/libfreetype.dll.a --build fresh --debug-output
+ - cd fresh
+ - make
  - cat CMakeCache.txt
 
 
