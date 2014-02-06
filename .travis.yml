@@ -10,9 +10,9 @@ before_install:
  - unzip freetype-2.3.5-1-lib.zip -d freetype
  - wget http://www.libsdl.org/release/SDL-devel-1.2.15-mingw32.tar.gz
  - tar xfz SDL-devel-1.2.15-mingw32.tar.gz
- - cp ~/libs/SDL-1.2.15/bin/* /usr/i586-mingw32msvc/bin/
- - cp -r ~/libs/SDL-1.2.15/include/SDL/* /usr/i586-mingw32msvc/include/
- - cp ~/libs/SDL-1.2.15/lib/* /usr/i586-mingw32msvc/lib/
+ - sudo cp ~/libs/SDL-1.2.15/bin/* /usr/i586-mingw32msvc/bin/
+ - sudo cp -r ~/libs/SDL-1.2.15/include/SDL/* /usr/i586-mingw32msvc/include/
+ - sudo cp ~/libs/SDL-1.2.15/lib/* /usr/i586-mingw32msvc/lib/
  - wget http://www.libsdl.org/projects/SDL_mixer/release/SDL_mixer-devel-1.2.12-VC.zip
  - unzip SDL_mixer-devel-1.2.12-VC.zip
  - mkdir lua
