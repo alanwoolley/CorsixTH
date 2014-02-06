@@ -10,6 +10,9 @@ before_install:
  - unzip freetype-2.3.5-1-lib.zip -d freetype
  - wget http://www.libsdl.org/release/SDL-devel-1.2.15-mingw32.tar.gz
  - tar xfz SDL-devel-1.2.15-mingw32.tar.gz
+ - cp ~/libs/SDL-1.2.15/bin/* /usr/i586-mingw32msvc/bin/
+ - cp -r ~/libs/SDL-1.2.15/include/SDL/* /usr/i586-mingw32msvc/include/
+ - cp ~/libs/SDL-1.2.15/lib/* /usr/i586-mingw32msvc/lib/
  - wget http://www.libsdl.org/projects/SDL_mixer/release/SDL_mixer-devel-1.2.12-VC.zip
  - unzip SDL_mixer-devel-1.2.12-VC.zip
  - mkdir lua
@@ -20,11 +23,9 @@ before_install:
  
 install:
  - cd $TRAVIS_BUILD_DIR
- - cmake -DCMAKE_TOOLCHAIN_FILE=build_files/toolchain-mingw.cmake -DWITH_AUDIO=ON -DWITH_MOVIES=OFF -DSDL_LIBRARY=~/libs/SDL-1.2.15/lib/libSDL.dll.a -DSDL_INCLUDE_DIR=~/libs/SDL-1.2.15/include/SDL -DSDLMAIN_LIBRARY=~/libs/SDL-1.2.15/lib/libSDLmain.a -DSDLMIXER_INCLUDE_DIR=~/libs/SDL_mixer-1.2.12/include -DSDLMIXER_LIBRARY=~/libs/SDL_mixer-1.2.12/include/ -DLUA_LIBRARY=~/libs/lua/lib/liblua.dll.a -DLUA_INCLUDE_DIR=~/libs/lua/include -DFREETYPE_INCLUDE_DIR_freetype2=~/libs/freetype/include/freetype2 -DFREETYPE_INCLUDE_DIR_ft2build=~/libs/freetype/include -DFREETYPE_LIBRARY=~/libs/freetype/lib/libfreetype.dll.a --debug-output
+ - cmake -DCMAKE_TOOLCHAIN_FILE=build_files/toolchain-mingw.cmake -DWITH_AUDIO=ON -DWITH_MOVIES=OFF -DSDL_LIBRARY="mingw32;~/libs/SDL-1.2.15/lib/libSDLmain.a;~/libs/SDL-1.2.15/lib/libSDL.dll.a;SDL;SDLmain" -DSDL_INCLUDE_DIR=~/libs/SDL-1.2.15/include/SDL -DSDLMAIN_LIBRARY=~/libs/SDL-1.2.15/lib/libSDLmain.a -DSDLMIXER_INCLUDE_DIR=~/libs/SDL_mixer-1.2.12/include -DSDLMIXER_LIBRARY=~/libs/SDL_mixer-1.2.12/include/ -DLUA_LIBRARY=~/libs/lua/lib/liblua.dll.a -DLUA_INCLUDE_DIR=~/libs/lua/include -DFREETYPE_INCLUDE_DIR_freetype2=~/libs/freetype/include/freetype2 -DFREETYPE_INCLUDE_DIR_ft2build=~/libs/freetype/include -DFREETYPE_LIBRARY=~/libs/freetype/lib/libfreetype.dll.a --debug-output
  - cat CMakeCache.txt
 
-env:
- - SDLDIR=~/libs/SDL-1.2.15
 
  
  
