@@ -29,10 +29,11 @@ before_install:
 after_success:
 - cp lib/SDL-1.2.15/bin/SDL.dll fresh/CorsixTH/
 - cp lib/SDL_mixer-1.2.12/lib/x86/SDL_mixer.dll fresh/CorsixTH/
-- cp -r CorsixTH/* fresh/CorsixTH/
-- cd fresh/CorsixTH/
+- cd CorsixTH/
+- cp -r * ../fresh/CorsixTH/
+- cd ../fresh/CorsixTH/
 - zip CTH-$TRAVIS_COMMIT.zip *
-- sshpass -p "$SCP_PASS" scp -p12349 cthbuilder@server2.armedpineapple.co.uk:/builds/ CTH-$TRAVIS_COMMIT.zip
+- sshpass -p "$SCP_PASS" scp -P12349 cthbuilder@server2.armedpineapple.co.uk:/builds/ CTH-$TRAVIS_COMMIT.zip
 - cat CMakeCache.txt
 install:
 - cd $TRAVIS_BUILD_DIR
