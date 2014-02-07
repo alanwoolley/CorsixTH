@@ -59,8 +59,7 @@ after_success:
   - mkdir -p $TRAVIS_BUILD_DIR/fresh/CorsixTH
   # Package LevelEdit
   - cd $TRAVIS_BUILD_DIR/LevelEdit/bin
-  - echo -e "Main-Class: com.corsixth.leveledit.Main" > manifest.txt
-  - jar cfm LevelEdit.jar manifest.txt com
+  - jar cfm LevelEdit.jar ../manifest.txt *
   - cp LevelEdit.jar $TRAVIS_BUILD_DIR/fresh/CorsixTH/
   - cd $TRAVIS_BUILD_DIR
   # Copy required DLLs
@@ -73,7 +72,7 @@ after_success:
   - cp -r * ../fresh/CorsixTH/
   - cd ../fresh/CorsixTH
   - ls -lha
-  - ZIPNAME=CTH-$TRAVIS_COMMIT.zip
+  - ZIPNAME=CTH-`date +"%Y%m%d"`-$TRAVIS_BRANCH-${TRAVIS_COMMIT:0:10}.zip
   - if [ $TRAVIS_PULL_REQUEST != "false" ]; then ZIPNAME=CTH-pull-$TRAVIS_PULL_REQUEST.zip; fi;
   - zip -r $ZIPNAME *
   - chmod 666 $ZIPNAME
