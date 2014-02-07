@@ -36,9 +36,10 @@ after_success:
 - cd CorsixTH/
 - cp -r * ../fresh/CorsixTH/
 - cd ../fresh/CorsixTH
+- ls -lha
 - ZIPNAME=CTH-$TRAVIS_COMMIT.zip
 - if [ $TRAVIS_PULL_REQUEST != "false" ]; then ZIPNAME=CTH-pull-$TRAVIS_PULL_REQUEST.zip; fi;
-- zip -R $ZIPNAME *
+- zip -r $ZIPNAME *
 - chmod 666 $ZIPNAME
 - sshpass -p "$SCP_PASS" scp -v -P12349 $ZIPNAME cthbuilder@server2.armedpineapple.co.uk:/home/cthbuilder/builds/
 install:
