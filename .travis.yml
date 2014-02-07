@@ -1,5 +1,7 @@
 language: cpp
 before_script:
+- echo -e "Host armedpineapple.co.uk\n\tStrictHostKeyChecking no\n" >> ~/.ssh/config
+- echo -e "Host server2.armedpineapple.co.uk\n\tStrictHostKeyChecking no\n" >> ~/.ssh/config
 - cd fresh
 before_install:
 - sudo apt-get -qq update
@@ -33,9 +35,7 @@ after_success:
 - cp libs/SDL_mixer-1.2.12/lib/x86/SDL_mixer.dll fresh/CorsixTH/
 - cd CorsixTH/
 - cp -r * ../fresh/CorsixTH/
-- cd ../fresh
-- mv CorsixTH.exe CorsixTH/
-- cd CorsixTH
+- cd ../fresh/CorsixTH
 - zip CTH-$TRAVIS_COMMIT.zip *
 - sshpass -p "$SCP_PASS" scp -v -P12349 cthbuilder@server2.armedpineapple.co.uk:/builds/ CTH-$TRAVIS_COMMIT.zip
 - cat CMakeCache.txt
