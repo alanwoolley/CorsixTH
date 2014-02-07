@@ -59,7 +59,7 @@ after_success:
   - mkdir -p $TRAVIS_BUILD_DIR/fresh/CorsixTH
   # Package LevelEdit
   - cd $TRAVIS_BUILD_DIR/LevelEdit/bin
-  - echo Main-Class: com.corsixth.leveledit.Main > manifest.txt
+  - echo "Main-Class: com.corsixth.leveledit.Main" > manifest.txt
   - jar cfm LevelEdit.jar manifest.txt com
   - cp LevelEdit.jar $TRAVIS_BUILD_DIR/fresh/CorsixTH/
   - cd $TRAVIS_BUILD_DIR
