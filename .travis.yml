@@ -73,7 +73,7 @@ after_success:
   - cd ../fresh/CorsixTH
   - ls -lha
   - ZIPNAME=CTH-`date +"%Y%m%d"`-$TRAVIS_BRANCH-${TRAVIS_COMMIT:0:10}.zip
-  - if [ $TRAVIS_PULL_REQUEST != "false" ]; then ZIPNAME=CTH-pull-$TRAVIS_PULL_REQUEST.zip; fi;
+  - if [ $TRAVIS_PULL_REQUEST != "false" ]; then ZIPNAME=CTH-pull-$TRAVIS_PULL_REQUEST-`date +"%Y%m%d"`-${TRAVIS_COMMIT:0:10}.zip; fi;
   - zip -r $ZIPNAME *
   - chmod 666 $ZIPNAME
   # Upload to server
