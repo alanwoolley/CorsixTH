@@ -13,7 +13,7 @@ before_install:
 - /usr/bin/7za x ffmpeg-2.1.3-win32-dev.7z
 - /usr/bin/7za x ffmpeg-2.1.3-win32-shared.7z
 - mv ffmpeg-2.1.3-win32-dev ffmpeg-dev
-- mv ffmpeg-2.1.3-win32-shared/* ffmpeg-dev/
+- mv ffmpeg-2.1.3-win32-shared ffmpeg-bin
 - wget http://mirror.ufs.ac.za/gnuwin32/freetype/2.3.5-1/freetype-2.3.5-1-lib.zip
 - unzip freetype-2.3.5-1-lib.zip -d freetype
 - wget http://www.libsdl.org/release/SDL-devel-1.2.15-mingw32.tar.gz
@@ -36,7 +36,7 @@ after_success:
 - mkdir -p fresh/CorsixTH
 - cp libs/SDL-1.2.15/bin/SDL.dll fresh/CorsixTH/
 - cp libs/SDL_mixer-1.2.12/lib/x86/SDL_mixer.dll fresh/CorsixTH/
-- cp libs/ffmpeg-dev/bin/*.dll fresh/CorsixTH/
+- cp libs/ffmpeg-bin/bin/*.dll fresh/CorsixTH/
 - cd CorsixTH/
 - cp -r * ../fresh/CorsixTH/
 - cd ../fresh/CorsixTH
