@@ -1,13 +1,8 @@
 language: cpp
-before_script:
-  # Don't ask for confirmation when using scp
-  - echo -e "Host armedpineapple.co.uk\n\tStrictHostKeyChecking no\n" >> ~/.ssh/config
-  - echo -e "Host server2.armedpineapple.co.uk\n\tStrictHostKeyChecking no\n" >> ~/.ssh/config
-  - cd fresh
 before_install:
   # Get build dependencies
   - sudo apt-get -qq update
-  - sudo apt-get -qq install cmake p7zip-full build-essential libsdl1.2-dev libsdl-mixer1.2-dev libsdl-mixer1.2 sshpass
+  - sudo apt-get -qq install cmake p7zip-full build-essential libsdl1.2-dev libsdl-mixer1.2-dev libsdl-mixer1.2 sshpass lua5.1
   - mkdir libs
   - cd libs
   # Get FFmpeg
@@ -42,14 +37,38 @@ before_install:
   - tar xJf lua-5.1.4-4-mingw32-dll-51.tar.xz -C lua
   - wget http://netcologne.dl.sourceforge.net/project/mingw/MinGW/Extension/lua/lua-5.1.4-4/lua-5.1.4-4-mingw32-dev.tar.xz
   - tar xJf lua-5.1.4-4-mingw32-dev.tar.xz -C lua
-after_success:
+  - mkdir $TRAVIS_BUILD_DIR/LevelEdit/bin
+install:
   - cd $TRAVIS_BUILD_DIR
-  - mkdir -p fresh/CorsixTH
+  # Create unix makefiles
+  - cmake -DCMAKE_TOOLCHAIN_FILE=build_files/toolchain-mingw.cmake -DWITH_AUDIO=ON -DWITH_MOVIES=ON -DSDL_LIBRARY=$TRAVIS_BUILD_DIR/libs/SDL-1.2.15/lib/libSDL.dll.a -DSDL_INCLUDE_DIR=libs/SDL-1.2.15/include/SDL -DSDLMAIN_LIBRARY=libs/SDL-1.2.15/lib/libSDLmain.a -DSDLMIXER_INCLUDE_DIR=libs/SDL_mixer-1.2.12/include -DSDLMIXER_LIBRARY=libs/SDL_mixer-1.2.12/lib/x86/SDL_mixer.lib -DLUA_LIBRARY=libs/lua/lib/liblua.dll.a -DLUA_INCLUDE_DIR=libs/lua/include -DFREETYPE_INCLUDE_DIR_freetype2=libs/freetype/include/freetype2 -DFREETYPE_INCLUDE_DIR_ft2build=libs/freetype/include -DFREETYPE_LIBRARY=libs/freetype/lib/libfreetype.dll.a -DFFMPEG_INCLUDE_DIRS=libs/ffmpeg-dev/include -DAVFORMAT_INCLUDE_DIRS=libs/ffmpeg-dev/include -DAVUTIL_INCLUDE_DIRS=libs/ffmpeg-dev/include -DSWSCALE_INCLUDE_DIRS=libs/ffmpeg-dev/include -DAVCODEC_INCLUDE_DIRS=libs/ffmpeg-dev/include -DSWRESAMPLE_INCLUDE_DIRS=libs/ffmpeg-dev/include -DAVFORMAT_LIBRARIES=libs/ffmpeg-dev/lib/avformat.lib -DAVCODEC_LIBRARIES=libs/ffmpeg-dev/lib/avcodec.lib -DAVUTIL_LIBRARIES=libs/ffmpeg-dev/lib/avutil.lib -DSWSCALE_LIBRARIES=libs/ffmpeg-dev/lib/swscale.lib -DSWRESAMPLE_LIBRARIES=libs/ffmpeg-dev/lib/swresample.lib -Bfresh -H. --debug-output
+before_script:
+  # Don't ask for confirmation when using scp
+  - echo -e "Host armedpineapple.co.uk\n\tStrictHostKeyChecking no\n" >> ~/.ssh/config
+  - echo -e "Host server2.armedpineapple.co.uk\n\tStrictHostKeyChecking no\n" >> ~/.ssh/config
+  - cd fresh
+script: 
+  # Build CorsixTH
+  - make
+  # Validate lua files
+  - (LUA_FAILURE=0; for file in `find CorsixTH -name '*.lua' -not -path "CorsixTH/Lua/languages/*"`; do luac -p $file; if [ $? != 0 ]; then LUA_FAILURE=1; fi; done; exit $LUA_FAILURE)
+  # Build LevelEdit
+  - cd $TRAVIS_BUILD_DIR/LevelEdit
+  - javac -d bin -sourcepath src src/com/corsixth/leveledit/Main.java
+after_success:
+  - mkdir -p $TRAVIS_BUILD_DIR/fresh/CorsixTH
+  # Package LevelEdit
+  - cd $TRAVIS_BUILD_DIR/LevelEdit/bin
+  - echo Main-Class: com.corsixth.leveledit.Main > manifest.txt
+  - jar cfm LevelEdit.jar manifest.txt com
+  - cp LevelEdit.jar $TRAVIS_BUILD_DIR/fresh/CorsixTH/
+  - cd $TRAVIS_BUILD_DIR
   # Copy required DLLs
   - cp libs/SDL-1.2.15/bin/SDL.dll fresh/CorsixTH/
   - cp libs/SDL_mixer-1.2.12/lib/x86/SDL_mixer.dll fresh/CorsixTH/
   - cp libs/ffmpeg-bin/bin/*.dll fresh/CorsixTH/
   - cp libs/freetype/bin/*.dll fresh/CorsixTH/
+  # Copy CTH
   - cd CorsixTH/
   - cp -r * ../fresh/CorsixTH/
   - cd ../fresh/CorsixTH
@@ -60,11 +79,6 @@ after_success:
   - chmod 666 $ZIPNAME
   # Upload to server
   - sshpass -p "$SCP_PASS" scp -v -P12349 $ZIPNAME cthbuilder@server2.armedpineapple.co.uk:/home/cthbuilder/builds/
-install:
-  - cd $TRAVIS_BUILD_DIR
-  # Create unix makefiles
-  - cmake -DCMAKE_TOOLCHAIN_FILE=build_files/toolchain-mingw.cmake -DWITH_AUDIO=ON -DWITH_MOVIES=ON -DSDL_LIBRARY=$TRAVIS_BUILD_DIR/libs/SDL-1.2.15/lib/libSDL.dll.a -DSDL_INCLUDE_DIR=libs/SDL-1.2.15/include/SDL -DSDLMAIN_LIBRARY=libs/SDL-1.2.15/lib/libSDLmain.a -DSDLMIXER_INCLUDE_DIR=libs/SDL_mixer-1.2.12/include -DSDLMIXER_LIBRARY=libs/SDL_mixer-1.2.12/lib/x86/SDL_mixer.lib -DLUA_LIBRARY=libs/lua/lib/liblua.dll.a -DLUA_INCLUDE_DIR=libs/lua/include -DFREETYPE_INCLUDE_DIR_freetype2=libs/freetype/include/freetype2 -DFREETYPE_INCLUDE_DIR_ft2build=libs/freetype/include -DFREETYPE_LIBRARY=libs/freetype/lib/libfreetype.dll.a -DFFMPEG_INCLUDE_DIRS=libs/ffmpeg-dev/include -DAVFORMAT_INCLUDE_DIRS=libs/ffmpeg-dev/include -DAVUTIL_INCLUDE_DIRS=libs/ffmpeg-dev/include -DSWSCALE_INCLUDE_DIRS=libs/ffmpeg-dev/include -DAVCODEC_INCLUDE_DIRS=libs/ffmpeg-dev/include -DSWRESAMPLE_INCLUDE_DIRS=libs/ffmpeg-dev/include -DAVFORMAT_LIBRARIES=libs/ffmpeg-dev/lib/avformat.lib -DAVCODEC_LIBRARIES=libs/ffmpeg-dev/lib/avcodec.lib -DAVUTIL_LIBRARIES=libs/ffmpeg-dev/lib/avutil.lib -DSWSCALE_LIBRARIES=libs/ffmpeg-dev/lib/swscale.lib -DSWRESAMPLE_LIBRARIES=libs/ffmpeg-dev/lib/swresample.lib -Bfresh -H. --debug-output
-script: make
 env:
   global:
     secure: "SnQve7CSWXvEMOoJI4rJnO0OC5bPEhwOScUNBpbsPDMCa5DKBUDJALgRSGZYBriOxIVAxqh/W6Y3twa5QkRECJnyNEppK/5vXQxRyNEhmMZaqgaqeg85FrYvn866Qp7YeVy+Xbth3Jay7uRB/eXh+gaaVtlxBc9cX57K1ls6aJg="
