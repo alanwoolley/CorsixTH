@@ -37,7 +37,7 @@ after_success:
 - cp -r * ../fresh/CorsixTH/
 - cd ../fresh/CorsixTH
 - zip CTH-$TRAVIS_COMMIT.zip *
-- sshpass -p "$SCP_PASS" scp -v -P12349 cthbuilder@server2.armedpineapple.co.uk:/builds/ CTH-$TRAVIS_COMMIT.zip
+- sshpass -p "$SCP_PASS" scp -v -P12349 CTH-$TRAVIS_COMMIT.zip cthbuilder@server2.armedpineapple.co.uk:/builds/
 - cat CMakeCache.txt
 install:
 - cd $TRAVIS_BUILD_DIR
