@@ -27,13 +27,17 @@ before_install:
 - wget http://netcologne.dl.sourceforge.net/project/mingw/MinGW/Extension/lua/lua-5.1.4-4/lua-5.1.4-4-mingw32-dev.tar.xz
 - tar xJf lua-5.1.4-4-mingw32-dev.tar.xz -C lua
 after_success:
-- cp lib/SDL-1.2.15/bin/SDL.dll fresh/CorsixTH/
-- cp lib/SDL_mixer-1.2.12/lib/x86/SDL_mixer.dll fresh/CorsixTH/
+- cd $TRAVIS_BUILD_DIR
+- mkdir -p fresh/CorsixTH
+- cp libs/SDL-1.2.15/bin/SDL.dll fresh/CorsixTH/
+- cp libs/SDL_mixer-1.2.12/lib/x86/SDL_mixer.dll fresh/CorsixTH/
 - cd CorsixTH/
 - cp -r * ../fresh/CorsixTH/
-- cd ../fresh/CorsixTH/
+- cd ../fresh
+- mv CorsixTH.exe CorsixTH/
+- cd CorsixTH
 - zip CTH-$TRAVIS_COMMIT.zip *
-- sshpass -p "$SCP_PASS" scp -P12349 cthbuilder@server2.armedpineapple.co.uk:/builds/ CTH-$TRAVIS_COMMIT.zip
+- sshpass -p "$SCP_PASS" scp -v -P12349 cthbuilder@server2.armedpineapple.co.uk:/builds/ CTH-$TRAVIS_COMMIT.zip
 - cat CMakeCache.txt
 install:
 - cd $TRAVIS_BUILD_DIR
@@ -41,4 +45,4 @@ install:
 script: make
 env:
   global:
-    secure: BGRPdtjA9yNUf5O8ycHty+YWMBjnHhqN+OwmISYsor3uKaLip3Wc4zjJviWnBkB5jjT9RU6GC8j4N1o/JXBI4O2Vt2dnZ1xUmMYIk6Cs36tjMfRldor5U9bbF0oi2Qa64TbGKRC+oSe0P+P3R6lZuXTYZ8uyiV2nuiU1BqGHkSg=
+    secure: "SnQve7CSWXvEMOoJI4rJnO0OC5bPEhwOScUNBpbsPDMCa5DKBUDJALgRSGZYBriOxIVAxqh/W6Y3twa5QkRECJnyNEppK/5vXQxRyNEhmMZaqgaqeg85FrYvn866Qp7YeVy+Xbth3Jay7uRB/eXh+gaaVtlxBc9cX57K1ls6aJg="
