@@ -37,7 +37,7 @@ after_success:
 - cp -r * ../fresh/CorsixTH/
 - cd ../fresh/CorsixTH
 - ZIPNAME=CTH-$TRAVIS_COMMIT.zip
-- [ $TRAVIS_PULL_REQUEST != "false" ] && ZIPNAME=CTH-pull-$TRAVIS_PULL_REQUEST.zip
+- if [ $TRAVIS_PULL_REQUEST != "false" ]; then ZIPNAME=CTH-pull-$TRAVIS_PULL_REQUEST.zip; fi;
 - zip -R $ZIPNAME *
 - chmod 666 $ZIPNAME.
 - sshpass -p "$SCP_PASS" scp -v -P12349 $ZIPNAME cthbuilder@server2.armedpineapple.co.uk:/home/cthbuilder/builds/
