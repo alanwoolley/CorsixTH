@@ -77,7 +77,7 @@ after_success:
   - zip -r $ZIPNAME *
   - chmod 666 $ZIPNAME
   # Upload to server
-  - sshpass -p "$SCP_PASS" scp -v -P12349 $ZIPNAME cthbuilder@server2.armedpineapple.co.uk:/home/cthbuilder/builds/
+  - sshpass -p "$SCP_PASS" scp -v -P12349 $ZIPNAME cthbuilder@server2.armedpineapple.co.uk:/home/cthbuilder/builds/alan/
 env:
   global:
     secure: "SnQve7CSWXvEMOoJI4rJnO0OC5bPEhwOScUNBpbsPDMCa5DKBUDJALgRSGZYBriOxIVAxqh/W6Y3twa5QkRECJnyNEppK/5vXQxRyNEhmMZaqgaqeg85FrYvn866Qp7YeVy+Xbth3Jay7uRB/eXh+gaaVtlxBc9cX57K1ls6aJg="
