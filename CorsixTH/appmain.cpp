@@ -92,14 +92,18 @@ static int showsettingsdialog(lua_State *L) {
 
 static int startvibration(lua_State *L) {
     LOG_INFO("Starting Vibration");
-    int arg = lua_gettop(L);
-    int vibrationCode = lua_tointeger(L, arg);
-    return sendCommandInt(jvm, COMMAND_START_VIBRATION, vibrationCode);
+    if (masterConfig.vibrate == 1) {
+        int arg = lua_gettop(L);
+        int vibrationCode = lua_tointeger(L, arg);
+        return sendCommandInt(jvm, COMMAND_START_VIBRATION, vibrationCode);
+    }
 }
 
 static int stopvibration(lua_State *L) {
     LOG_INFO("Stopping Vibration");
-    return sendCommand(jvm, COMMAND_STOP_VIBRATION);
+    if (masterConfig.vibrate == 1) {
+        return sendCommand(jvm, COMMAND_STOP_VIBRATION);
+    }
 }
 static int gamespeedupdated(lua_State *L) {
 	LOG_INFO("Game speed updated");
@@ -225,6 +229,8 @@ void populateConfiguration(JNIEnv* env, jobject configuration) {
 			env->GetMethodID(configclass, "getAdviser", "()Z"));
 	jboolean edgeScrollEnabled = env->CallBooleanMethod(configuration,
 			env->GetMethodID(configclass, "getEdgeScroll", "()Z"));
+	jboolean vibrate = env->CallBooleanMethod(configuration,
+	        env->GetMethodID(configclass, "getHaptic", "()Z"));
 
 	masterConfig.cthPath = (char*) env->GetStringUTFChars(cthpath, 0);
 	masterConfig.originalFilesPath = (char*) env->GetStringUTFChars(
@@ -240,6 +246,7 @@ void populateConfiguration(JNIEnv* env, jobject configuration) {
 	masterConfig.edgeScrollSize = (int) edgeBordersSize;
 	masterConfig.edgeScrollSpeed = (int) edgeScrollSpeed;
 	masterConfig.controlsMode = (Configuration::controls_mode) controlsMode;
+	masterConfig.vibrate = (unsigned char) vibrate;
 	LOG_INFO("Done");
 }
 

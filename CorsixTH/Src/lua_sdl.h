@@ -56,7 +56,7 @@ typedef struct {
 		NORMAL = 1, DESKTOP = 2, TOUCHPAD = 3
 	} controlsMode;
 	unsigned char playSoundFx, playMusic, playAnnouncements, adviserEnabled,
-			edgeScroll;
+			edgeScroll, vibrate;
 	char* originalFilesPath, *cthPath, *language;
 } Configuration;
 
