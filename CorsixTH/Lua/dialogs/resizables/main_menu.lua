@@ -29,7 +29,7 @@ local col_bg = {
 
 function UIMainMenu:UIMainMenu(ui)
   self:UIResizable(ui, 280, 445, col_bg)
-  
+
   local app = ui.app
   self.esc_closes = false
   self.modal_class = "main menu"
@@ -39,7 +39,7 @@ function UIMainMenu:UIMainMenu(ui)
   -- The main menu also shows the version number of the player's copy of the game.
   self.label_font = TheApp.gfx:loadFont("QData", "Font01V")
   self.version_number = TheApp:getVersion()
-  
+
   -- individual buttons
   self.default_button_sound = "selectx.wav"
   self:addBevelPanel(20, 20, 240, 60, col_bg):setLabel(_S.main_menu.new_game):makeButton(0, 0, 240, 60, nil, self.buttonNewGame):setTooltip(_S.tooltip.main_menu.new_game)
@@ -82,6 +82,71 @@ function UIMainMenu:buttonCustomGame()
   else
     local window = UICustomGame(self.ui)
     self.ui:addWindow(window)
+  end
+end
+
+function UIMainMenu:buttonContinueGame()
+  local save_dir_treenode = FileTreeNode(self.ui.app.savegame_dir)
+  save_dir_treenode:checkForChildren()
+  save_dir_treenode:reSortChildren("date", "descending")
+  local auto_save_dir_treenode = save_dir_treenode:getChildByIndex(1)
+  local auto_save_dir_exists = false
+  
+  if auto_save_dir_treenode then
+    auto_save_dir_exists = auto_save_dir_treenode:getLabel() == "Autosaves"
+  end
+
+  if save_dir_treenode:hasChildren() then
+    -- 1. Get latest saved game:
+    local latest_save_dir_game = nil
+    local name = nil
+    
+    if auto_save_dir_exists then
+      latest_save_dir_game = save_dir_treenode:getChildByIndex(2)
+    else
+      latest_save_dir_game = save_dir_treenode:getChildByIndex(1)
+    end
+
+    if latest_save_dir_game then
+      name = latest_save_dir_game:getLabel()
+    end
+  
+    --2. If the auto save folder has the latest saved game:
+    if auto_save_dir_exists then
+      auto_save_dir_treenode:checkForChildren()
+      if auto_save_dir_treenode:hasChildren() then
+        auto_save_dir_treenode:reSortChildren("date", "descending")
+        local pathsep = package.config:sub(1, 1)
+        local latest_auto_save = auto_save_dir_treenode:getChildByIndex(1)
+        if latest_save_dir_game then
+          if tonumber(lfs.attributes(latest_auto_save.path, "modification")) > tonumber(lfs.attributes(latest_save_dir_game.path, "modification")) then
+            name = pathsep .. "Autosaves" .. pathsep .. latest_auto_save:getLabel()
+          end
+        else
+          name = pathsep .. "Autosaves" .. pathsep .. latest_auto_save:getLabel()  
+        end
+      end
+    end
+  
+    if name then
+      --3. Try to load the latest saved game:
+      local app = self.ui.app
+
+      local status, err = pcall(app.load, app, name)
+      if not status then
+        err = _S.errors.load_prefix .. err
+        print(err)
+        app.ui:addWindow(UIInformation(self.ui, {err}))
+      end
+    else  
+      local error = _S.errors.load_prefix .. _S.errors.no_games_to_contine
+      print(error)
+      self.ui.app.ui:addWindow(UIInformation(self.ui, {error}))    
+    end
+  else
+    local error = _S.errors.load_prefix .. _S.errors.no_games_to_contine
+    print(error)
+    self.ui.app.ui:addWindow(UIInformation(self.ui, {error}))  
   end
 end
 

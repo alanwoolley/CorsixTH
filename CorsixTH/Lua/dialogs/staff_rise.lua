@@ -78,11 +78,11 @@ function UIStaffRise:UIStaffRise(ui, staff, rise_amount)
   self:makeTooltip(_S.tooltip.staff_window.face, 96, 44, 168, 125)
   self:makeTooltip(_S.tooltip.staff_window.salary, 14, 171, 168, 193)
   self:makeTooltip(_S.tooltip.staff_window.ability, 12, 213, 89, 243)
-  
+
   if profile.humanoid_class == "Doctor" then
     self:makeTooltip(_S.tooltip.staff_window.doctor_seniority, 89, 197, 168, 243)
     self:makeTooltip(_S.tooltip.staff_window.skills, 14, 132, 47, 166)
-    
+
     -- NB: should be sufficient here to check only once, not make a dynamic tooltip
     if profile.is_surgeon >= 1.0 then
       self:makeTooltip(_S.tooltip.staff_window.surgeon, 72, 133, 87, 164)
@@ -170,6 +170,10 @@ function UIStaffRise:fireStaff()
   self.staff.message_callback = nil
   self.staff:fire()
   self:close()
+  local world = self.ui.app.world
+  if world and world:isCurrentSpeed("Pause") then
+    world:setSpeed(world.prev_speed)
+  end
 end
 
 function UIStaffRise:increaseSalary()
@@ -177,5 +181,8 @@ function UIStaffRise:increaseSalary()
   self.staff:increaseWage(self.rise_amount)
   self.staff.quitting_in = nil
   self:close()
+  local world = self.ui.app.world
+  if world and world:isCurrentSpeed("Pause") then
+    world:setSpeed(world.prev_speed)
+  end
 end
-

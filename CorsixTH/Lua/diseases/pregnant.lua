@@ -19,7 +19,7 @@ SOFTWARE. --]]
 local disease = {}
 disease.id = "pregnant"
 disease.expertise_id = 14
-disease.non_visuals_id = 19
+disease.visuals_id = 12
 disease.name = _S.diseases.pregnancy.name
 disease.cause = _S.diseases.pregnancy.cause
 disease.symptoms = _S.diseases.pregnancy.symptoms
@@ -47,7 +47,7 @@ disease.diagnosis_rooms = {
   "blood_machine",
   "x_ray",
   "psych",
-  "ward", 
+  "ward",
 }
 
 -- Treatment rooms are the rooms which must be visited, in the given order, to

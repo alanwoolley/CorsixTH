@@ -1,4 +1,4 @@
---[[ Copyright (c) 2009 Manuel König
+--[[ Copyright (c) 2009 Manuel KÃ¶nig
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of
 this software and associated documentation files (the "Software"), to deal in
@@ -78,7 +78,7 @@ object.orientations = {
   },
   east = {
     render_attach_position = { {0, 0}, {1, 0}, {-1, 1} },
-    footprint = { {-1, -1, complete_cell = true}, {0, -1, only_passable = true, need_north_side = true}, 
+    footprint = { {-1, -1, complete_cell = true}, {0, -1, only_passable = true, need_north_side = true},
                   {1, -1, only_passable = true, need_north_side = true},
                   {-1, 0, complete_cell = true}, {0, 0}, {1, 0, only_passable = true},
                   {-1, 1, only_passable = true, complete_cell = true}, {0, 1, only_passable = true} },
