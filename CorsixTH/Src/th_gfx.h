@@ -35,15 +35,9 @@ enum THScaledItems
     THSI_All = 3,
 };
 
-#include "th_gfx_dx9.h"
-#include "th_gfx_ogl.h"
 #include "th_gfx_sdl.h"
 #include "th_gfx_font.h"
 #include <stddef.h>
-
-#ifndef CORSIX_TH_HAS_RENDERING_ENGINE
-#error No rendering engine enabled in config file
-#endif
 
 void IntersectTHClipRect(THClipRect& rcClip,const THClipRect& rcIntersect);
 
@@ -90,12 +84,9 @@ struct THRenderTargetCreationParams
     int iHeight;
     int iBPP;
     uint32_t iSDLFlags;
-    bool bHardware;
-    bool bDoubleBuffered;
     bool bFullscreen;
     bool bPresentImmediate;
     bool bReuseContext;
-    bool bOpenGL;
 };
 
 /*!

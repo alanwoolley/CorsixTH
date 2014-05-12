@@ -88,6 +88,21 @@ static int l_rawbitmap_load(lua_State *L)
     return 1;
 }
 
+static int l_rawbitmap_load_colour(lua_State *L)
+{
+    THRawBitmap* pBitmap = luaT_testuserdata<THRawBitmap>(L);
+    size_t iDataLen;
+    const unsigned char* pData = luaT_checkfile(L, 2, &iDataLen);
+    THRenderTarget* pSurface = luaT_testuserdata<THRenderTarget>(L, 3, luaT_upvalueindex(1), false);
+
+    if(pBitmap->loadFullColour(pData, iDataLen, pSurface))
+        lua_pushboolean(L, 1);
+    else
+        lua_pushboolean(L, 0);
+
+    return 1;
+}
+
 static int l_rawbitmap_draw(lua_State *L)
 {
     THRawBitmap* pBitmap = luaT_testuserdata<THRawBitmap>(L);
@@ -133,6 +148,21 @@ static int l_spritesheet_load(lua_State *L)
     THRenderTarget* pSurface = luaT_testuserdata<THRenderTarget>(L, 5, luaT_upvalueindex(1), false);
 
     if(pSheet->loadFromTHFile(pDataTable, iDataLenTable, pDataChunk, iDataLenChunk, bComplex, pSurface))
+        lua_pushboolean(L, 1);
+    else
+        lua_pushboolean(L, 0);
+
+    return 1;
+}
+
+static int l_spritesheet_load_colour(lua_State *L)
+{
+    THSpriteSheet* pSheet = luaT_testuserdata<THSpriteSheet>(L);
+    size_t iDataLen;
+    const unsigned char* pData = luaT_checkfile(L, 2, &iDataLen);
+    THRenderTarget* pSurface = luaT_testuserdata<THRenderTarget>(L, 3, luaT_upvalueindex(1), false);
+
+    if(pSheet->loadFullColour(pData, iDataLen, pSurface))
         lua_pushboolean(L, 1);
     else
         lua_pushboolean(L, 0);
@@ -550,12 +580,9 @@ static int l_surface_new(lua_State *L)
     else
         oParams.iBPP = 0;
     oParams.iSDLFlags = 0;
-    oParams.bHardware = false;
-    oParams.bDoubleBuffered = false;
     oParams.bFullscreen = false;
     oParams.bPresentImmediate = false;
     oParams.bReuseContext = false;
-    oParams.bOpenGL = false;
 
 #define FLAG(name, field, flag) \
     else if(stricmp(sOption, name) == 0) \
@@ -566,30 +593,12 @@ static int l_surface_new(lua_State *L)
         const char* sOption = luaL_checkstring(L, iArg);
         if(sOption[0] == 0)
             continue;
-        FLAG("hardware"         , bHardware        , SDL_HWSURFACE );
-        FLAG("doublebuf"        , bDoubleBuffered  , SDL_DOUBLEBUF );
-        FLAG("fullscreen"       , bFullscreen      , SDL_FULLSCREEN);
-        FLAG("present immediate", bPresentImmediate, 0             );
-        FLAG("reuse context"    , bReuseContext    , 0             );
-        FLAG("opengl"           , bOpenGL          , SDL_OPENGL    );
+        FLAG("fullscreen",          bFullscreen,        SDL_WINDOW_FULLSCREEN_DESKTOP   );
+        FLAG("present immediate",   bPresentImmediate,  0                               );
+        FLAG("reuse context",       bReuseContext,      0                               );
     }
 
 #undef FLAG
-
-#ifndef CORSIX_TH_USE_DX9_RENDERER
-    if(SDL_WasInit(SDL_INIT_VIDEO))
-    {
-        const char *sTitle, *sIcon;
-        SDL_WM_GetCaption(&sTitle, &sIcon);
-        if(sTitle) sTitle = strdup(sTitle);
-        if(sIcon) sIcon = strdup(sIcon);
-        SDL_QuitSubSystem(SDL_INIT_VIDEO);
-        SDL_InitSubSystem(SDL_INIT_VIDEO);
-        SDL_WM_SetCaption(sTitle, sIcon);
-        if(sTitle) free((void*)sTitle);
-        if(sIcon) free((void*)sIcon);
-    }
-#endif
 
     THRenderTarget* pCanvas = luaT_stdnew<THRenderTarget>(L);
     if(pCanvas->create(&oParams))
@@ -750,6 +759,22 @@ static int l_surface_scale(lua_State *L)
     return 1;
 }
 
+static int l_surface_set_caption(lua_State *L)
+{
+    THRenderTarget* pCanvas = luaT_testuserdata<THRenderTarget>(L);
+    pCanvas->setCaption(luaL_checkstring(L, 2));
+
+    lua_settop(L, 1);
+    return 1;
+}
+
+static int l_surface_get_renderer_details(lua_State *L)
+{
+    THRenderTarget* pCanvas = luaT_testuserdata<THRenderTarget>(L);
+    lua_pushstring(L, pCanvas->getRendererDetails());
+    return 1;
+}
+
 static int l_line_new(lua_State *L)
 {
     luaT_stdnew<THLine>(L);
@@ -833,6 +858,7 @@ void THLuaRegisterGfx(const THLuaRegisterState_t *pState)
     // Raw bitmap
     luaT_class(THRawBitmap, l_rawbitmap_new, "bitmap", MT_Bitmap);
     luaT_setfunction(l_rawbitmap_load, "load", MT_Surface);
+    luaT_setfunction(l_rawbitmap_load_colour, "loadCustom", MT_Surface);
     luaT_setfunction(l_rawbitmap_set_pal, "setPalette", MT_Palette);
     luaT_setfunction(l_rawbitmap_draw, "draw", MT_Surface);
     luaT_endclass();
@@ -841,6 +867,7 @@ void THLuaRegisterGfx(const THLuaRegisterState_t *pState)
     luaT_class(THSpriteSheet, l_spritesheet_new, "sheet", MT_Sheet);
     luaT_setmetamethod(l_spritesheet_count, "len");
     luaT_setfunction(l_spritesheet_load, "load", MT_Surface);
+    luaT_setfunction(l_spritesheet_load_colour, "loadCustom", MT_Surface);
     luaT_setfunction(l_spritesheet_set_pal, "setPalette", MT_Palette);
     luaT_setfunction(l_spritesheet_size, "size");
     luaT_setfunction(l_spritesheet_draw, "draw", MT_Surface);
@@ -902,6 +929,8 @@ void THLuaRegisterGfx(const THLuaRegisterState_t *pState)
     luaT_setfunction(l_surface_set_clip, "setClip");
     luaT_setfunction(l_surface_screenshot, "takeScreenshot");
     luaT_setfunction(l_surface_scale, "scale");
+    luaT_setfunction(l_surface_set_caption, "setCaption");
+    luaT_setfunction(l_surface_get_renderer_details, "getRendererDetails");
     luaT_endclass();
 
     // Line
