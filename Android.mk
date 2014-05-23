@@ -37,8 +37,7 @@ LOCAL_C_INCLUDES := $(LOCAL_PATH)/$(SDL_PATH)/include \
 LOCAL_CFLAGS := -DPLAY_MOD 
 
 # Add your application source files here...
-LOCAL_SRC_FILES := $(SDL_PATH)/src/main/android/SDL_android_main.cpp \
-			$(CORSIX_TH_SRC)/../appmain.cpp \
+LOCAL_SRC_FILES := $(CORSIX_TH_SRC)/../appmain.cpp \
 			$(CORSIX_TH_SRC)/../logging.cpp \
 			$(CORSIX_TH_SRC)/../commands.cpp \
 			$(CORSIX_TH_SRC)/main.cpp \
@@ -73,8 +72,8 @@ LOCAL_SRC_FILES := $(SDL_PATH)/src/main/android/SDL_android_main.cpp \
 			$(LPEG_SRC)/lpeg.c
 			
 
-LOCAL_SHARED_LIBRARIES := libLUA libSDL libSDL_mixer libffmpeg
-LOCAL_STATIC_LIBRARIES := libfreetype2 libSDL_gfx libAGG
+LOCAL_SHARED_LIBRARIES := libLUA SDL2 SDL2_mixer libffmpeg
+LOCAL_STATIC_LIBRARIES := libfreetype2 libSDL2_gfx
 
 LOCAL_LDLIBS := -llog
 

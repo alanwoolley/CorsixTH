@@ -23,7 +23,7 @@ SOFTWARE.
 #include "config.h"
 #include "lua_sdl.h"
 #include "th_lua.h"
-#include "SDL_framerate.h"
+#include "SDL2_framerate.h"
 #include <string.h>
 #include "../logging.h"
 #ifndef _MSC_VER
