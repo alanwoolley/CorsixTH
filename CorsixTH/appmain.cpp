@@ -92,9 +92,10 @@ static int showsettingsdialog(lua_State *L) {
 
 static int startvibration(lua_State *L) {
     LOG_INFO("Starting Vibration");
+    int arg = lua_gettop(L);
+    int vibrationCode = lua_tointeger(L, arg);
+
     if (masterConfig.vibrate == 1) {
-        int arg = lua_gettop(L);
-        int vibrationCode = lua_tointeger(L, arg);
         return sendCommandInt(jvm, COMMAND_START_VIBRATION, vibrationCode);
     }
 }
