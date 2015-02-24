@@ -98,14 +98,19 @@ static int startvibration(lua_State *L) {
     if (masterConfig.vibrate == 1) {
         return sendCommandInt(jvm, COMMAND_START_VIBRATION, vibrationCode);
     }
+    return 0;
 }
 
 static int stopvibration(lua_State *L) {
     LOG_INFO("Stopping Vibration");
+
     if (masterConfig.vibrate == 1) {
         return sendCommand(jvm, COMMAND_STOP_VIBRATION);
     }
+    LOG_INFO("Stopped Vibration");
+    return 0;
 }
+
 static int gamespeedupdated(lua_State *L) {
 	LOG_INFO("Game speed updated");
 	int arg = lua_gettop(L);
