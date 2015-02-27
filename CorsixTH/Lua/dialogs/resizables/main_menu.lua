@@ -45,12 +45,10 @@ function UIMainMenu:UIMainMenu(ui)
   self:addBevelPanel(20, 20, 240, 60, col_bg):setLabel(_S.main_menu.new_game):makeButton(0, 0, 240, 60, nil, self.buttonNewGame):setTooltip(_S.tooltip.main_menu.new_game)
   self:addBevelPanel(20, 85, 240, 60, col_bg):setLabel(_S.main_menu.custom_level):makeButton(0, 0, 240, 60, nil, self.buttonCustomGame):setTooltip(_S.tooltip.main_menu.custom_level)
   self:addBevelPanel(20, 150, 240, 60, col_bg):setLabel(_S.main_menu.load_game):makeButton(0, 0, 240, 60, nil, self.buttonLoadGame):setTooltip(_S.tooltip.main_menu.load_game)  
-  self:addBevelPanel(20, 280, 240, 60, col_bg):setLabel("Settings"):makeButton(0, 0, 240, 60, nil, self.buttonSettings):setTooltip("Settings")
-  self:addBevelPanel(20, 110, 160, 40, col_bg):setLabel(_S.main_menu.continue):makeButton(0, 0, 160, 40, nil, self.buttonContinueGame):setTooltip(_S.tooltip.main_menu.continue)
-  self:addBevelPanel(20, 200, 160, 40, col_bg):setLabel(_S.main_menu.options):makeButton(0, 0, 160, 40, nil, self.buttonOptions):setTooltip(_S.tooltip.main_menu.options)
-  self:addBevelPanel(20, 265, 160, 40, col_bg):setLabel(_S.main_menu.exit):makeButton(0, 0, 160, 40, nil, self.buttonExit):setTooltip(_S.tooltip.main_menu.exit)
-  
-  self:addBevelPanel(20, 360, 240, 60, col_bg):setLabel(_S.main_menu.exit):makeButton(0, 0, 240, 60, nil, self.buttonExit):setTooltip(_S.tooltip.main_menu.exit)
+  -- self:addBevelPanel(20, 280, 240, 60, col_bg):setLabel("Settings"):makeButton(0, 0, 240, 60, nil, self.buttonSettings):setTooltip("Settings")
+  self:addBevelPanel(20, 215, 240, 60, col_bg):setLabel(_S.main_menu.continue):makeButton(0, 0, 240, 60, nil, self.buttonContinueGame):setTooltip(_S.tooltip.main_menu.continue)
+  self:addBevelPanel(20, 280, 240, 60, col_bg):setLabel(_S.main_menu.options):makeButton(0, 0, 240, 60, nil, self.buttonSettings):setTooltip(_S.tooltip.main_menu.options)
+  self:addBevelPanel(20, 345, 240, 60, col_bg):setLabel(_S.main_menu.exit):makeButton(0, 0, 240, 60, nil, self.buttonExit):setTooltip(_S.tooltip.main_menu.exit)
 end
 
 function UIMainMenu:getSavedWindowPositionName()
