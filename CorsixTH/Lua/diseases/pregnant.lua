@@ -19,7 +19,7 @@ SOFTWARE. --]]
 local disease = {}
 disease.id = "pregnant"
 disease.expertise_id = 14
-disease.non_visuals_id = 19
+disease.visuals_id = 12
 disease.name = _S.diseases.pregnancy.name
 disease.cause = _S.diseases.pregnancy.cause
 disease.symptoms = _S.diseases.pregnancy.symptoms
@@ -27,6 +27,7 @@ disease.cure = _S.diseases.pregnancy.cure
 disease.cure_price = 200
 disease.emergency_sound = "emerg021.wav"
 disease.emergency_number = 8
+disease.contagious = false
 disease.initPatient = function(patient)
   patient:setType("Standard Female Patient")
   patient:setLayer(0, math.random(1, 4) * 2)
@@ -47,7 +48,7 @@ disease.diagnosis_rooms = {
   "blood_machine",
   "x_ray",
   "psych",
-  "ward", 
+  "ward",
 }
 
 -- Treatment rooms are the rooms which must be visited, in the given order, to

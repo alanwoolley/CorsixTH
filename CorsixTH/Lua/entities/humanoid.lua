@@ -55,10 +55,21 @@ local function anims(name, walkN, walkE, idleN, idleE, doorL, doorE, knockN, kno
   }
 end
 
-local function die_anims(name, fall, rise, wings, hands, fly, extra)
+---
+-- @param name The name of the patient class these death animations are for.
+-- @param fall The patient's fall animation.
+-- @param rise The transparent getting up animation for heaven death patients who have been lying dead on the ground.
+-- @param rise_hell The opaque getting up animation for hell death patients who have been lying dead on the ground.
+-- @param wings The heaven death animation in which the patient's wings appear.
+-- @param hands The heaven death animation which occurs after the wings animation when the patient puts their hands together.
+-- @param fly The heaven death animation which makes patients fly upwards to heaven.
+-- @param extra Dead untreated patients who don't transform before falling over use this animation afterwards to transform into a standard male/female.
+---
+local function die_anims(name, fall, rise, rise_hell, wings, hands, fly, extra)
   die_animations[name] = {
     fall_east = fall,
     rise_east = rise,
+    rise_hell_east = rise_hell,
     wings_east = wings,
     hands_east = hands,
     fly_east = fly,
@@ -103,7 +114,7 @@ anims("Standard Male Patient",       16,   18,   24,   26,  182,  184,   286,   
 anims("Gowned Male Patient",        406,  408,  414,  416)                           -- 0-10
 anims("Stripped Male Patient",      818,  820,  826,  828)                           -- 0-16
 anims("Stripped Male Patient 2",      818,  820,  826,  828)                           -- 0-16
-anims("Stripped Male Patient 3",      818,  820,  826,  828)    
+anims("Stripped Male Patient 3",      818,  820,  826,  828)
 anims("Alternate Male Patient",    2704, 2706, 2712, 2714, 2748, 2750,  2764,  2766) -- 0-10, ABC
 anims("Slack Male Patient",        1484, 1486, 1492, 1494, 1524, 1526,  2764,  1494) -- 0-14, ABC
 anims("Slack Female Patient",         0,    2,    8,   10,  258,  260,   294,   296,  2864,  2866) -- 0-16, ABC
@@ -112,7 +123,7 @@ anims("Standard Female Patient",      0,    2,    8,   10,  258,  260,   294,   
 anims("Gowned Female Patient",     2876, 2878, 2884, 2886)                           -- 0-8
 anims("Stripped Female Patient",    834,  836,  842,  844)                           -- 0-16
 anims("Stripped Female Patient 2",    834,  836,  842,  844)                           -- 0-16
-anims("Stripped Female Patient 3",    834,  836,  842,  844)    
+anims("Stripped Female Patient 3",    834,  836,  842,  844)
 anims("Transparent Female Patient",3012, 3014, 3020, 3022, 3052, 3054,  3068,  3070) -- 0-8, ABC
 anims("Chewbacca Patient",          858,  860,  866,  868, 3526, 3528,  4150,  4152)
 anims("Elvis Patient",              978,  980,  986,  988, 3634, 3636,  4868,  4870)
@@ -125,24 +136,25 @@ anims("Nurse",                     1206, 1208, 1650, 1652, 3264, 3266,   nil,   
 anims("Handyman",                  1858, 1860, 1866, 1868, 3286, 3288,   nil,   nil, 3518,  3520)
 anims("Receptionist",              3668, 3670, 3676, 3678) -- Could do with door animations
 anims("VIP",                        266,  268,  274,  276)
+anims("Inspector",                  266,  268,  274,  276)
 anims("Grim Reaper",                994,  996, 1002, 1004)
 
 --  | Die Animations                 |
---  | Name                           |FallE|RiseE|WingsE|HandsE|FlyE|ExtraE| Notes
-----+--------------------------------+-----+-----+-----+-----+------+------+
-die_anims("Standard Male Patient",     1682, 2434, 2438, 2446,  2450) -- Always facing east or south
-die_anims("Alternate Male Patient",    1682, 2434, 2438, 2446,  2450)
-die_anims("Slack Male Patient",        1682, 2434, 2438, 2446,  2450)
+--  | Name                           |FallE|RiseE|RiseE Hell|WingsE|HandsE|FlyE|ExtraE| Notes 2248
+----+--------------------------------+-----+-----+----------+-----+------+-----+------
+die_anims("Standard Male Patient",     1682, 2434,       384, 2438,  2446, 2450) -- Always facing east or south
+die_anims("Alternate Male Patient",    1682, 2434,      3404, 2438,  2446, 2450)
+die_anims("Slack Male Patient",        1682, 2434,       384, 2438,  2446, 2450)
 -- TODO: Where is slack male transformation? Uses alternate male for now.
-die_anims("Transparent Male Patient",  4412, 2434, 2438, 2446,  2450,  4416) -- Extra = Transformation
-die_anims("Standard Female Patient",   3116, 3208, 3212, 3216,  3220)
-die_anims("Slack Female Patient",      4288, 3208, 3212, 3216,  3220)
-die_anims("Transparent Female Patient",4420, 3208, 3212, 3216,  3220,  4428) -- Extra = Transformation
-die_anims("Chewbacca Patient",         4182, 2434, 2438, 2446,  2450) -- Only males die... (1222 is the Female)
-die_anims("Elvis Patient",              974, 2434, 2438, 2446,  2450,  4186) -- Extra = Transformation
-die_anims("Invisible Patient",         4200, 2434, 2438, 2446,  2450)
-die_anims("Alien Male Patient",        4882, 2434, 2438, 2446,  2450)
-die_anims("Alien Female Patient",      4886, 3208, 3212, 3216,  3220)
+die_anims("Transparent Male Patient",  4412, 2434,       384, 2438,  2446, 2450,  4416) -- Extra = Transformation
+die_anims("Standard Female Patient",   3116, 3208,       580, 3212,  3216, 3220)
+die_anims("Slack Female Patient",      4288, 3208,       580, 3212,  3216, 3220)
+die_anims("Transparent Female Patient",4420, 3208,       580, 3212,  3216, 3220,  4428) -- Extra = Transformation
+die_anims("Chewbacca Patient",         4182, 2434,       384, 2438,  2446, 2450,  1682) -- Only males die... (1222 is the Female)
+die_anims("Elvis Patient",              974, 2434,       384, 2438,  2446, 2450,  4186) -- Extra = Transformation
+die_anims("Invisible Patient",         4200, 2434,       384, 2438,  2446, 2450)
+die_anims("Alien Male Patient",        4882, 2434,       384, 2438,  2446, 2450)
+die_anims("Alien Female Patient",      4886, 3208,       580, 3212,  3216, 3220)
 
 -- The next fours sets belong together, but are done like this so we can use them on there own
 -- I also had difficulty in keeping them together, as the patient needs to on the floor
@@ -151,19 +163,19 @@ die_anims("Alien Female Patient",      4886, 3208, 3212, 3216,  3220)
 --  | Falling Animations                   |
 --  | Name                                 |Anim| Notes
 ----+--------------------------------+-----+-----+-----+-----+------+------+
-falling_anim("Standard Male Patient",     1682) 
+falling_anim("Standard Male Patient",     1682)
 falling_anim("Standard Female Patient",   3116)
 
 --  | On_ground Animations                   |
 --  | Name                                 |Anim| Notes
 ----+--------------------------------+-----+-----+-----+-----+------+------+
-on_ground_anim("Standard Male Patient",     1258) 
+on_ground_anim("Standard Male Patient",     1258)
 on_ground_anim("Standard Female Patient",   3116)
 
 --  | Get_up Animations                   |
 --  | Name                                 |Anim| Notes
 ----+--------------------------------+-----+-----+-----+-----+------+------+
-get_up_anim("Standard Male Patient",     384) 
+get_up_anim("Standard Male Patient",     384)
 get_up_anim("Standard Female Patient",   580)
 
 --  | Shake_fist Animations                   |
@@ -214,7 +226,7 @@ check_watch_anim("Slack Male Patient",         4060)
 pee_anim("Elvis Patient",              970)
 pee_anim("Standard Female Patient",    4744)
 pee_anim("Slack Female Patient",       4744)
-pee_anim("Standard Male Patient",      2244) 
+pee_anim("Standard Male Patient",      2244)
 pee_anim("Alternate Male Patient",     4472)
 pee_anim("Slack Male Patient",         4328)
 pee_anim("Chewbacca Patient",          4178)
@@ -240,10 +252,10 @@ moods("queue",          4568,      70)             -- no matter what other prior
 moods("poo",            3996,       5)
 moods("money",          4018,      30)
 moods("patient_wait",   5006,      40)
-moods("epidemy1",       4566,      38)
-moods("epidemy2",       4570,      40)
-moods("epidemy3",       4572,      40)
-moods("epidemy4",       4574,      40)
+moods("epidemy1",       4566,      55)
+moods("epidemy2",       4570,      55)
+moods("epidemy3",       4572,      55)
+moods("epidemy4",       4574,      55)
 moods("sad1",           3992,      40)
 moods("sad2",           4000,      41)
 moods("sad3",           4002,      42)
@@ -284,28 +296,27 @@ function Humanoid:Humanoid(...)
   self.should_knock_on_doors = false
 
   self.speed = "normal"
-  
+
   self.build_callbacks  = {--[[set]]}
   self.remove_callbacks = {--[[set]]}
 end
 
 -- Save game compatibility
 function Humanoid:afterLoad(old, new)
-
   if old < 38 then
     -- should existing patients be updated and be getting really ill?
-    -- adds the new variables for health icons 
+    -- adds the new variables for health icons
     self.attributes["health"] = math.random(60, 100) /100
   end
   -- make sure female slack patients have the correct animation
   if old < 42 then
     if self.humanoid_class == "Slack Female Patient" then
       self.die_anims = die_animations["Slack Female Patient"]
+    end
   end
   if old < 77 then
     self.has_vomitted = 0
   end
-end   
   if old < 49 then
     self.has_fallen = 1
   end
@@ -321,6 +332,9 @@ end
       self.build_callbacks[self.toilet_callback] = true
       self.toilet_callback = nil
     end
+  end
+  if old < 83 and self.humanoid_class == "Chewbacca Patient" then
+    self.die_anims.extra_east = 1682
   end
   Entity.afterLoad(self, old, new)
 end
@@ -366,7 +380,7 @@ function Humanoid:dump()
   print("Actions:")
   for i = 1, #self.action_queue do
     local action = self.action_queue[i]
-    local flag = 
+    local flag =
       (action.must_happen and "  must_happen" or "  ") ..
       (action.todo_interrupt and "  " or "  ")
     if action.room_type then
@@ -381,7 +395,7 @@ function Humanoid:dump()
         distance = "nil"
       end
       local standing = "false"
-      if action:isStanding() then 
+      if action:isStanding() then
         standing = "true"
       end
       print(action.name .. " - Bench distance: " .. distance .. " Standing: " .. standing)
@@ -425,9 +439,9 @@ function Humanoid:setHospital(hospital)
 end
 
 -- Function to activate/deactivate moods of a humanoid.
--- If mood_name is nil it is considered a refresh only. 
+-- If mood_name is nil it is considered a refresh only.
 function Humanoid:setMood(mood_name, activate)
-  if mood_name then 
+  if mood_name then
     if activate and activate ~= "deactivate" then
       if self.active_moods[mood_name] then
         return -- No use doing anything if it already exists.
@@ -458,7 +472,7 @@ end
 
 function Humanoid:setCallCompleted()
   if self.on_call then
-    CallsDispatcher.onCheckpointCompleted(self.on_call)    
+    CallsDispatcher.onCheckpointCompleted(self.on_call)
   end
 end
 
@@ -487,15 +501,23 @@ local function Humanoid_startAction(self)
 
   -- Handle an empty action queue in some way instead of crashing.
   if not action then
+    -- if this is a patient that is going home, an empty
+    -- action queue is not a problem
+    if class.is(self, Patient) and self.going_home then
+      return
+    end
+
     ---- Empty action queue! ----
     -- First find out if this humanoid is in a room.
     local room = self:getRoom()
     if room then
       room:makeHumanoidLeave(self)
     end
-    -- Is it a member of staff or a patient?
+    -- Is it a member of staff, grim or a patient?
     if class.is(self, Staff) then
       self:queueAction({name = "meander"})
+    elseif class.is(self,GrimReaper) then
+      self:queueAction({name = "idle"})
     else
       self:queueAction({name = "seek_reception"})
     end
@@ -543,12 +565,12 @@ local function Humanoid_startAction(self)
       end
     ))
     action = self.action_queue[1]
-    
+
   end
   ---- There is an action to start ----
   -- Call the action start handler
   TheApp.humanoid_actions[action.name](action, self)
-  
+
   if action == self.action_queue[1] and action.todo_interrupt then
     local high_priority = action.todo_interrupt == "high"
     action.todo_interrupt = nil
@@ -567,13 +589,13 @@ function Humanoid:setNextAction(action, high_priority)
   local i = 1
   local queue = self.action_queue
   local interrupted = false
-  
+
   -- Skip over any actions which must happen
   while queue[i] and queue[i].must_happen do
     interrupted = true
     i = i + 1
   end
-  
+
   -- Remove actions which are no longer going to happen
   local done_set = {}
   for j = #queue, i, -1 do
@@ -596,10 +618,10 @@ function Humanoid:setNextAction(action, high_priority)
       end
     end
   end
-  
+
   -- Add the new action to the queue
   queue[i] = action
-  
+
   -- Interrupt the current action and queue other actions to be interrupted
   -- when they start.
   if interrupted then
@@ -669,13 +691,13 @@ function Humanoid:setType(humanoid_class)
   self.vomit_anim = vomit_animations[humanoid_class]
   self.yawn_anim = yawn_animations[humanoid_class]
   self.tap_foot_anim = tap_foot_animations[humanoid_class]
-  self.check_watch_anim = check_watch_animations[humanoid_class]  
+  self.check_watch_anim = check_watch_animations[humanoid_class]
   self.pee_anim = pee_animations[humanoid_class]
   self.humanoid_class = humanoid_class
   if #self.action_queue == 0 then
     self:setNextAction {name = "idle"}
   end
-  
+
   self.th:setPartialFlag(self.permanent_flags or 0, false)
   if humanoid_class == "Invisible Patient" then
     -- Invisible patients do not have very many pixels to hit, box works better
@@ -776,11 +798,11 @@ function Humanoid:tickDay()
   if self.going_home then
     return false
   end
-  
+
   local temperature = self.world.map.th:getCellTemperature(self.tile_x, self.tile_y)
   self.attributes.warmth = self.attributes.warmth * 0.75 + temperature * 0.25
-  
-  -- If it is too hot or too cold, start to decrease happiness and 
+
+  -- If it is too hot or too cold, start to decrease happiness and
   -- show the corresponding icon. Otherwise we could get happier instead.
   -- Let the player get into the level first though, don't decrease happiness the first year.
   if self.attributes["warmth"] and self.hospital and not self.hospital.initial_grace then

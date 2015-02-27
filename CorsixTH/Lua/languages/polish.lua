@@ -7,7 +7,7 @@ The study, diagnosis and surgery on the translation performed by:
 - Johnny, as a doctor - correction (grajpopolsku.pl)
 - Machiner, as a GP - translation, corrections (grajpopolsku.pl)
 - Mziab, as a surgeon - translation, font, corrections, tools and preparing script to CAT software (mziab.grajpopolsku.pl)
-- Spec0071, as a doctor - correction, tests 
+- Spec0071, as a doctor - correction, tests
 - Twig, as a consultant - technical issues (grajpopolsku.pl)
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of
@@ -395,7 +395,7 @@ tooltip = {
       load_slot = "WCZYTAJ GRĘ",
       empty_slot = "PUSTY",
     },
-    new_game = "Start a completely new game from scratch",
+    new_game = "Zacznij grę od samego początku‏",
     load_game = "Wczytaj zapisaną grę",
   },
   patient_window = {
@@ -796,6 +796,7 @@ errors = {
   dialog_missing_graphics = "Niestety, demo nie zawiera tego dialogu.",
   maximum_screen_size = "Proszę wpisać rozmiar ekranu, maksimum 3000x2000.",
   load_prefix = "Błąd podczas ładowania gry: ",
+  no_games_to_contine = "Nie ma zapisanych gier.",
   save_prefix = "Błąd podczas zapisywania gry: ",
   map_file_missing = "Nie można znaleźć pliku z mapą %s dla tego poziomu!",
   minimum_screen_size = "Proszę wpisać rozmiar ekranu, minimum 640x480.",
@@ -822,6 +823,7 @@ main_menu = {
   custom_level = "Gra niestandardowa",
   version = "Wersja: ",
   new_game = "Nowa gra",
+  continue = "Powrót do gry",
   load_game = "Wczytaj grę",
   options = "Ustawienia",
   savegame_version = "Wersja zapisu: ",

@@ -29,6 +29,7 @@ disease.cure = _S.diseases.bloaty_head.cure
 disease.cure_price = 850
 disease.emergency_sound = "emerg007.wav"
 disease.emergency_number = 18
+disease.contagious = false
 disease.initPatient = function(patient)
   patient:setType("Standard Male Patient")
   patient:setLayer(0, math.random(6, 8) * 2)
@@ -52,7 +53,7 @@ disease.treatment_rooms = {
   "inflation",
 }
 
- 
+
 -- If a machine is required a small icon should appear in the drug casebook.
 disease.requires_machine = true
 

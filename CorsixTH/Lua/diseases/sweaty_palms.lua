@@ -29,6 +29,7 @@ disease.cure = _S.diseases.sweaty_palms.cure
 disease.cure_price = 600
 disease.emergency_sound = "emerg017.wav"
 disease.emergency_number = 14
+disease.contagious = true
 disease.initPatient = function(patient)
   if math.random(0, 1) == 0 then
     patient:setType("Standard Male Patient")
@@ -54,7 +55,7 @@ disease.diagnosis_rooms = {
   "blood_machine",
   "x_ray",
   "psych",
-  "ward", 
+  "ward",
 }
 -- Treatment rooms are the rooms which must be visited, in the given order, to
 -- cure the disease.

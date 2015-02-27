@@ -1,4 +1,4 @@
---[[ Copyright (c) 2009 Manuel König
+--[[ Copyright (c) 2009 Manuel KÃ¶nig
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of
 this software and associated documentation files (the "Software"), to deal in
@@ -54,7 +54,7 @@ function XRayRoom:commandEnteringPatient(patient)
 
   local --[[persistable:x_ray_shared_loop_callback]] function loop_callback()
     if staff.action_queue[1].name == "idle" and patient.action_queue[1].name == "idle" then
-     
+
     local length = math.random(2, 4) * (2 - staff.profile.skill)
       patient:setNextAction{
         name = "use_object",
@@ -79,13 +79,13 @@ function XRayRoom:commandEnteringPatient(patient)
 
   patient:walkTo(pat_x, pat_y)
   patient:queueAction{
-    name = "idle", 
+    name = "idle",
     direction = x_ray.direction == "north" and "east" or "south",
     loop_callback = loop_callback,
   }
   staff:walkTo(stf_x, stf_y)
   staff:queueAction{
-    name = "idle", 
+    name = "idle",
     direction = console.direction == "north" and "east" or "south",
     loop_callback = loop_callback,
   }

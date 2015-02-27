@@ -112,6 +112,12 @@ FIND_PACKAGE(Lua REQUIRED)
 IF(Lua_FOUND)
   TARGET_LINK_LIBRARIES(CorsixTH ${LUA_LIBRARY})
   INCLUDE_DIRECTORIES(${LUA_INCLUDE_DIR})
+  # Special link flags needed on OSX/64bit, according to: http://luajit.org/install.html
+  # If these are not specified, luaL_newstate() returns NULL and we get this:
+  #   Fatal error starting CorsixTH: Cannot open Lua state.
+  IF(${CMAKE_SYSTEM_NAME} MATCHES "Darwin" AND LUA_INTERPRETER_TYPE STREQUAL "LuaJIT" AND CMAKE_SIZEOF_VOID_P EQUAL 8)
+    TARGET_LINK_LIBRARIES(CorsixTH "-pagezero_size 10000" "-image_base 100000000")
+  ENDIF()
   message("  ${LUA_INTERPRETER_TYPE} found")
 ELSE(Lua_FOUND)
   message(FATAL_ERROR "Error: Lua library not found, it is required to build")
@@ -198,30 +204,15 @@ ENDIF(MSVC AND NOT CORSIX_TH_HAS_INTTYPES_H)
 
 # Declaration of the install process
 IF(APPLE)
-
   #Just use the prefix as it's sufficient to just set the prefix to /Applications on Mac.
   install(TARGETS CorsixTH BUNDLE DESTINATION .)
 
-  #Copy the required frameworks into the bundle.
-  IF(SDL_FOUND)
-	IF(SDL_LIBRARY MATCHES "\\.framework") #Only copy if it's an actual framework.
-      string(REPLACE "-framework Cocoa" "" SDL_FRAMEWORK_LOC ${SDL_LIBRARY})
-      install(DIRECTORY ${SDL_FRAMEWORK_LOC} DESTINATION CorsixTH.app/Contents/Frameworks)
-    ENDIF()
-  ENDIF()
-
-  IF(SDLMIXER_FOUND)
-    IF(${SDLMIXER_LIBRARY} MATCHES "\\.framework$") #Only copy if it's an actual framework.
-      install(DIRECTORY ${SDLMIXER_LIBRARY} DESTINATION CorsixTH.app/Contents/Frameworks)
-    ENDIF()
-  ENDIF()
-
-  IF(LUA_FOUND)
-    IF(${LUA_LIBRARY} MATCHES "\\.framework$") #Only copy if it's an actual framework.
-  	  install(DIRECTORY ${LUA_LIBRARY} DESTINATION CorsixTH.app/Contents/Frameworks)
-    ENDIF()
-  ENDIF()
-  
+  # Fix the OS X bundle to include required libraries (create a redistributable app)
+  install(CODE "
+    INCLUDE(BundleUtilities)
+    SET(BU_CHMOD_BUNDLE_ITEMS ON)
+    FIXUP_BUNDLE(${CMAKE_INSTALL_PREFIX}/CorsixTH.app \"\" \"\")
+    ")
 ELSE()
   install(TARGETS CorsixTH RUNTIME DESTINATION CorsixTH)
   install(DIRECTORY Lua Levels DESTINATION CorsixTH PATTERN "*.svn" EXCLUDE)

@@ -31,9 +31,9 @@ function UIFax:UIFax(ui, icon)
   self.icon = icon
   self.message = icon.message or {}
   self.owner = icon.owner
-  
+
   self.code = ""
-  
+
   -- Add choice buttons
   local choices = self.message.choices
   self.choice_buttons = {}
@@ -52,31 +52,31 @@ function UIFax:UIFax(ui, icon)
         :setDisabledSprite(19):enable(enabled)
     end
   end
-  
+
   -- Close button
   self:addPanel(0, 598, 440):makeButton(0, 0, 26, 26, 16, self.close):setTooltip(_S.tooltip.fax.close)
-  
+
   self:addPanel(0, 471, 349):makeButton(0, 0, 87, 20, 14, self.cancel) -- Cancel code button
   self:addPanel(0, 474, 372):makeButton(0, 0, 91, 27, 15, self.validate) -- Validate code button
-  
+
   self:addPanel(0, 168, 348):makeButton(0, 0, 43, 10, 1, self.correct) -- Correction button
-  
+
   local function button(char)
     return --[[persistable:fax_button]] function() self:appendNumber(char) end
   end
-  
+
   self:addPanel(0, 220, 348):makeButton(0, 0, 43, 10,  2, button"1"):setSound"Fax_1.wav"
   self:addPanel(0, 272, 348):makeButton(0, 0, 44, 10,  3, button"2"):setSound"Fax_2.wav"
   self:addPanel(0, 327, 348):makeButton(0, 0, 43, 10,  4, button"3"):setSound"Fax_3.wav"
-  
+
   self:addPanel(0, 219, 358):makeButton(0, 0, 44, 10,  5, button"4"):setSound"Fax_4.wav"
   self:addPanel(0, 272, 358):makeButton(0, 0, 43, 10,  6, button"5"):setSound"Fax_5.wav"
   self:addPanel(0, 326, 358):makeButton(0, 0, 44, 10,  7, button"6"):setSound"Fax_6.wav"
-  
+
   self:addPanel(0, 218, 370):makeButton(0, 0, 44, 11,  8, button"7"):setSound"Fax_7.wav"
   self:addPanel(0, 271, 370):makeButton(0, 0, 44, 11,  9, button"8"):setSound"Fax_8.wav"
   self:addPanel(0, 326, 370):makeButton(0, 0, 44, 11, 10, button"9"):setSound"Fax_9.wav"
-  
+
   self:addPanel(0, 217, 382):makeButton(0, 0, 45, 12, 11, button"*")
   self:addPanel(0, 271, 382):makeButton(0, 0, 44, 11, 12, button"0"):setSound"Fax_0.wav"
   self:addPanel(0, 326, 382):makeButton(0, 0, 44, 11, 13, button"#")
@@ -95,11 +95,11 @@ function UIFax:draw(canvas, x, y)
   self.background:draw(canvas, self.x + x, self.y + y)
   UIFullscreen.draw(self, canvas, x, y)
   x, y = self.x + x, self.y + y
-  
+
   if self.message then
     local last_y = y + 40
     for i, message in ipairs(self.message) do
-      last_y = self.fax_font:drawWrapped(canvas, message.text, x + 190, 
+      last_y = self.fax_font:drawWrapped(canvas, message.text, x + 190,
                                          last_y + (message.offset or 0), 330,
                                          "center")
     end
@@ -155,6 +155,7 @@ function UIFax:choice(choice,additionalInfo)
       }
     end
   end
+  local vip_ignores_refusal = math.random(1, 2)
   if choice == "accept_emergency" then
     self.ui.app.world:newObject("helicopter", self.ui.hospital, "north")
     self.ui:addWindow(UIWatch(self.ui, "emergency"))
@@ -162,11 +163,27 @@ function UIFax:choice(choice,additionalInfo)
     self.ui.adviser:say(_A.information.emergency)
   elseif choice == "refuse_emergency" then
     self.ui.app.world:nextEmergency()
-  elseif choice == "accept_vip" then
-    self.ui.hospital.num_vips = self.ui.hospital.num_vips+1
+  -- VIP may choose to visit anyway if he is refused too often
+  elseif (self.ui.hospital.vip_declined > 2 and vip_ignores_refusal == 2) and choice == "refuse_vip" then
+    self.ui.hospital.num_vips = self.ui.hospital.num_vips + 1
     self.ui.app.world:spawnVIP(additionalInfo.name)
+    self.ui.hospital.vip_declined = 0
   elseif choice == "refuse_vip" then
     self.ui.app.world:nextVip() -- don't start an inspection
+    self.ui.hospital.vip_declined = self.ui.hospital.vip_declined + 1
+  elseif choice == "accept_vip" then
+    self.ui.hospital.num_vips = self.ui.hospital.num_vips + 1
+    self.ui.app.world:spawnVIP(additionalInfo.name)
+  elseif choice == "declare_epidemic" then
+    local epidemic = self.ui.hospital.epidemic
+    if epidemic then
+      epidemic:resolveDeclaration()
+    end
+  elseif choice == "cover_up_epidemic" then
+    local epidemic = self.ui.hospital.epidemic
+    if epidemic then
+      epidemic:startCoverUp()
+    end
   elseif choice == "accept_new_level" then
     -- Set the new salary.
     self.ui.hospital.player_salary = self.ui.hospital.salary_offer
@@ -225,7 +242,7 @@ function UIFax:validate()
     return
   end
   self.ui:playSound("fax_yes.wav")
-  
+
   -- TODO: Other cheats (preferably with slight obfuscation, as above)
 end
 
@@ -240,7 +257,7 @@ function UIFax:close()
   UIFullscreen.close(self)
   if world and world:isCurrentSpeed("Pause") then
     world:setSpeed(world.prev_speed)
-  end  
+  end
 end
 
 function UIFax:afterLoad(old, new)

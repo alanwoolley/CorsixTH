@@ -34,7 +34,7 @@ function GameUI:GameUI(app, local_hospital)
 
   self.hospital = local_hospital
   self.tutorial = { chapter = 0, phase = 0 }
-  
+
   if _MAP_EDITOR then
     self:addWindow(UIMapEditor(self))
   else
@@ -65,12 +65,14 @@ function GameUI:GameUI(app, local_hospital)
   self.limit_to_visible_diamond = not _MAP_EDITOR
   self.transparent_walls = false
   self.do_world_hit_test = true
-  
+
   self:setRandomAnnouncementTarget()
   self.ticks_since_last_announcement = 0
-  
+
   self.momentum = app.config.scrolling_momentum
   self.current_momentum = {x = 0.0, y = 0.0, z = 0.0}
+
+  self.speed_up_key_pressed = false
 end
 
 function GameUI:setupGlobalKeyHandlers()
@@ -160,7 +162,7 @@ function GameUI:onChangeResolution()
   local scr_h = self.app.config.height
   self.visible_diamond = self:makeVisibleDiamond(scr_w / self.zoom_factor, scr_h / self.zoom_factor)
   self:scrollMap(0, 0)
-  
+
   UI.onChangeResolution(self)
 end
 
@@ -223,6 +225,7 @@ end
 
 function GameUI:keySpeedUp()
   if self.key_codes[122] then
+    self.speed_up_key_pressed = true
     self.app.world:speedUp()
   end
 end
@@ -256,9 +259,14 @@ function GameUI:onKeyUp(code)
     self:updateKeyScroll()
     return
   end
-  if self.app.world:isCurrentSpeed("Speed Up")  then
+
+  -- Guess that the "Speed Up" key was released because the 
+  -- code parameter can't provide UTF-8 key codes:
+  self.speed_up_key_pressed = false
+  if self.app.world:isCurrentSpeed("Speed Up") then
     self.app.world:previousSpeed()
   end
+
   if self.transparent_walls then
     self:removeTransparentWalls()
   end
@@ -323,12 +331,26 @@ function GameUI:onCursorWorldPositionChange()
       self.debug_cursor_entity = entity
     end
 
+    local epidemic = self.hospital.epidemic
+    local infected_cursor = TheApp.gfx:loadMainCursor("epidemic")
+    local epidemic_cursor = TheApp.gfx:loadMainCursor("epidemic_hover")
+
     self.cursor_entity = entity
     if self.cursor ~= self.edit_room_cursor and self.cursor ~= self.waiting_cursor then
       local cursor = self.default_cursor
       if self.app.world.user_actions_allowed then
-        cursor = entity and entity.hover_cursor or
-        (self.down_count ~= 0 and self.down_cursor or self.default_cursor)
+        --- If the patient is infected show the infected cursor
+        if epidemic and epidemic.coverup_in_progress and
+          entity and entity.infected and not epidemic.timer.closed then
+          cursor = infected_cursor
+          -- In vaccination mode display epidemic hover cursor for all entities
+        elseif epidemic and epidemic.vaccination_mode_active then
+          cursor = epidemic_cursor
+          -- Otherwise just show the normal cursor and hover if appropriate
+        else
+          cursor = entity and entity.hover_cursor or
+          (self.down_count ~= 0 and self.down_cursor or self.default_cursor)
+        end
       end
       self:setCursor(cursor)
     end
@@ -380,7 +402,7 @@ function GameUI:onCursorWorldPositionChange()
   if entity and self.bottom_panel then
     self.bottom_panel:setDynamicInfo(entity:getDynamicInfo())
   end
-  
+
   return Window.onCursorWorldPositionChange(self, self.cursor_x, self.cursor_y)
 end
 
@@ -401,7 +423,7 @@ function GameUI:onMouseMove(x, y, dx, dy)
   if self.app.moviePlayer.playing then
     return false
   end
-  
+
   self.cursor_x = x
   self.cursor_y = y
   if self:onCursorWorldPositionChange() or self.simulated_cursor then
@@ -416,12 +438,12 @@ function GameUI:onMouseMove(x, y, dx, dy)
     self:scrollMap(self.current_momentum.x, self.current_momentum.y)
     repaint = true
   end
-  
+
   if self.drag_mouse_move then
     self.drag_mouse_move(x, y)
     return true
   end
-  
+
   local scroll_region_size = self.app.config.scroll_region_size
   local scroll_power = self.app.config.scroll_speed
   
@@ -450,7 +472,7 @@ function GameUI:onMouseMove(x, y, dx, dy)
     elseif y >= self.app.config.height - scroll_region_size then
       dy = scroll_power
     end
-    
+
     if not self.tick_scroll_amount_mouse then
       self.tick_scroll_amount_mouse = {x = dx, y = dy}
     else
@@ -460,13 +482,13 @@ function GameUI:onMouseMove(x, y, dx, dy)
   else
     self.tick_scroll_amount_mouse = false
   end
-  
+
   if Window.onMouseMove(self, x, y, dx, dy) then
     repaint = true
   end
-  
+
   self:updateTooltip()
-  
+
   local map = self.app.map
   local wx, wy = self:ScreenToWorld(x, y)
   wx = math.floor(wx)
@@ -482,7 +504,7 @@ function GameUI:onMouseMove(x, y, dx, dy)
       highlight_y = wy
     end
   end
-  
+
   return repaint
 end
 
@@ -495,14 +517,14 @@ function GameUI:onMouseUp(code, x, y)
     -- Mouse wheel
     local window = self:getWindow(UIFullscreen)
     if not window or not window:hitTest(x - window.x, y - window.y) then
-      
+
       -- Apply momentum to the zoom
       if math.abs(self.current_momentum.z) < 12 then
         self.current_momentum.z = self.current_momentum.z + (4.5 - code)*2
       end
     end
   end
-  
+
   local button = self.button_codes[code]
   if button == "right" and not _MAP_EDITOR and highlight_x then
     local window = self:getWindow(UIPatient)
@@ -512,7 +534,7 @@ function GameUI:onMouseUp(code, x, y)
       patient:queueAction{name = "idle"}
     end
   end
-  
+
   if self.edit_room then
     if class.is(self.edit_room, Room) then
       if button == "right" and self.cursor == self.waiting_cursor then
@@ -532,7 +554,27 @@ function GameUI:onMouseUp(code, x, y)
       end
     end
   end
-  
+
+  -- During vaccination mode you can only interact with
+  -- infected patients
+  local epidemic = self.hospital.epidemic
+  -- infected patients
+  local epidemic = self.hospital.epidemic
+  if epidemic and epidemic.vaccination_mode_active then
+    if button == "left" then
+      if self.cursor_entity then
+        -- Allow click behaviour for infected patients
+        if self.cursor_entity.infected then
+          self.cursor_entity:onClick(self,button)
+        end
+      end
+    elseif button == "right" then
+      --Right click turns vaccination mode off
+      local watch = TheApp.ui:getWindow(UIWatch)
+      watch:toggleVaccinationMode()
+    end
+  end
+
   return UI.onMouseUp(self, code, x, y)
 end
 
@@ -541,16 +583,16 @@ function GameUI:setRandomAnnouncementTarget()
   self.random_announcement_ticks_target = math.random(8000, 12000)
 end
 
-function GameUI:playAnnouncement(name)
+function GameUI:playAnnouncement(name, played_callback, played_callback_delay)
   self.ticks_since_last_announcement = 0
   if self.app.world:getLocalPlayerHospital():hasStaffedDesk() then
-    UI.playAnnouncement(self, name)
+    UI.playAnnouncement(self, name, played_callback, played_callback_delay)
   end
 end
 
 function GameUI:onTick()
   local repaint = UI.onTick(self)
-  if not self.buttons_down.mouse_middle then  
+  if not self.buttons_down.mouse_middle then
     if math.abs(self.current_momentum.x) < 0.2 and math.abs(self.current_momentum.y) < 0.2 then
       -- Stop scrolling
       self.current_momentum.x = 0.0
@@ -567,7 +609,7 @@ function GameUI:onTick()
       self.app.world:adjustZoom(self.current_momentum.z)
     end
   end
-  do
+  if not self.app.world:isCurrentSpeed("Pause") then
     local ticks_since_last_announcement = self.ticks_since_last_announcement
     if ticks_since_last_announcement >= self.random_announcement_ticks_target then
       self:playAnnouncement("rand*.wav")
@@ -585,7 +627,7 @@ function GameUI:onTick()
       mult = 2
     end
     self.tick_scroll_mult = mult
-    
+
     -- Combine the mouse scroll and keyboard scroll
     local dx, dy = 0, 0
     if self.tick_scroll_amount_mouse then
@@ -601,7 +643,7 @@ function GameUI:onTick()
       dx = dx + self.tick_scroll_amount.x
       dy = dy + self.tick_scroll_amount.y
     end
-    
+
     -- Faster scrolling with shift key
     local factor = self.app.config.scroll_speed
     if self.buttons_down.shift then
@@ -684,7 +726,7 @@ function GameUI:scrollMap(dx, dy)
 
   dx, dy, self.in_visible_diamond = self.limitPointToDiamond(dx, dy,
     self.visible_diamond, self.limit_to_visible_diamond)
-  
+
   self.screen_offset_x = floor(dx + 0.5)
   self.screen_offset_y = floor(dy + 0.5)
 end
@@ -722,7 +764,7 @@ end
 
 function UI:togglePlaySounds()
   self.app.config.play_sounds = not self.app.config.play_sounds
-  
+  self.app.audio:playSoundEffects(self.app.config.play_sounds)
   self.app:saveConfig()
 end
 
@@ -761,7 +803,7 @@ tutorial_phases = {
     _A.tutorial.reception_invalid_position,            -- 5
                                                        -- 6: object other than reception selected. currently no text for this phase.
   },
-  
+
   {
     -- 2) hire receptionist
     { text = _A.tutorial.hire_receptionist,            -- 1
@@ -782,7 +824,7 @@ tutorial_phases = {
     _A.tutorial.place_receptionist,                    -- 6
     _A.tutorial.receptionist_invalid_position,         -- 7
   },
-  
+
   {
     -- 3) build GP's office
     -- 3.1) room window
@@ -795,7 +837,7 @@ tutorial_phases = {
     { text = _A.tutorial.click_gps_office,             -- 3
       begin_callback = function() TheApp.ui:getWindow(UIBuildRoom):startButtonBlinking(5) end,
       end_callback = function() TheApp.ui:getWindow(UIBuildRoom):stopButtonBlinking() end, },
-    
+
     -- 3.2) blueprint
     -- [11][58] was maybe planned to be used in this place, but is not needed.
     _A.tutorial.click_and_drag_to_build,               -- 4
@@ -805,7 +847,7 @@ tutorial_phases = {
     { text = _A.tutorial.room_big_enough,              -- 8
       begin_callback = function() TheApp.ui:getWindow(UIEditRoom):startButtonBlinking(4) end,
       end_callback = function() TheApp.ui:getWindow(UIEditRoom):stopButtonBlinking() end, },
-    
+
     -- 3.3) door and windows
     _A.tutorial.place_door,                            -- 9
     _A.tutorial.door_in_invalid_position,              -- 10
@@ -815,7 +857,7 @@ tutorial_phases = {
     { text = _A.tutorial.window_in_invalid_position,   -- 12
       begin_callback = function() TheApp.ui:getWindow(UIEditRoom):startButtonBlinking(4) end,
       end_callback = function() TheApp.ui:getWindow(UIEditRoom):stopButtonBlinking() end, },
-    
+
     -- 3.4) objects
     _A.tutorial.place_objects,                         -- 13
     _A.tutorial.object_in_invalid_position,            -- 14
@@ -826,7 +868,7 @@ tutorial_phases = {
       begin_callback = function() TheApp.ui:getWindow(UIInformation):startButtonBlinking(1) end,
       end_callback = function() TheApp.ui:getWindow(UIInformation):stopButtonBlinking() end, },
   },
-  
+
   {
     -- 4) hire doctor
     { text = _A.tutorial.hire_doctor,                  -- 1
@@ -888,12 +930,12 @@ function GameUI:tutorialStep(chapter, phase_from, phase_to, ...)
   else
     if self.tutorial.phase ~= phase_from then return false end
   end
-  
+
   local old_phase = tutorial_phases[self.tutorial.chapter][self.tutorial.phase]
   if old_phase and old_phase.end_callback and type(old_phase.end_callback) == "function" then
     old_phase.end_callback(...)
   end
-  
+
   if phase_to == "end" then
     self.tutorial.chapter = 0
     self.tutorial.phase = 0
@@ -904,7 +946,7 @@ function GameUI:tutorialStep(chapter, phase_from, phase_to, ...)
   else
     self.tutorial.phase = phase_to
   end
-  
+
   if TheApp.config.debug then print("Tutorial: Now in " .. self.tutorial.chapter .. ", " .. self.tutorial.phase) end
   local new_phase = tutorial_phases[self.tutorial.chapter][self.tutorial.phase]
   local str, callback
@@ -929,7 +971,7 @@ function GameUI:startTutorial(chapter)
   chapter = chapter or 1
   self.tutorial.chapter = chapter
   self.tutorial.phase = 0
-  
+
   self:tutorialStep(chapter, 0, 1)
 end
 
@@ -988,7 +1030,7 @@ function GameUI:afterLoad(old, new)
   if old < 78 then
     self.current_momentum = { x = 0, y = 0, z = 0}
   end
-  if old < 81 then 
+  if old < 81 then
     self:removeKeyHandler("x", self, self.toggleWallsTransparent)
     self:addKeyHandler("z", self, self.keySpeedUp)
     self:addKeyHandler("x", self, self.keyTransparent)

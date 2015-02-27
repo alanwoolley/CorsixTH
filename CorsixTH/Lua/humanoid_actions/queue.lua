@@ -47,7 +47,7 @@ local function interrupt_head(humanoid, n)
     end
     n = n - 1
   end
-  
+
   local action = humanoid.action_queue[n]
   assert(action.must_happen)
   local on_interrupt = action.on_interrupt
@@ -68,10 +68,9 @@ local function action_queue_find_idle(action, humanoid)
     end
   end
   if found_any then
-    error "Proper idle not in action_queue"
-  else
-    return -1
+    print("Warning: Proper idle not in action_queue")
   end
+  return -1
 end
 
 local function action_queue_find_drink_action(action, humanoid)
@@ -123,7 +122,7 @@ end
 local function action_queue_leave_bench(action, humanoid)
   local index
   for i, current_action in ipairs(humanoid.action_queue) do
-    -- Check to see that we haven't 
+    -- Check to see that we haven't
     -- gotten to the actual queue action yet.
     -- Instead of crashing if we have, try with the assumption
     -- that we're actually standing.
@@ -152,8 +151,14 @@ local function action_queue_leave_bench(action, humanoid)
 end
 
 local action_queue_on_change_position = permanent"action_queue_on_change_position"( function(action, humanoid)
-  -- Find out if we have to be standing up
-  local must_stand = class.is(humanoid, Staff) or class.is(humanoid, Vip) or  (humanoid.disease and humanoid.disease.must_stand)
+  -- Only proceed with this handler if the patient is still in the queue
+  if not action.is_in_queue then
+    return
+  end
+
+  -- Find out if we have to be standing up - considering humanoid_class covers both health inspector and VIP
+  local must_stand = class.is(humanoid, Staff) or humanoid.humanoid_class == "Inspector" or
+    humanoid.humanoid_class == "VIP" or (humanoid.disease and humanoid.disease.must_stand)
   local queue = action.queue
   if not must_stand then
     for i = 1, queue.bench_threshold do
@@ -163,7 +168,7 @@ local action_queue_on_change_position = permanent"action_queue_on_change_positio
       end
     end
   end
-  
+
   if not must_stand then
     -- Try to find a bench
     local bench_max_distance
@@ -199,7 +204,7 @@ local action_queue_on_change_position = permanent"action_queue_on_change_positio
       return
     end
   end
-  
+
   -- Stand up in the correct position in the queue
   local standing_index = 0
   local our_room = humanoid:getRoom()
@@ -275,7 +280,7 @@ local action_queue_on_leave = permanent"action_queue_on_leave"( function(action,
 end)
 
 -- While queueing one could get thirsty.
-local action_queue_get_soda = permanent"action_queue_get_soda"( 
+local action_queue_get_soda = permanent"action_queue_get_soda"(
 function(action, humanoid, machine, mx, my, fun_after_use)
   local num_actions_prior
   if action:isStanding() then
@@ -283,20 +288,23 @@ function(action, humanoid, machine, mx, my, fun_after_use)
   else
     num_actions_prior = action_queue_leave_bench(action, humanoid)
   end
-  
+
   -- Callback function used after the drinks machine has been used.
   local --[[persistable:action_queue_get_soda_after_use]] function after_use()
     fun_after_use() -- Defined in patient:tickDay
-    -- Insert an idle action so that change_position can do its work.
+    -- If the patient is still in the queue, insert an idle action so that
+    -- change_position can do its work.
     -- Note that it is inserted after the currently executing use_object action.
-    humanoid:queueAction({
-      name = "idle", 
-      --direction = machine,
-      must_happen = true,
-    }, 1)
-    action_queue_on_change_position(action, humanoid)
+    if action.is_in_queue then
+      humanoid:queueAction({
+        name = "idle",
+        --direction = machine,
+        must_happen = true,
+      }, 1)
+      action_queue_on_change_position(action, humanoid)
+    end
   end
-  
+
   -- Walk to the machine and then use it.
   humanoid:queueAction({
     name = "walk",
@@ -332,7 +340,7 @@ end)
 
 local function action_queue_start(action, humanoid)
   local queue = action.queue
-  
+
   if action.done_init then
     return
   end
@@ -343,11 +351,11 @@ local function action_queue_start(action, humanoid)
   action.onLeaveQueue = action_queue_on_leave
   action.onGetSoda = action_queue_get_soda
   action.isStanding = action_queue_is_standing
-  
+
   action.is_in_queue = true
   queue:unexpect(humanoid)
   queue:push(humanoid, action)
-  
+
   local door = action.reserve_when_done
   if door then
     door:updateDynamicInfo()
@@ -357,10 +365,11 @@ local function action_queue_start(action, humanoid)
   end
   humanoid:queueAction({
     name = "idle",
+    is_leaving = humanoid:isLeaving(),
     must_happen = true,
   }, 0)
   action:onChangeQueuePosition(humanoid)
-  
+
   if queue.same_room_priority then
     queue.same_room_priority:getRoom():tryAdvanceQueue()
   end

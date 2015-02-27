@@ -33,33 +33,33 @@ object.idle_animations = {
 }
 object.orientations = {
   north = {
-    footprint = { {0, 0}, {0, -1, only_passable = true}, 
+    footprint = { {0, 0}, {0, -1, only_passable = true},
                   {0, 1, only_passable = true}, {1, 0, need_north_side = true, need_south_side = true},
-                  {-1, 0, need_north_side = true, need_south_side = true} 
+                  {-1, 0, need_north_side = true, need_south_side = true}
                 },
     use_position = {0, -1},
     use_position_secondary = {0, 1},
   },
   east = {
-    footprint = { {0, 0}, {0, -1, need_west_side = true, need_east_side = true}, 
-                  {0, 1, need_west_side = true, need_east_side = true}, {1, 0, only_passable = true}, 
-                  {-1, 0, only_passable = true} 
+    footprint = { {0, 0}, {0, -1, need_west_side = true, need_east_side = true},
+                  {0, 1, need_west_side = true, need_east_side = true}, {1, 0, only_passable = true},
+                  {-1, 0, only_passable = true}
                 },
     use_position = {1, 0},
     use_position_secondary = {-1, 0},
   },
   south = {
     footprint = { {0, 0}, {0, -1, only_passable = true}, {0, 1, only_passable = true},
-                  {1, 0, need_north_side = true, need_south_side = true}, 
-                  {-1, 0, need_north_side = true, need_south_side = true} 
+                  {1, 0, need_north_side = true, need_south_side = true},
+                  {-1, 0, need_north_side = true, need_south_side = true}
                 },
     use_position = {0, 1},
     use_position_secondary = {0, -1},
   },
   west = {
     footprint = { {0, 0}, {0, -1, need_west_side = true, need_east_side = true},
-                   {0, 1, need_west_side = true, need_east_side = true}, 
-                  {1, 0, only_passable = true}, {-1, 0, only_passable = true} 
+                   {0, 1, need_west_side = true, need_east_side = true},
+                  {1, 0, only_passable = true}, {-1, 0, only_passable = true}
                 },
     use_position = {-1, 0},
     use_position_secondary = {1, 0},
@@ -100,8 +100,22 @@ function ReceptionDesk:tick()
         if queue_front.next_room_to_visit then
           queue_front:queueAction{name = "seek_room", room_type = queue_front.next_room_to_visit.room_info.id}
         else
-          -- VIP has his own list, don't add the gp office twice
-          if queue_front.humanoid_class ~= "VIP" then
+          if class.is(queue_front, Inspector) then
+            local inspector = queue_front
+            if not inspector.going_home  then
+              local epidemic = self.world:getLocalPlayerHospital().epidemic
+              if epidemic then
+                -- The result of the epidemic may already by determined
+                -- i.e if an infected patient has left the hospital
+                if not epidemic.result_determined then
+                  epidemic:finishCoverUp()
+                end
+                epidemic:applyOutcome()
+                inspector:goHome()
+              end
+            end
+            -- VIP has his own list, don't add the gp office twice
+          elseif queue_front.humanoid_class ~= "VIP" then
             queue_front:queueAction{name = "seek_room", room_type = "gp"}
           else
             -- the VIP will realise that he is idle, and start going round rooms
@@ -111,6 +125,7 @@ function ReceptionDesk:tick()
         end
         self.queue:pop()
         self.queue.visitor_count = self.queue.visitor_count + 1
+        queue_front.has_passed_reception = true
       end
     end
   end
@@ -125,7 +140,7 @@ function ReceptionDesk:checkForNearbyStaff()
     -- Already got staff, or a staff member is on the way
     return true
   end
-  
+
   local nearest_staff, nearest_d
   local world = self.world
   local use_x, use_y = self:getSecondaryUsageTile()
@@ -141,7 +156,7 @@ function ReceptionDesk:checkForNearbyStaff()
   if not nearest_staff then
     return false
   end
-  
+
   self:occupy(nearest_staff)
   return true
 end

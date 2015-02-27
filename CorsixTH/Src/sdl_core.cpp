@@ -348,6 +348,11 @@ static int l_mainloop(lua_State *L) {
                 lua_pushliteral(dispatcher, "movie_over");
                 nargs = 1;
                 break;
+            case SDL_USEREVENT_SOUND_OVER:
+                lua_pushliteral(dispatcher, "sound_over");
+                lua_pushinteger(dispatcher, *(static_cast<int*>(e.user.data1)));
+                nargs = 2;
+                break;
             default:
                 nargs = 0;
                 break;
@@ -452,7 +457,7 @@ static int l_get_ticks(lua_State *L)
 
 /*
     Enable or disable the keyboard modifier.
-    
+
     Takes two parameters: delay and interval. Both are integers in miliseconds
     where nil gives default values, and delay of 0 disables the repeat.
 */
@@ -460,7 +465,7 @@ static int l_modify_keyboardrepeat(lua_State *L)
 {
     int delay = luaL_optint(L, 1, SDL_DEFAULT_REPEAT_DELAY);
     int interval = luaL_optint(L, 2, SDL_DEFAULT_REPEAT_INTERVAL);
-    
+
     lua_pushboolean(L, SDL_EnableKeyRepeat(delay, interval) == 0 ? 1 : 0);
     return 1;
 }

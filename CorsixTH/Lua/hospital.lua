@@ -54,15 +54,28 @@ function Hospital:Hospital(world, name)
   -- The sum of all material values (tiles, rooms, objects).
   -- Initial value: hospital tile count * tile value + 20000
   self.value = world.map:getParcelPrice(self:getPlayerIndex()) + 20000
-  
+
   -- TODO: With the fame/shame screen and scoring comes salary.
   self.player_salary = 10000
   self.salary_offer = 0
-  
-  
+
+
   self.handymanTasks = {}
-  
-  
+  -- Represents the "active" epidemic non-nil if
+  -- an epidemic is happening currently in the hospital
+  -- Only one epidemic is ever "active"
+  self.epidemic = nil
+
+  -- The pool of epidemics which may happen in the future.
+  -- Epidemic in this table continue in the background its
+  -- patients infecting each other. Epidemics are chosen from
+  -- this pool to become the "active" epidemic
+  self.future_epidemics_pool = {}
+  -- How many epidemics can exist simultaneously counting current and future
+  -- epidemics. If epidemic_limit = 1 then only one epidemic can exist at a
+  -- time either in the futures pool or as a current epidemic.
+  self.concurrent_epidemic_limit = self.world.map.level_config.gbv.EpidemicConcurrentLimit or 1
+
   -- Initial values
   self.interest_rate = interest_rate
   self.inflation_rate = 0.045
@@ -80,16 +93,17 @@ function Hospital:Hospital(world, name)
   self.seating_warning = 0
   self.num_explosions = 0
   self.announce_vip = 0
+  self.vip_declined = 0
   self.num_vips = 0 -- used to check if it's the user's first vip
   self.percentage_cured = 0
   self.percentage_killed = 0
   self.msg_counter = 0
   self.population = 0.25 -- TODO: Percentage showing how much of
-  -- the total population that goes to the player's hospital, 
+  -- the total population that goes to the player's hospital,
   -- used for one of the goals. Change when competitors are there.
   -- Since there are none right now the player's hospital always get
   -- 50 % of all patients as soon as gbv.AllocDelay has expired.
-  
+
   -- Statistics used in the graph dialog. Each entry is the month, inside it
   -- is "money in", "money out", wages, balance, visitors, cures, deaths, reputation
   -- statistic[i] shows what the values were when going from month i - 1 to i.
@@ -107,14 +121,14 @@ function Hospital:Hospital(world, name)
   }
   self.money_in = 0
   self.money_out = 0
-    
+
   -- Other statistics, back to zero each year
   self.sodas_sold = 0
   self.reputation_above_threshold = self.win_awards and level_config.awards_trophies.Reputation < self.reputation or false
   self.num_vips_ty  = 0 -- used to count how many VIP visits in the year for an award
   self.pleased_vips_ty  = 0
   self.num_cured_ty = 0
-  self.not_cured_ty = 0 
+  self.not_cured_ty = 0
   self.num_visitors_ty = 0
 
   self.ownedPlots = {1}
@@ -149,7 +163,7 @@ function Hospital:Hospital(world, name)
     end
   end
   -- A list of how much each insurance company owes you. The first entry for
-  -- each company is the current month's dept, the second the previous 
+  -- each company is the current month's dept, the second the previous
   -- month and the third the month before that.
   -- All payment that goes through an insurance company a given month is payed two
   -- months later. For example diagnoses in April are payed the 1st of July
@@ -212,7 +226,7 @@ function Hospital:noStaffroom_msg()
   if staffroom_msg then
     self.world.ui.adviser:say(staffroom_msg[math.random(1, #staffroom_msg)])
     self.staff_room_msg = true
-  end  
+  end
 end
 
 function Hospital:noToilet_msg()
@@ -224,7 +238,7 @@ function Hospital:noToilet_msg()
   if toilet_msg then
     self.world.ui.adviser:say(toilet_msg[math.random(1, #toilet_msg)])
     self.toilet_msg = true
-  end  
+  end
 end
 
 -- Give praise where it is due
@@ -237,7 +251,7 @@ function Hospital:praiseBench()
   if bench_msg then
     self.world.ui.adviser:say(bench_msg[math.random(1, #bench_msg)])
     self.bench_msg = true
-  end  
+  end
 end
 
 --! Messages regarding numbers cured and killed
@@ -250,21 +264,21 @@ function Hospital:msgCured()
     elseif msg_chance == 12 and self.msg_counter > 10 then
       self.world.ui.adviser:say(_A.praise.patients_cured:format(self.num_cured))
       self.msg_counter = 0
-    end      
-  end 
+    end
+  end
 end
 --! So the messages don't show too often there will need to be at least 10 days before one can show again.
 function Hospital:msgKilled()
-  local msg_chance = math.random(1, 10) 
-  if self.num_deaths > 1 then  
+  local msg_chance = math.random(1, 10)
+  if self.num_deaths > 1 then
     if msg_chance < 4 and self.msg_counter > 10 then
       self.world.ui.adviser:say(_A.warnings.many_killed:format(self.num_deaths))
       self.msg_counter = 0
     elseif msg_chance > 7 and self.msg_counter > 10 then
       self.world.ui.adviser:say(_A.level_progress.another_patient_killed:format(self.num_deaths))
-      self.msg_counter = 0 
-    end      
-  end   
+      self.msg_counter = 0
+    end
+  end
 end
 
 -- Warn if the hospital is lacking some basics
@@ -276,7 +290,7 @@ function Hospital:warningBench()
   if bench_msg then
     self.world.ui.adviser:say(bench_msg[math.random(1, #bench_msg)])
     self.bench_msg = true
-  end  
+  end
 end
 
 -- Warn when it is too hot
@@ -350,7 +364,7 @@ function Hospital:afterLoad(old, new)
     self.opened = true
   end
   if old < 14 then
-    -- NOTE: This will no longer work, but cluttering the code with stub functions 
+    -- NOTE: This will no longer work, but cluttering the code with stub functions
     -- for this "old" compatibility, is it necessary?
     self:_initResearch()
   end
@@ -431,16 +445,16 @@ function Hospital:afterLoad(old, new)
     local cure, diagnosis
     local config = self.world.map.level_config.objects
     for _, room in ipairs(self.world.available_rooms) do
-      -- If a room is discovered, make sure its objects are also 
+      -- If a room is discovered, make sure its objects are also
       -- discovered, otherwise add it to the undiscovered list.
       if self.discovered_rooms[room] then
         for name, _ in pairs(room.objects_needed) do
           local object = TheApp.objects[name]
           if config[object.thob] and (config[object.thob].AvailableForLevel == 1)
-          and object.research_category 
+          and object.research_category
           and not research.research_progress[object].discovered then
             local progress = self.research_rooms[room]
-            if self.research.cure.current == room 
+            if self.research.cure.current == room
             or self.research.diagnosis.current == room then
               progress = progress + self.research.diagnosis.points
             end
@@ -454,7 +468,7 @@ function Hospital:afterLoad(old, new)
           for name, _ in pairs(room.objects_needed) do
             local object = TheApp.objects[name]
             if config[object.thob] and (config[object.thob].AvailableForLevel == 1)
-            and object.research_category 
+            and object.research_category
             and not research.research_progress[object].discovered then
               if object.research_category == "cure" then
                 cure = object
@@ -556,21 +570,21 @@ function Hospital:afterLoad(old, new)
   if old < 41 then
     self.boiler_can_break = true
   end
-  
+
   if old < 45 then
     self.num_explosions = 0
     self.num_vips = 0
   end
-  
+
   if old < 48 then
     self.seating_warning = 0
   end
-  
+
   if old < 50 then
-    self.num_vips_ty  = 0
-    self.pleased_vips_ty  = 0
+    self.num_vips_ty = 0
+    self.pleased_vips_ty = 0
     self.num_cured_ty = 0
-    self.not_cured_ty = 0 
+    self.not_cured_ty = 0
     self.num_visitors_ty = 0
 
     self.reception_desks = {}
@@ -582,12 +596,12 @@ function Hospital:afterLoad(old, new)
       end
     end
   end
-  
+
   if old < 52 then
     self:initOwnedPlots()
     self.handymanTasks = {}
   end
-  
+
   if old < 54 then
     local current = self.research.research_policy.specialisation.current
       if current and not current.dummy and not current.thob and not current.drug then
@@ -601,13 +615,23 @@ function Hospital:afterLoad(old, new)
   end
 
   if old < 56 then
-    self.research_dep_built = false 
-  end 
+    self.research_dep_built = false
+  end
   if old < 76 then
     self.msg_counter = 0
-  end    
+  end
+  if old < 84 then
+    self.vip_declined = 0
+  end
+
+  if old < 88 then
+    self.future_epidemics_pool = {}
+    self.concurrent_epidemic_limit = self.world.map.level_config.gbv.EpidemicConcurrentLimit or 1
+  end
+
 end
 
+--! Update the Hospital.patientcount variable.
 function Hospital:countPatients()
   -- I have taken the patient count out of town map, from memory it does not work the other way round.
   -- i.e. calling it from town map to use here
@@ -621,6 +645,23 @@ function Hospital:countPatients()
     end
   end
 end
+
+--! Count number of sitting and standing patients in the hospital.
+--!return (integer, integer) Number of sitting and number of standing patient in the hospital.
+function Hospital:countSittingStanding()
+  local numberSitting = 0
+  local numberStanding = 0
+  for _, patient in ipairs(self.patients) do
+    if patient.action_queue[1].name == "idle" then
+      numberStanding = numberStanding + 1
+    elseif patient.action_queue[1].name == "use_object"
+    and patient.action_queue[1].object.object_type.id == "bench" then
+      numberSitting = numberSitting + 1
+    end
+  end
+  return numberSitting, numberStanding
+end
+
 
 -- A range of checks to help a new player. These are set days apart and will show no more than once a month
 function Hospital:checkFacilities()
@@ -646,16 +687,8 @@ function Hospital:checkFacilities()
     -- check the seating : standing ratio of waiting patients
     -- find all the patients who are currently waiting around
     local show_msg = math.random(1, 4)
-    local numberSitting = 0
-    local numberStanding = 0
-    for _, patient in ipairs(self.patients) do
-      if (patient.action_queue[1].name == "idle") then
-        numberStanding = numberStanding + 1
-      elseif (patient.action_queue[1].name == "use_object" 
-      and patient.action_queue[1].object.object_type.id == "bench") then
-        numberSitting = numberSitting + 1
-      end
-    end
+    local numberSitting, numberStanding = self:countSittingStanding()
+
     -- If there are patients standing then maybe the seating is in the wrong place!
     -- set to 5% (standing:seated) if there are more than 50 patients or 20% if there are less than 50.
     -- If this happens for 10 days in any month you are warned about seating unless you have already been warned that month
@@ -664,7 +697,7 @@ function Hospital:checkFacilities()
       if numberStanding > math.min(numberSitting / 5) then
         self.seating_warning = self.seating_warning + 1
       end
-    elseif self.patientcount >= 50 then
+    else
       if numberStanding > math.min(numberSitting / 20) then
         self.seating_warning = self.seating_warning + 1
       end
@@ -672,8 +705,9 @@ function Hospital:checkFacilities()
         self:warningBench()
         self.seating_warning = 0
       end
-    elseif self.world.year == 1 and self.world.month > 4
-    and self.world.day == 12 and show_msg  == 4 and not self.bench_msg then
+    end
+    if self.world.day == 12 and show_msg  == 4 and not self.bench_msg
+    and (self.world.year > 1 or (self.world.year == 1 and self.world.month > 4)) then
       -- If there are less patients standing than sitting (1:20) and there are more benches than patients in the hospital
       -- you have plenty of seating.  If you have not been warned of standing patients in the last month, you could be praised.
       if self.world.object_counts.bench > self.patientcount then
@@ -682,14 +716,8 @@ function Hospital:checkFacilities()
       elseif self.world.object_counts.bench < self.patientcount then
         self:warningBench()
       end
-    elseif self.world.year > 1 and self.world.day == 12
-    and show_msg  == 4  and not self.bench_msg then
-      if self.world.object_counts.bench > self.patientcount then
-        self:praiseBench()
-      elseif self.world.object_counts.bench < self.patientcount then
-        self:warningBench()
-      end
     end
+
     -- Make players more aware of the need for radiators and how hot or cold the patients and staff are
     -- If there are no radiators remind the player from May onwards
     if self.world.object_counts.radiator == 0 and self.world.month > 4 and self.world.day == 15 then
@@ -758,22 +786,23 @@ end
 function Hospital:tick()
 -- add some random background sounds, ringing phones, coughing, belching etc
   self:countPatients()
-  local sounds = {  
+  local sounds = {
   "ispot001.wav", "ispot002.wav", "ispot003.wav", "ispot004.wav", "ispot005.wav", "ispot006.wav", "ispot007.wav", "ispot008.wav",
   "ispot009.wav", "ispot010.wav", "ispot011.wav", "ispot012.wav", "ispot013.wav", "ispot014.wav", "ispot015.wav", "ispot016.wav",
   "ispot017.wav", "ispot018.wav", "ispot019.wav", "ispot020.wav", "ispot021.wav", "ispot022.wav", "ispot023.wav", "ispot024.wav",
   "ispot025.wav"
-  } -- ispot026 and ispot027 are both toilet related sounds  
--- wait until there are some patients in the hospital and a room, otherwise you will wonder who is coughing or who is the 
--- receptionist telephoning! opted for gp as you can't run the hospital without one.  
+  } -- ispot026 and ispot027 are both toilet related sounds
+-- wait until there are some patients in the hospital and a room, otherwise you will wonder who is coughing or who is the
+-- receptionist telephoning! opted for gp as you can't run the hospital without one.
   if self:hasRoomOfType("gp") and self.patientcount > 2 then
     if math.random(1, 100) == 3 then
       local sound_to_play = sounds[math.random(1, #sounds)]
       if TheApp.audio:soundExists(sound_to_play) then
         self.world.ui:playSound(sound_to_play)
       end
-    end  
-  end    
+    end
+  end
+  self:manageEpidemics()
 end
 
 function Hospital:purchasePlot(plot_number)
@@ -783,16 +812,16 @@ function Hospital:purchasePlot(plot_number)
     if cost <= self.balance then
       self.world:setPlotOwner(plot_number, self:getPlayerIndex())
       table.insert(self.ownedPlots, plot_number)
-      -- Also make sure to apply transparency to the new walls, if required. 
+      -- Also make sure to apply transparency to the new walls, if required.
       self.world.ui:applyTransparency()
       self:spendMoney(cost, _S.transactions.buy_land, cost)
-      return true 
+      return true
     else
     -- Give visual warning that player doesn't have enough $ to build
     -- Let the message remain unitl cancelled by the player as it is being displayed behind the town map
-      self.world.ui.adviser:say(_A.warnings.cannot_afford_2, true, true)    
+      self.world.ui.adviser:say(_A.warnings.cannot_afford_2, true, true)
     end
-  end   
+  end
   return false
 end
 
@@ -832,7 +861,7 @@ function Hospital:isInHospital(x, y)
 end
 function Hospital:coldWarning()
   local announcements = {
-    "sorry002.wav", "sorry004.wav", 
+    "sorry002.wav", "sorry004.wav",
   }
   if announcements and self:isPlayerHospital() then
     self.world.ui:playAnnouncement(announcements[math.random(1, #announcements)])
@@ -840,7 +869,7 @@ function Hospital:coldWarning()
 end
 function Hospital:hotWarning()
   local announcements = {
-    "sorry003.wav", "sorry004.wav", 
+    "sorry003.wav", "sorry004.wav",
   }
   if announcements and self:isPlayerHospital() then
     self.world.ui:playAnnouncement(announcements[math.random(1, #announcements)])
@@ -899,7 +928,7 @@ function Hospital:onEndDay()
     if staff.humanoid_class == "Receptionist" then
       hosp.receptionist_count = hosp.receptionist_count + 1
     end
-  end    
+  end
   -- if there's currently an earthquake going on, possibly give the machines some damage
   if (self.world.active_earthquake) then
     for _, room in pairs(self.world.rooms) do
@@ -908,7 +937,7 @@ function Hospital:onEndDay()
         for object, value in pairs(room.objects) do
           if object.strength then
             -- The or clause is for backwards compatibility. Then the machine takes one damage each day.
-            if (object.quake_points and object.quake_points > 0) 
+            if (object.quake_points and object.quake_points > 0)
             or object.quake_points == nil then
               object:machineUsed(room)
             end
@@ -936,7 +965,7 @@ function Hospital:onEndDay()
     end
   end
 
-  -- Countdown for boiler breakdowns 
+  -- Countdown for boiler breakdowns
   if self.heating_broke then
     self.boiler_countdown = self.boiler_countdown - 1
     if self.boiler_countdown == 0 then
@@ -950,7 +979,7 @@ function Hospital:onEndDay()
   and self.world.object_counts.radiator > 0 then
     if tonumber(self.world.map.level_number) then
       if self.world.map.level_number == 1 and (self.world.month > 5 or self.world.year > 1) then
-        self:boilerBreakdown()  
+        self:boilerBreakdown()
       elseif self.world.map.level_number > 1 then
         self:boilerBreakdown()
       end
@@ -962,7 +991,7 @@ function Hospital:onEndDay()
   -- Calculate heating cost daily.  Divide the monthly cost by the number of days in that month
   local month_length = {
     31, -- Jan
-    28, -- Feb 
+    28, -- Feb
     31, -- Mar
     30, -- Apr
     31, -- May
@@ -998,7 +1027,7 @@ function Hospital:onEndMonth()
   if self:isPlayerHospital() then
     if self.balance < 1000 and not self.cash_msg then
       self:cashLow()
-    elseif self.balance > 6000 
+    elseif self.balance > 6000
     and self.loan > 0 and not self.cash_ms then
       self.world.ui.adviser:say(_A.warnings.pay_back_loan)
     end
@@ -1009,7 +1038,7 @@ function Hospital:onEndMonth()
     self:spendMoney(math.round(self.acc_loan_interest), _S.transactions.loan_interest)
     self.acc_loan_interest = 0
   end
-  -- Pay overdraft charges 
+  -- Pay overdraft charges
   if math.round(self.acc_overdraft) > 0 then
     self:spendMoney(math.round(self.acc_overdraft), _S.transactions.overdraft)
     self.acc_overdraft = 0
@@ -1021,21 +1050,19 @@ function Hospital:onEndMonth()
   end
   -- add to score each month
   -- rate varies on some performance factors i.e. reputation above 500 increases the score
-  -- and the number of deaths will reduce the score. 
-  local sal_inc = self.salary_incr /10
-  local sal_mult = ((self.reputation)-500)/((self.num_deaths)+1) -- added 1 so that you don't multipy by 0
+  -- and the number of deaths will reduce the score.
+  local sal_inc = self.salary_incr / 10
+  local sal_mult = (self.reputation - 500) / (self.num_deaths + 1) -- added 1 so that you don't divide by 0
   local month_incr = sal_inc + sal_mult
-  -- To ensure that you can't recieve less than 50 or 
+  -- To ensure that you can't receive less than 50 or
   -- more than 300 per month
   if month_incr < self.sal_min then
     month_incr = self.sal_min
   elseif month_incr > self.salary_incr then
     month_incr = self.salary_incr
-  else 
-    month_incr = month_incr
   end
   self.player_salary = self.player_salary + math.ceil(month_incr)
-  
+
   -- TODO: do you get interest on the balance owed?
   for i, company in ipairs(self.insurance_balance) do
     -- Get the amount that is about to be payed to the player
@@ -1048,10 +1075,10 @@ function Hospital:onEndMonth()
     table.remove(company, 3)
     table.insert(company, 1, 0) -- The new month have no payments yet
   end
-  
+
   -- Check for equipment getting available
   self.research:checkAutomaticDiscovery(self.world.month + 12 * (self.world.year - 1))
-  
+
   -- Add some interesting statistics.
   self.statistics[self.world.month + 1 + 12 * (self.world.year - 1)] = {
     money_in = self.money_in,
@@ -1070,10 +1097,10 @@ function Hospital:onEndMonth()
   if (self:isPlayerHospital() and not self:hasStaffedDesk()) and self.world.year == 1 then
     if self.receptionist_count ~= 0 and self.world.month > 2 and not self.receptionist_msg then
       self.world.ui.adviser:say(_A.warnings.no_desk_6)
-      self.receptionist_msg = true 
+      self.receptionist_msg = true
     elseif self.receptionist_count == 0 and self.world.month > 2 and self.world.object_counts["reception_desk"] ~= 0  then
       self.world.ui.adviser:say(_A.warnings.no_desk_7)
-    --  self.receptionist_msg = true     
+    --  self.receptionist_msg = true
     elseif self.world.month == 3 then
       self.world.ui.adviser:say(_A.warnings.no_desk, true)
     elseif self.world.month == 8 then
@@ -1095,17 +1122,17 @@ end
 
 function Hospital:hasStaffedDesk()
   return (self.world.object_counts["reception_desk"] ~= 0 and self:hasStaffOfCategory("Receptionist"))
-end  
+end
 
 --! Called at the end of each year
 function Hospital:onEndYear()
   self.sodas_sold = 0
   self.num_vips_ty  = 0
   self.num_deaths_this_year = 0
-  self.reputation_above_threshold = self.win_awards 
+  self.reputation_above_threshold = self.win_awards
   and self.world.map.level_config.awards_trophies.Reputation < self.reputation or false
   -- On third year of level 3 there is the large increase to salary
-  -- this will replicate that. I have still to check other levels above 5 to 
+  -- this will replicate that. I have still to check other levels above 5 to
   -- see if there are other large increases.
   -- TODO Hall of fame and shame
   if self.world.year == 3 and self.world.map.level_number == 3 then
@@ -1126,23 +1153,23 @@ function Hospital:createEmergency(emergency)
       -- Create a random emergency if parameters are not specified already.
       emergency = {
         disease = disease,
-        victims = number, 
+        victims = number,
         bonus = 1000,
         percentage = 0.75,
         killed_emergency_patients = 0,
         cured_emergency_patients = 0,
       }
     end
-    
+
     self.emergency = emergency
     -- The last room in the list of treatment rooms is considered when checking for availability.
     -- It works for all original diseases, but if we introduce new multiple room diseases it might break.
     -- TODO: Make it work for all kinds of lists of treatment rooms.
     -- TODO: Change to make use of Hospital:checkDiseaseRequirements
     local no_rooms = #emergency.disease.treatment_rooms
-    local room_name, required_staff, staff_name = 
+    local room_name, required_staff, staff_name =
       self.world:getRoomNameAndRequiredStaffName(emergency.disease.treatment_rooms[no_rooms])
-    
+
     local staff_available = self:hasStaffOfCategory(required_staff)
     -- Check so that all rooms in the list are available
     if self:hasRoomOfType(emergency.disease.treatment_rooms[no_rooms]) then
@@ -1195,7 +1222,10 @@ function Hospital:resolveEmergency()
   local total = emer.victims
   local max_bonus = emer.bonus * total
   local emergency_success = rescued_patients/total >= emer.percentage
-  local earned = math.floor((emergency_success and rescued_patients/total or 0) * 10) * max_bonus/10
+  local earned = 0
+  if emergency_success then
+    earned = emer.bonus * rescued_patients
+  end
   local message = {
     {text = _S.fax.emergency_result.saved_people
       :format(rescued_patients, total)},
@@ -1228,11 +1258,164 @@ function Hospital:createVip()
   local message = {
     {text = _S.fax.vip_visit_query.vip_name:format(vipName)},
     choices = {{text = _S.fax.vip_visit_query.choices.invite, choice = "accept_vip", additionalInfo = {name=vipName}},
-               {text = _S.fax.vip_visit_query.choices.refuse, choice = "refuse_vip"}}
+               {text = _S.fax.vip_visit_query.choices.refuse, choice = "refuse_vip", additionalInfo = {name=vipName}}}
   }
   -- auto-refuse after 20 days
   self.world.ui.bottom_panel:queueMessage("personality", message, nil, 24*20, 2)
 end
+
+--[[ Creates a new epidemic by creating a new contagious patient with
+ a random disease - this is NOT typically how epidemics are started (mainly for cheat use)
+ see @Hospital:determineIfContagious() to see how epidemics are typically started]]
+function Hospital:spawnContagiousPatient()
+  --[[ Gets the available non-visual disease in the current world
+    @return non_visuals (table) table of available non-visual diseases]]
+  local function get_avaliable_contagious_diseases()
+    local contagious = {}
+    for _, disease in ipairs(self.world.available_diseases) do
+      if disease.contagious then
+          contagious[#contagious + 1] = disease
+      end
+    end
+    return contagious
+  end
+
+  if self:hasStaffedDesk() then
+    local patient = self.world:newEntity("Patient", 2)
+    local contagious_diseases = get_avaliable_contagious_diseases()
+    if #contagious_diseases > 0 then
+      local disease = contagious_diseases[math.random(1,#contagious_diseases)]
+      patient:setDisease(disease)
+      --Move the first patient closer (FOR TESTING ONLY)
+      local x,y = self:getHeliportSpawnPosition()
+      patient:setTile(x,y)
+      patient:setHospital(self)
+      self:addToEpidemic(patient)
+    else
+      print("Cannot create epidemic - no contagious diseases available")
+    end
+  else
+    print("Cannot create epidemic - no staffed reception desk")
+  end
+end
+
+function Hospital:countEpidemics()
+  -- Count the current epidemic if it exists
+  local epidemic_count = self.epidemic and 1 or 0
+  epidemic_count = epidemic_count + #self.future_epidemics_pool
+  return epidemic_count
+end
+
+--[[ Make the active epidemic (if exists) and any future epidemics tick. If there
+is no current epidemic determines if any epidemic in the pool of future
+epidemics can become the active one. Also removes any epidemics from the
+future pool which have no infected patients and thus, will have no effect on
+the hospital. ]]
+function Hospital:manageEpidemics()
+  --[[ Can the future epidemic be revealed to the player
+  @param future_epidemic (Epidemic) the epidemic to attempt to reveal
+  @return true if can be revealed false otherwise (boolean) ]]
+  local function can_be_revealed(epidemic)
+    return not self.world.ui:getWindow(UIWatch) and
+    not self.epidemic and epidemic.ready_to_reveal
+  end
+
+  local current_epidemic = self.epidemic
+  if(current_epidemic) then
+    current_epidemic:tick()
+  end
+
+  if self.future_epidemics_pool then
+    for i, future_epidemic in ipairs(self.future_epidemics_pool) do
+      if future_epidemic:hasNoInfectedPatients() then
+        table.remove(self.future_epidemics_pool,i)
+      elseif can_be_revealed(future_epidemic) then
+        self.epidemic = future_epidemic
+        self.epidemic:revealEpidemic()
+        table.remove(self.future_epidemics_pool,i)
+      else
+        future_epidemic:tick()
+      end
+    end
+  end
+end
+
+--[[ Determines if a patient is contagious and then attempts to add them the
+ appropriate epidemic if so.
+ @param patient (Patient) patient to determine if contagious]]
+function Hospital:determineIfContagious(patient)
+  if patient.is_emergency or not patient.disease.contagious then
+    return false
+  end
+  -- ContRate treated like a percentage with ContRate% of patients with
+  -- a disease having the contagious strain
+  local config = self.world.map.level_config
+  local expertise = config.expertise
+  local disease = patient.disease
+  local contRate = expertise[disease.expertise_id].ContRate or 0
+
+  -- The patient is potentially contagious as we do not yet know if there
+  -- is a suitable epidemic which they can belong to
+  local potentially_contagious = contRate > 0 and (math.random(1,contRate) == contRate)
+  -- The patient isn't contagious if these conditions aren't passed
+  local reduce_months = config.ReduceContMonths or 14
+  local reduce_people = config.ReduceContPeepCount or 20
+  local date_in_months = self.world.month + (self.world.year - 1)*12
+
+  if potentially_contagious and date_in_months > reduce_months and
+      self.num_visitors > reduce_people then
+    self:addToEpidemic(patient)
+  end
+end
+
+--[[ Determines if there is a suitable epidemic the contagious patient can
+ belong to and adds them to it if possible. N.B. a patient isn't actually
+ contagious until they belong to an epidemic. So if it isn't possible to add a
+ patient to an epidemic they are just treated as a normal patient.
+ @param patient (Patient) patient to attempt to add to an epidemic  ]]
+function Hospital:addToEpidemic(patient)
+  --[[ See if there exists a future epidemic with the same
+  disease as the contagious patient - if so add them to it
+  @param patient (Patient) the patient to add to the epidemic
+  @return true if patient was successfully added to a future epidemic
+  false otherwise (boolean) ]]
+  local function add_to_existing_future_epidemic(patient)
+    for _, future_epidemic in ipairs(self.future_epidemics_pool) do
+      if future_epidemic.disease == patient.disease then
+        future_epidemic:addContagiousPatient(patient)
+        return true
+      end
+    end
+    return false
+  end
+
+  --[[ Create a new epidemic and add it to the pool of future epidemics
+  @param patient (Patient) the patient who will be the first
+  contagious patient of the new epidemic]]
+  local function add_new_epidemic_to_pool(patient)
+    local new_epidemic = Epidemic(self,patient)
+    self.future_epidemics_pool[#self.future_epidemics_pool + 1] = new_epidemic
+  end
+
+  local epidemic = self.epidemic
+  -- Don't add a new contagious patient if the player is trying to cover up
+  -- an existing epidemic - not really fair
+  if epidemic and not epidemic.coverup_in_progress and
+      (patient.disease == epidemic.disease) then
+    epidemic:addContagiousPatient(patient)
+  elseif self.future_epidemics_pool and
+      not (epidemic and epidemic.coverup_in_progress) then
+    local added_to_future_epidemic = add_to_existing_future_epidemic(patient)
+    if not added_to_future_epidemic then
+      -- Make a new epidemic as one doesn't exist with this disease only if
+      -- we haven't reach the concurrent epidemic limit
+      if self:countEpidemics() < self.concurrent_epidemic_limit then
+        add_new_epidemic_to_pool(patient)
+      end
+    end
+  end
+end
+
 
 function Hospital:spawnPatient()
   self.world:spawnPatient(self)
@@ -1344,8 +1527,8 @@ function Hospital:receiveMoneyForTreatment(patient)
       if patient.insurance_company then
         self:addInsuranceMoney(patient.insurance_company, amount)
       else
-        self:receiveMoney(amount, reason) 
-      end 
+        self:receiveMoney(amount, reason)
+      end
     end
   end
 end
@@ -1398,12 +1581,15 @@ function Hospital:addPatient(patient)
   -- Add to the hospital's visitor count
   self.num_visitors = self.num_visitors + 1
   self.num_visitors_ty = self.num_visitors_ty + 1
+
+  -- Decide if the patient belongs in an epidemic
+  self:determineIfContagious(patient)
 end
 
 function Hospital:humanoidDeath(humanoid)
   self.num_deaths = self.num_deaths + 1
   self.num_deaths_this_year = self.num_deaths_this_year + 1
-  
+
   self:changeReputation("death", humanoid.disease)
   self:updatePercentages()
 end
@@ -1419,8 +1605,8 @@ function Hospital:hasStaffOfCategory(category)
     if staff.humanoid_class == category then
       result = (result or 0) + 1
     elseif staff.humanoid_class == "Doctor" then
-      if (category == "Psychiatrist" and staff.profile.is_psychiatrist >= 1.0) or 
-          (category == "Surgeon" and staff.profile.is_surgeon >= 1.0) or 
+      if (category == "Psychiatrist" and staff.profile.is_psychiatrist >= 1.0) or
+          (category == "Surgeon" and staff.profile.is_surgeon >= 1.0) or
           (category == "Researcher" and staff.profile.is_researcher >= 1.0) or
           (category == "Consultant" and staff.profile.is_consultant) then
         result = (result or 0) + 1
@@ -1475,7 +1661,7 @@ local reputation_changes = {
 --! disease also has its own reputation meter.
 --!param reason (string) The reason for changing reputation, for example "cured" or "death".
 --!param disease The disease, if any, that should be affected.
---!param valueChange (integer) In some cases, for example at year end, the amount varies a lot. 
+--!param valueChange (integer) In some cases, for example at year end, the amount varies a lot.
 -- Then it is specified here.
 function Hospital:changeReputation(reason, disease, valueChange)
   local amount
@@ -1541,7 +1727,7 @@ function Hospital:checkDiseaseRequirements(disease)
       rooms[#rooms + 1] = room_id
       any = true
     end
-    
+
     -- Get staff for room
     for staff_class, amount in pairs(TheApp.rooms[room_id].required_staff) do
       local available = self:hasStaffOfCategory(staff_class) or 0
@@ -1596,7 +1782,7 @@ function Hospital:removeHandymanTask(taskIndex, taskType)
     local task = subTable[taskIndex]
     table.remove(subTable, taskIndex)
     if task.assignedHandyman then
-      if task.object.ticks ~= true then 
+      if task.object.ticks ~= true then
         task.assignedHandyman:interruptHandymanTask()
       end
     end
@@ -1606,7 +1792,7 @@ end
 function Hospital:findHandymanTaskSubtable(taskType)
   for i,v in ipairs(self.handymanTasks) do
     if self.handymanTasks[i].taskType == taskType then
-      return self.handymanTasks[i].subTable 
+      return self.handymanTasks[i].subTable
     end
   end
   table.insert(self.handymanTasks, {["taskType"] = taskType, ["subTable"] = {}})
@@ -1632,7 +1818,7 @@ end
 
 function Hospital:searchForHandymanTask(handyman, taskType)
   local subTable = self:findHandymanTaskSubtable(taskType)
-  --if a distance is smaller than this value stop the search to 
+  --if a distance is smaller than this value stop the search to
   --save performance
   local thresholdForStopping = 3
   local first, dist, index, priority, multiplier = true, 0, -1, 0, 1
@@ -1663,6 +1849,12 @@ function Hospital:searchForHandymanTask(handyman, taskType)
       if v.assignedHandyman then
         if v.assignedHandyman.fired then
           v.assignedHandyman = nil
+        elseif not v.assignedHandyman.hospital then
+          -- This should normally never be the case. If the handyman doesn't belong to a hsopital
+          -- then they should not have any tasks assigned to them however it was previously possible
+          -- We need to tidy up to make sure the task can be reassigned.
+          print("Warning: Orphaned handyman is still assigned a task. Removing.");
+          v.assignedHandyman = nil
         else
           local assignedDistance = self.world:getPathDistance(v.tile_x, v.tile_y, v.assignedHandyman.tile_x, v.assignedHandyman.tile_y)
           if assignedDistance ~= false then
@@ -1679,7 +1871,7 @@ function Hospital:searchForHandymanTask(handyman, taskType)
             end
           end
         end
-      end  
+      end
       if canContinue then
         if first then
           if distance <= thresholdForStopping then
@@ -1740,11 +1932,11 @@ function Hospital:roomNotYetResearched(disease)
       end
     end
   end
-  return false  
+  return false
 end
 
 --! Function that returns true if concentrating research on the disease is possible.
---! @param disease (string): the disease to be checked. 
+--! @param disease (string): the disease to be checked.
 function Hospital:canConcentrateResearch(disease)
   local book = self.disease_casebook
   if not book[disease].pseudo and self:roomNotYetResearched(disease) then
@@ -1752,7 +1944,7 @@ function Hospital:canConcentrateResearch(disease)
   end
   if book[disease].drug then
     return book[disease].cure_effectiveness < 100
-  end 
+  end
   local room
   if book[disease].pseudo then
     room = book[disease].disease.id:sub(6)
@@ -1769,7 +1961,7 @@ function Hospital:canConcentrateResearch(disease)
   end
 
   if object_type then
-    local progress = research_progress[self.world.object_types[object_type]]  
+    local progress = research_progress[self.world.object_types[object_type]]
     return progress.start_strength < self.world.map.level_config.gbv.MaxObjectStrength
   end
   return false

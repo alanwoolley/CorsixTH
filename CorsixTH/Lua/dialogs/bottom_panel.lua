@@ -23,7 +23,7 @@ class "UIBottomPanel" (Window)
 
 function UIBottomPanel:UIBottomPanel(ui)
   self:Window()
-  
+
   local app = ui.app
 
   self.ui = ui
@@ -37,17 +37,17 @@ function UIBottomPanel:UIBottomPanel(ui)
   self.date_font = app.gfx:loadFont("QData", "Font16V")
   self.white_font = app.gfx:loadFont("QData", "Font01V", 0, -2)
   self.pause_font = app.gfx:loadFont("QData", "Font124V")
-  
+
   -- State relating to fax notification messages
   self.show_animation = true
   self.factory_counter = 22
   self.factory_direction = 0
   self.message_windows = {}
   self.message_queue = {}
-  
+
   self.default_button_sound = "selectx.wav"
   self.countdown = 0
-  
+
   self.bank_button = self:addPanel( 1,   0, 0):makeToggleButton(6, 6, 35, 36, 2, self.dialogBankManager, nil, self.dialogBankStats):setTooltip(_S.tooltip.toolbar.bank_button)
   self:addPanel( 3,  40, 0) -- Background for balance, rep and date
   self:addPanel( 4, 206, 0):makeButton(6, 6, 35, 36, 5, self.dialogBuildRoom):setTooltip(_S.tooltip.toolbar.rooms)
@@ -61,11 +61,11 @@ function UIBottomPanel:UIBottomPanel(ui)
     self:addPanel(13, x, 0)
   end
   self:addPanel(14, 627, 0)
-  
+
   -- Buttons that are shown instead of the dynamic info bar when hovering over it.
   local panels = {}
   local buttons = {}
-  
+
   panels[1]  = self:addPanel(15, 364, 0) -- Staff management button
   buttons[1] = panels[1]:makeToggleButton(6, 6, 35, 36, 16, self.dialogStaffManagement):setTooltip(_S.tooltip.toolbar.staff_list)
   panels[2]  = self:addPanel(17, 407, 0) -- Town map button
@@ -86,7 +86,7 @@ function UIBottomPanel:UIBottomPanel(ui)
     end
   self.additional_panels = panels
   self.additional_buttons = buttons
-  
+
   self:makeTooltip(_S.tooltip.toolbar.balance, 41, 5, 137, 28)
   self:makeTooltip(_S.tooltip.toolbar.date, 140, 5, 200, 42)
   self:makeDynamicTooltip(--[[persistable:reputation_tooltip]] function()
@@ -103,7 +103,7 @@ function UIBottomPanel:UIBottomPanel(ui)
   ui:addKeyHandler("F7", buttons[5], buttons[5].handleClick, "left")    -- status
   ui:addKeyHandler("F8", buttons[6], buttons[6].handleClick, "left")    -- charts
   ui:addKeyHandler("F9", buttons[7], buttons[7].handleClick, "left")    -- policy
-  
+
   -- "old" keyboard shortcuts for some of the fullscreen windows
   ui:addKeyHandler("T", buttons[2], buttons[2].handleClick, "left") -- T for town map
   ui:addKeyHandler("R", buttons[4], buttons[4].handleClick, "left") -- R for research
@@ -112,14 +112,14 @@ function UIBottomPanel:UIBottomPanel(ui)
     ui:addKeyHandler("C", buttons[3], buttons[3].handleClick, "left") -- C for casebook
   else
     ui:addKeyHandler({"shift", "C"}, buttons[3], buttons[3].handleClick, "left") -- Shift + C for casebook
-  end    
+  end
   ui:addKeyHandler({"shift", "L"}, self, self.openLoad)  -- Shift + L for Load saved game menu
   ui:addKeyHandler({"shift", "S"}, self, self.openSave)  -- Shift + S for Load create save menu
   ui:addKeyHandler({"shift", "R"}, self, self.restart)  -- Shift + R for restart the level
   ui:addKeyHandler({"shift", "Q"}, self, self.quit)  -- Shift + Q quit the game and return to main menu
   ui:addKeyHandler({"shift", "alt", "S"}, self, self.quickSave)  -- Shift+Alt+S quick save
-  ui:addKeyHandler({"shift", "alt", "L"}, self, self.quickLoad)  -- Shift+Alt+L load last quick save 
-  
+  ui:addKeyHandler({"shift", "alt", "L"}, self, self.quickLoad)  -- Shift+Alt+L load last quick save
+
   -- misc. keyhandlers
   ui:addKeyHandler("M", self, self.openFirstMessage)    -- M for message
   ui:addKeyHandler("I", self, self.toggleInformation)   -- I for Information when you first build
@@ -132,11 +132,11 @@ end
 
 function UIBottomPanel:openSave()
   self.ui:addWindow(UISaveGame(self.ui))
-end  
+end
 
 function UIBottomPanel:openLoad()
   self.ui:addWindow(UILoadGame(self.ui, "game"))
-end 
+end
 
 function UIBottomPanel:quickSave()
   self.ui.app:quickSave()
@@ -144,14 +144,14 @@ end
 
 function UIBottomPanel:quickLoad()
   self.ui.app:quickLoad()
-end 
+end
 
 function UIBottomPanel:restart()
   self.ui.app:restart()
-end 
+end
 
 function UIBottomPanel:quit()
-  self.ui:quit() 
+  self.ui:quit()
 end
 
 function UIBottomPanel:draw(canvas, x, y)
@@ -161,28 +161,28 @@ function UIBottomPanel:draw(canvas, x, y)
   self.money_font:draw(canvas, ("%7i"):format(self.ui.hospital.balance), x + 44, y + 9)
   local month, day = self.world:getDate()
   self.date_font:draw(canvas, _S.date_format.daymonth:format(day, month), x + 140, y + 20, 60, 0)
-  
+
   -- Draw possible information in the dynamic info bar
   if not self.additional_panels[1].visible then
     self:drawDynamicInfo(canvas, x + 364, y)
   end
-  
+
   if self.show_animation then
     if self.factory_counter >= 1 then
         self.panel_sprites:draw(canvas, 40, x + 177, y + 1)
     end
-  
+
     if self.factory_counter > 1 and self.factory_counter <= 22 then
       for dx = 0, self.factory_counter do
         self.panel_sprites:draw(canvas, 41, x + 179 + dx, y + 1)
       end
     end
-  
+
     if self.factory_counter == 22 then
       self.panel_sprites:draw(canvas, 42, x + 201, y + 1)
     end
   end
-  
+
   self:drawReputationMeter(canvas, x + 55, y + 35)
 end
 
@@ -288,7 +288,7 @@ function UIBottomPanel:queueMessage(type, message, owner, timeout, default_choic
     self.world.ui.adviser:say(_A.information.fax_received)
     self.ui.hospital.message_popup = true
   end
-  self.message_queue[#self.message_queue + 1] = {
+  local fax = {
     type = type,
     message = message,
     owner = owner,
@@ -296,11 +296,69 @@ function UIBottomPanel:queueMessage(type, message, owner, timeout, default_choic
     default_choice = default_choice,
     callback = callback,
   }
-  -- create reference to message in owner
-  if owner then
-    owner.message = message
+
+  if self:canQueueFax(fax) then
+    self.message_queue[#self.message_queue + 1] = fax
+    -- create reference to message in owner
+    if owner then
+      owner.message = message
+    end
+  else
+    self:cancelFax(fax.type)
   end
 end
+
+--[[ A fax can be queued if the event the fax causes does not effect
+an event caused by any other fax that is queued. i.e both emergency
+and epidemics use the timer, so both faxes cannot appear at the same time.
+@param fax (table) the fax we want to determine if can be queued.
+@return true if fax can be queued, false otherwise (boolean) ]]
+function UIBottomPanel:canQueueFax(fax)
+  --[[ Determine if fax of a particular type is queued either in the
+  message queue or the message window (ui)
+  @param fax_type (string) the fax type to check if any queued
+  @return true if any of fax_type is queued false otherwise (boolean) ]]
+  local function isFaxTypeQueued(fax_type)
+    -- Check the queued messages
+    for _, fax in ipairs(self.message_queue) do
+      if fax.type == fax_type then
+        return true
+      end
+    end
+    -- Then the messages displayed on the bottom bar
+    for _, fax in ipairs(self.message_windows) do
+      if fax.type == fax_type then
+        return true
+      end
+    end
+    return false
+  end
+
+  if fax.type == "epidemy" then
+    if isFaxTypeQueued("emergency") then
+      return false
+    end
+  elseif fax.type == "emergency" then
+    if isFaxTypeQueued("epidemy") then
+      return false
+    end
+  end
+  return true
+end
+
+--[[ Cancels a fax of a particular type currently only "emergency" and "epidemy"
+Handles the cancelling of the event which the fax pertains to.
+@param fax_type (string) type of fax event to be cancelled]]
+function UIBottomPanel:cancelFax(fax_type)
+  local hospital = self.ui.hospital
+  if fax_type == "epidemy" then
+    hospital.epidemic:clearAllInfectedPatients()
+    hospital.epidemic = nil
+  elseif fax_type == "emergency" then
+    self.world:nextEmergency()
+  end
+end
+
 -- Opens the last available message. Currently used to open the level completed message.
 function UIBottomPanel:openLastMessage()
   if #self.message_queue > 0 then
@@ -314,7 +372,7 @@ end
 -- first performing the necessary animation.
 function UIBottomPanel:showMessage()
   if self.factory_direction ~= -1 then
-    self.factory_direction = -1 
+    self.factory_direction = -1
     if self.factory_counter < 0 then
       -- Factory is already opened so don't wait to show the message
       self.show_animation = false
@@ -372,7 +430,7 @@ function UIBottomPanel:createMessageWindow(index)
     end
     table.remove(self.message_windows, index_to_remove)
   end
-  
+
   if not index then
     index = 1
   end
@@ -413,7 +471,7 @@ function UIBottomPanel:onTick()
       self.factory_counter = self.factory_counter - 1
     end
   end
-  
+
   -- The dynamic info bar is there a while longer when hovering an entity has stopped
   if self.countdown then
     if self.countdown < 1 then
@@ -432,12 +490,12 @@ function UIBottomPanel:onTick()
       self.countdown = self.countdown - 1
     end
   end
-  
+
   -- Move an item out of the message queue if there is room
   if #self.message_windows < 5 and #self.message_queue > 0 then
     self:showMessage()
   end
-  
+
   Window.onTick(self)
 end
 
@@ -454,7 +512,7 @@ function UIBottomPanel:dialogBankCommon(enable, stats)
     self:updateButtonStates()
     return
   end
-    
+
   if enable then
     self:addDialog("UIBankManager", stats and "showStatistics")
   else
@@ -723,7 +781,7 @@ function UIBottomPanel:afterLoad(old, new)
       self.additional_buttons[i] = self.buttons[5 + i]:makeToggle() -- made them toggle buttons
     end
     self.bank_button = self.buttons[1]:makeToggle()
-    
+
     -- keyboard shortcuts have been added/changed
     self.ui:addKeyHandler("F1", self.bank_button, self.bank_button.handleClick, "left")  -- bank manager
     self.ui:addKeyHandler("F2", self.bank_button, self.bank_button.handleClick, "right")  -- bank manager
@@ -757,13 +815,13 @@ function UIBottomPanel:afterLoad(old, new)
     self.ui:addKeyHandler("J", self, self.openJukebox)   -- open the jukebox
     self.ui:addKeyHandler({"shift", "L"}, self, self.openLoad)  -- Shift + L for Load saved game menu
     self.ui:addKeyHandler({"shift", "S"}, self, self.openSave)  -- Shift + S for Load create save menu
-    self.ui:addKeyHandler({"shift", "R"}, self, self.restart)  -- Shift + R for restart the level 
-    self.ui:addKeyHandler({"shift", "Q"}, self, self.quit)  -- Shift + Q quit the game and return to main menu    
-  end  
+    self.ui:addKeyHandler({"shift", "R"}, self, self.restart)  -- Shift + R for restart the level
+    self.ui:addKeyHandler({"shift", "Q"}, self, self.quit)  -- Shift + Q quit the game and return to main menu
+  end
   if old < 82 then
     self.ui:addKeyHandler({"shift","alt", "S"}, self, self.quickSave)  -- Shift+Alt+S quick save
     self.ui:addKeyHandler({"shift","alt", "L"}, self, self.quickLoad)  -- Shift+Alt+L load last quick save
-  end    
+  end
   Window.afterLoad(self, old, new)
 end
 
