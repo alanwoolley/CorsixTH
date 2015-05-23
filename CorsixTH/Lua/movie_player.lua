@@ -25,6 +25,9 @@ local pathsep = package.config:sub(1, 1)
 
 class "MoviePlayer"
 
+---@type MoviePlayer
+local MoviePlayer = _G["MoviePlayer"]
+
 function MoviePlayer:MoviePlayer(app, audio, video)
   self.app = app
   self.audio = audio
@@ -242,9 +245,6 @@ function MoviePlayer:_destroyMovie()
   if self.opengl_mode_index then
     self.app.modes[self.opengl_mode_index] = "opengl"
   end
-  if(self.moviePlayer:requiresVideoReset()) then
-    self.app.ui:resetVideo()
-  end
   if self.channel >= 0 then
     self.audio:releaseChannel(self.channel)
     self.channel = -1
@@ -266,3 +266,6 @@ function MoviePlayer:refresh()
   self.moviePlayer:refresh()
 end
 
+function MoviePlayer:updateRenderer()
+  self.moviePlayer:setRenderer(self.video)
+end

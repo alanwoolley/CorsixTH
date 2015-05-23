@@ -20,6 +20,9 @@ SOFTWARE. --]]
 
 class "UIFax" (UIFullscreen)
 
+---@type UIFax
+local UIFax = _G["UIFax"]
+
 function UIFax:UIFax(ui, icon)
   self:UIFullscreen(ui)
   local gfx = ui.app.gfx
@@ -155,6 +158,7 @@ function UIFax:choice(choice,additionalInfo)
       }
     end
   end
+  local vip_ignores_refusal = math.random(1, 2)
   if choice == "accept_emergency" then
     self.ui.app.world:newObject("helicopter", self.ui.hospital, "north")
     self.ui:addWindow(UIWatch(self.ui, "emergency"))
@@ -162,11 +166,27 @@ function UIFax:choice(choice,additionalInfo)
     self.ui.adviser:say(_A.information.emergency)
   elseif choice == "refuse_emergency" then
     self.ui.app.world:nextEmergency()
-  elseif choice == "accept_vip" then
-    self.ui.hospital.num_vips = self.ui.hospital.num_vips+1
+  -- VIP may choose to visit anyway if he is refused too often
+  elseif (self.ui.hospital.vip_declined > 2 and vip_ignores_refusal == 2) and choice == "refuse_vip" then
+    self.ui.hospital.num_vips = self.ui.hospital.num_vips + 1
     self.ui.app.world:spawnVIP(additionalInfo.name)
+    self.ui.hospital.vip_declined = 0
   elseif choice == "refuse_vip" then
     self.ui.app.world:nextVip() -- don't start an inspection
+    self.ui.hospital.vip_declined = self.ui.hospital.vip_declined + 1
+  elseif choice == "accept_vip" then
+    self.ui.hospital.num_vips = self.ui.hospital.num_vips + 1
+    self.ui.app.world:spawnVIP(additionalInfo.name)
+  elseif choice == "declare_epidemic" then
+    local epidemic = self.ui.hospital.epidemic
+    if epidemic then
+      epidemic:resolveDeclaration()
+    end
+  elseif choice == "cover_up_epidemic" then
+    local epidemic = self.ui.hospital.epidemic
+    if epidemic then
+      epidemic:startCoverUp()
+    end
   elseif choice == "accept_new_level" then
     -- Set the new salary.
     self.ui.hospital.player_salary = self.ui.hospital.salary_offer

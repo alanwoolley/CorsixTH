@@ -22,6 +22,9 @@ local TH = require "TH"
 
 class "Room"
 
+---@type Room
+local Room = _G["Room"]
+
 function Room:Room(x, y, w, h, id, room_info, world, hospital, door, door2)
   self.id = id
   self.world = world
@@ -63,6 +66,9 @@ function Room:initRoom(x, y, w, h, door, door2)
   self.humanoids_enroute = {--[[a set rather than a list]]}
 end
 
+--! Get the tile next to the door.
+--!param inside (bool) If set, get the tile inside the room, else get the tile outside.
+--!return x,y (tile coordinates) of the tile next to the door.
 function Room:getEntranceXY(inside)
   local door = self.door
   local x, y = door.tile_x, door.tile_y
@@ -76,6 +82,8 @@ function Room:getEntranceXY(inside)
   return x, y
 end
 
+--! Construct an 'walk' action to the tile next to the door, just outside the room.
+--!return Action to move to the tile just outside the room.
 function Room:createLeaveAction()
   local x, y = self:getEntranceXY(false)
   return {
@@ -113,6 +121,8 @@ function Room:createEnterAction(humanoid_entering, callback)
     is_entering = humanoid_entering and self or true}
 end
 
+--! Get a patient in the room.
+--!return A patient (humanoid) if there is a patient, nil otherwise.
 function Room:getPatient()
   for humanoid in pairs(self.humanoids) do
     if class.is(humanoid, Patient) then
@@ -121,6 +131,8 @@ function Room:getPatient()
   end
 end
 
+--! Count the number of patients in the room.
+--!return Number of patients in the room.
 function Room:getPatientCount()
   local count = 0
   for humanoid in pairs(self.humanoids) do
@@ -254,19 +266,25 @@ function Room:testStaffCriteria(criteria, extra_humanoid)
   end
 end
 
-local no_staff = {}
+local no_staff = {} -- Constant denoting 'no staff at all' in a room.
+
+--! Get the type and number of maximum staff for the room.
+--!return (table) Type and number of maximum staff.
 function Room:getMaximumStaffCriteria()
   -- Some rooms have dynamic criteria (i.e. dependent upon the number of items
   -- in the room), so this method is provided for such rooms to override it.
   return self.room_info.maximum_staff or self.room_info.required_staff or no_staff
 end
 
+--! Get the type and number of required staff for the room.
+--!return (table) Type and number of required staff.
 function Room:getRequiredStaffCriteria()
   return self.room_info.required_staff or no_staff
 end
 
 function Room:onHumanoidEnter(humanoid)
   assert(not self.humanoids[humanoid], "Humanoid entering a room that they are already in")
+
   humanoid.in_room = self
   humanoid.last_room = self -- Remember where the staff was for them to come back after staffroom rest
   -- Do not set humanoids[humanoid] here, because it affect staffFitsInRoom test
@@ -358,6 +376,16 @@ function Room:onHumanoidEnter(humanoid)
   self.humanoids[humanoid] = true
   self:tryAdvanceQueue()
   if class.is(humanoid, Patient) then
+    -- An infect patient's disease may have changed so they might have
+    -- been sent to an incorrect diagnosis room, they should leave and go
+    -- back to the gp for redirection
+    if (humanoid.infected) and not humanoid.diagnosed and
+        not self:isDiagnosisRoomForPatient(humanoid) then
+      humanoid:queueAction(self:createLeaveAction())
+      humanoid.needs_redirecting = true
+      humanoid:queueAction({name = "seek_room", room_type = "gp"})
+      return
+    end
     -- Check if the staff requirements are still fulfilled (the staff might have left / been picked up meanwhile)
     if self:testStaffCriteria(self:getRequiredStaffCriteria()) then
       if self.staff_member  then
@@ -393,17 +421,23 @@ function Room:createDealtWithPatientCallback(humanoid)
   self.waiting_staff_member = humanoid
 end
 
--- Returns the current staff member. Can be overriden in rooms with multiples staff members to return the desired one.
+--! Get the current staff member.
+-- Can be overridden in rooms with multiple staff members to return the desired one.
+--!return (staff) The current staff member.
 function Room:getStaffMember()
   return self.staff_member
 end
 
+--! Set the current staff member.
+--!param staff (staff) Staff member to denote as current staff.
 function Room:setStaffMember(staff)
   self.staff_member = staff
 end
 
+--! Does the given staff member fit in the room?
 -- Returns false if the room is already full of staff or if the given member of staff cannot help out.
 -- Otherwise returns true.
+--!return (bool) True if the staff member can work in the room, else False.
 function Room:staffFitsInRoom(staff)
   local criteria = self:getMaximumStaffCriteria()
   if self:testStaffCriteria(criteria) or not self:testStaffCriteria(criteria, staff) then
@@ -544,15 +578,17 @@ function Room:onHumanoidLeave(humanoid)
     end
     -- Make patients leave the room if there are no longer enough staff
     if not self:testStaffCriteria(self:getRequiredStaffCriteria()) then
-      -- Call for staff if needed
-      if self.is_active and self.door.queue:patientSize() > 0 then
-        self.world.dispatcher:callForStaff(self)
-      end
+      local patient_needs_to_reenter = false
       for humanoid in pairs(self.humanoids) do
         if class.is(humanoid, Patient) and self:shouldHavePatientReenter(humanoid) then
           self:makeHumanoidLeave(humanoid)
           humanoid:queueAction(self:createEnterAction(humanoid))
+          patient_needs_to_reenter = true
         end
+      end
+      -- Call for staff if needed
+      if self.is_active and (patient_needs_to_reenter or self.door.queue:patientSize() > 0) then
+        self.world.dispatcher:callForStaff(self)
       end
     end
     -- Remove any unwanted moods the staff member might have
@@ -579,6 +615,9 @@ end
 
 local tile_factor = 10     -- how many tiles further are we willing to walk for 1 person fewer in the queue
 local readiness_bonus = 50 -- how many tiles further are we willing to walk if the room has all the required staff
+
+--! Score function to decide how desirable a room is for a patient.
+--!return (int) The score, lower is better.
 function Room:getUsageScore()
   local queue = self.door.queue
   local score = queue:patientSize() + self:getPatientCount() - self.maximum_patients
@@ -655,8 +694,10 @@ function Room:tryToFindNearbyPatients()
       while queue:reportedSize() > 1 do
         local patient = queue:back()
         local px, py = patient.tile_x, patient.tile_y
-        if world:getPathDistance(px, py, our_x, our_y) + our_score <
-        world:getPathDistance(px, py, other_x, other_y) + other_score then
+        -- Don't reroute the patient if he just decided to go to the toilet
+        if not patient.going_to_toilet and
+          world:getPathDistance(px, py, our_x, our_y) + our_score <
+          world:getPathDistance(px, py, other_x, other_y) + other_score then
           -- Update the queues
           queue:removeValue(patient)
           patient.next_room_to_visit = self
@@ -672,7 +713,13 @@ function Room:tryToFindNearbyPatients()
             if i ~= 1 then
               action.todo_interrupt = true
             end
-            if action.name == "walk" and action.x == other_x and action.y == other_y then
+            -- The patient will most likely have a queue action for the other
+            -- room that must be cancelled. To prevent the after_use callback
+            -- of the drinks machine to enqueue the patient in the other queue
+            -- again, is_in_queue is set to false so the callback won't run
+            if action.name == 'queue' then
+              action.is_in_queue = false
+            elseif action.name == "walk" and action.x == other_x and action.y == other_y then
               local action = self:createEnterAction(patient)
               patient:queueAction(action, i)
               break
@@ -692,10 +739,24 @@ function Room:tryToFindNearbyPatients()
   end
 end
 
+--! Explode the room.
 function Room:crashRoom()
   self.door:closeDoor()
   if self.door2 then
     self.door2.hover_cursor = nil
+  end
+
+  -- A patient might be about to use the door (staff are dealt with elsewhere):
+  if self.door.reserved_for then
+    local person = self.door.reserved_for
+    if not person:isLeaving() then
+      if class.is(person, Patient) then
+        person:queueAction({name = "idle", count = 1}) --Delay so that room is destroyed before the seek_room search.
+        person:queueAction({name = "seek_room", room_type = self.room_info.id})
+      end
+    end
+    person:finishAction()
+    self.door.reserved_for = nil
   end
 
   local remove_humanoid = function(humanoid)
@@ -790,6 +851,57 @@ function Room:makeHumanoidLeave(patient)
   patient:setNextAction(leave)
 end
 
+function Room:makeHumanoidDressIfNecessaryAndThenLeave(humanoid)
+  if not humanoid:isLeaving() then
+    local leave = self:createLeaveAction()
+    leave.must_happen = true
+
+    if not string.find(humanoid.humanoid_class, "Stripped") then
+      humanoid:setNextAction(leave)
+      return
+    end
+
+    local screen, sx, sy = self.world:findObjectNear(humanoid, "screen")
+    local use_screen = {
+      name = "use_screen",
+      object = screen,
+      must_happen = true,
+      is_leaving = true
+    }
+
+    --Make old saved game action queues compatible with the changes made by the #293 fix commit:
+    for actions_index, action in ipairs(humanoid.action_queue) do
+      if action.name == "use screen" or (action.name == "walk" and action.x == sx and action.y == sy) then
+        if not action.is_leaving then
+          humanoid.humanoid_actions[actions_index].is_leaving = true
+        end
+        if action.name == "walk" and action.must_happen then
+          action.must_happen = false
+        end
+      end
+    end
+
+    if humanoid.action_queue[1].name == "use_screen" then
+      --The humanoid must be using the screen to undress because this isn't a leaving action:
+      humanoid.action_queue[1].after_use = nil
+      humanoid:setNextAction(use_screen)
+    else
+      humanoid:setNextAction{
+        name = "walk",
+        x = sx,
+        y = sy,
+        must_happen = true,
+        no_truncate = true,
+        is_leaving = true
+      }
+      humanoid:queueAction(use_screen)
+    end
+
+    humanoid:queueAction(leave)
+  end
+end
+
+--! Deactivate the room from the world.
 function Room:deactivate()
   self.is_active = false -- So that no more patients go to it.
   self.world:notifyRoomRemoved(self)
@@ -836,6 +948,24 @@ end
 function Room:afterLoad(old, new)
   if old and old < 46 then
     self.humanoids_enroute = {--[[a set rather than a list]]}
+  end
+end
+
+--[[ Is the room one of the diagnosis rooms for the patient?
+-- This used for epidemics when the disease and therefore the diagnosis
+-- rooms of a patient may change.
+-- @param patient (Patient) patient to verify if treatment room ]]
+-- @return result (boolean) true if is suitable diagnosis room, false otherwise
+function Room:isDiagnosisRoomForPatient(patient)
+  if self.room_info.id ~= "gp" then
+    for _, room_name in ipairs(patient.disease.diagnosis_rooms) do
+      if self.room_info.id == room_name then
+        return true
+      end
+    end
+    return false
+  else
+    return true
   end
 end
 

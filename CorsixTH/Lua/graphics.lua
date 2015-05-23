@@ -31,6 +31,9 @@ local assert, string_char, table_concat, unpack, type, pairs, ipairs
 -- the other Lua code.
 class "Graphics"
 
+---@type Graphics
+local Graphics = _G["Graphics"]
+
 local cursors_name = {
   default = 1,
   clicked = 2,
@@ -86,29 +89,31 @@ function Graphics:Graphics(app)
   -- be done with a different graphics engine, or might only need to grab an
   -- object from the cache.
   self.reload_functions = setmetatable({}, {__mode = "k"})
-  -- Cursors need to be reloaded after sprite sheets, as they are created
-  -- from a sprite sheet.
-  self.reload_functions_cursors = setmetatable({}, {__mode = "k"})
+  -- Cursors and fonts need to be reloaded after sprite sheets, as they are
+  -- created from sprite sheets.
+  self.reload_functions_last = setmetatable({}, {__mode = "k"})
 
   self:loadFontFile()
 
-  -- Check if the config specifies a place to look for graphics in.
-  -- Otherwise check in the default "Graphics" folder.
+  local graphics_folder = nil
+  if self.app.config.use_new_graphics then
+    -- Check if the config specifies a place to look for graphics in.
+    -- Otherwise check in the default "Graphics" folder.
+    graphics_folder = self.app.config.new_graphics_folder or ourpath .. "Graphics"
+    if graphics_folder:sub(-1) ~= pathsep then
+      graphics_folder = graphics_folder .. pathsep
+    end
 
-  local graphics_folder = self.app.config.new_graphics_folder or ourpath .. "Graphics"
-  if graphics_folder:sub(-1) ~= pathsep then
-    graphics_folder = graphics_folder .. pathsep
-  end
+    local graphics_config_file = graphics_folder .. "file_mapping.txt"
+    local result, err = loadfile_envcall(graphics_config_file)
 
-  local graphics_config_file = graphics_folder .. "file_mapping.txt"
-  local result, err = loadfile_envcall(graphics_config_file)
-
-  if not result then
-    print("Warning: Failed to read custom graphics configuration:\n" .. err)
-  else
-    result(self.custom_graphics)
-    if not self.custom_graphics.file_mapping then
-      print("Error: An invalid custom graphics mapping file was found")
+    if not result then
+      print("Warning: Failed to read custom graphics configuration:\n" .. err)
+    else
+      result(self.custom_graphics)
+      if not self.custom_graphics.file_mapping then
+        print("Error: An invalid custom graphics mapping file was found")
+      end
     end
   end
   self.custom_graphics_folder = graphics_folder
@@ -169,7 +174,7 @@ function Graphics:loadCursor(sheet, index, hot_x, hot_y)
       local function reloader(res)
         assert(res:load(sheet, index, hot_x, hot_y))
       end
-      self.reload_functions_cursors[cursor] = reloader
+      self.reload_functions_last[cursor] = reloader
     end
     sheet_cache[index] = cursor
     self.load_info[cursor] = {self.loadCursor, self, sheet, index, hot_x, hot_y}
@@ -353,6 +358,11 @@ function Graphics:loadLanguageFont(name, sprite_table, ...)
       -- TODO: Choose face based on "name" rather than always using same face.
       font:setFace(self.ttf_font_data)
       font:setSheet(sprite_table)
+      local function reloader(font)
+        font:clearCache()
+      end
+      self.reload_functions_last[font] = reloader
+
       if not cache then
         cache = {}
         self.cache.language_fonts[name] = cache
@@ -414,6 +424,18 @@ function Graphics:loadAnimations(dir, prefix)
     return self.cache.anims[prefix]
   end
 
+  --! Load a custom animation file (if it can be found)
+  --!param path Path to the file.
+  local function loadCustomAnims(path)
+    local file, err = io.open(path, "rb")
+    if not file then
+      return nil, err
+    end
+    local data = file:read"*a"
+    file:close()
+    return data
+  end
+
   local sheet = self:loadSpriteTable(dir, prefix .. "Spr-0")
   local anims = TH.anims()
   anims:setSheet(sheet)
@@ -423,7 +445,19 @@ function Graphics:loadAnimations(dir, prefix)
   self.app:readDataFile(dir, prefix .. "List-1.ani"),
   self.app:readDataFile(dir, prefix .. "Ele-1.ani"))
   then
-    error("Cannot load animations " .. prefix)
+    error("Cannot load original animations " .. prefix)
+  end
+
+  if self.custom_graphics_folder and self.custom_graphics.file_mapping then
+    for _, fname in pairs(self.custom_graphics.file_mapping) do
+      anims:setCanvas(self.target)
+      local data, err = loadCustomAnims(self.custom_graphics_folder .. fname)
+      if not data then
+        print("Error when loading custom animations:\n" .. err)
+      elseif not anims:loadCustom(data) then
+        print("Warning: custom animations loading failed")
+      end
+    end
   end
 
   self.cache.anims[prefix] = anims
@@ -438,15 +472,6 @@ function Graphics:loadSpriteTable(dir, name, complex, palette)
   end
 
   local sheet = TH.sheet()
-  local function loadCustomSprites(path)
-    local file, err = io.open(path, "rb")
-    if not file then
-      return nil, err
-    end
-    local data = file:read"*a"
-    file:close()
-    return data
-  end
   local function reloader(sheet)
     sheet:setPalette(palette or self:loadPalette())
     local data_tab, data_dat
@@ -454,18 +479,6 @@ function Graphics:loadSpriteTable(dir, name, complex, palette)
     data_dat = self.app:readDataFile(dir, name .. ".dat")
     if not sheet:load(data_tab, data_dat, complex, self.target) then
       error("Cannot load sprite sheet " .. dir .. ":" .. name)
-    end
-    if self.app.config.use_new_graphics then
-      if self.custom_graphics.file_mapping and
-         self.custom_graphics.file_mapping[dir .. ":" .. name] then
-        local data, err = loadCustomSprites(self.custom_graphics_folder ..
-                     self.custom_graphics.file_mapping[dir .. ":" .. name])
-        if not data then
-          print("Error when loading custom graphics:\n" .. err)
-        elseif not sheet:loadCustom(data, self.target) then
-          print("Warning: custom sheet loading failed")
-        end
-      end
     end
   end
   self.reload_functions[sheet] = reloader
@@ -480,7 +493,7 @@ end
 
 function Graphics:updateTarget(target)
   self.target = target
-  for _, res_set in ipairs{"reload_functions", "reload_functions_cursors"} do
+  for _, res_set in ipairs{"reload_functions", "reload_functions_last"} do
     for resource, reloader in pairs(self[res_set]) do
       reloader(resource)
     end
@@ -489,6 +502,9 @@ end
 
 --! Utility class for setting animation markers and querying animation length.
 class "AnimationManager"
+
+---@type AnimationManager
+local AnimationManager = _G["AnimationManager"]
 
 function AnimationManager:AnimationManager(anims)
   self.anim_length_cache = {}

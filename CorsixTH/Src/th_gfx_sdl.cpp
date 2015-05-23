@@ -160,49 +160,114 @@ THRenderTarget::THRenderTarget()
     m_pZoomTexture = NULL;
     m_bShouldScaleBitmaps = false;
     m_bBlueFilterActive = false;
+    m_iWidth = -1;
+    m_iHeight = -1;
 }
 
 THRenderTarget::~THRenderTarget()
 {
-    SDL_FreeFormat(m_pFormat);
-    SDL_DestroyRenderer(m_pRenderer);
-    SDL_DestroyWindow(m_pWindow);
-    SDL_DestroyTexture(m_pZoomTexture);
+    destroy();
 }
 
 bool THRenderTarget::create(const THRenderTargetCreationParams* pParams)
 {
-    if(m_pRenderer != NULL)
+    if (m_pRenderer != NULL)
         return false;
 
     SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "linear");
-
+    m_pFormat = SDL_AllocFormat(SDL_PIXELFORMAT_ABGR8888);
     m_pWindow = SDL_CreateWindow("CorsixTH",
                                  SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
-                                 pParams->iWidth, pParams->iHeight,
-                                 SDL_WINDOW_OPENGL | pParams->iSDLFlags);
+                                 pParams->iWidth, pParams->iHeight, SDL_WINDOW_OPENGL);
     if (!m_pWindow)
     {
         return false;
     }
 
-    m_pRenderer = SDL_CreateRenderer(m_pWindow, -1, (pParams->bPresentImmediate ? 0 : SDL_RENDERER_PRESENTVSYNC));
-    if (!m_pRenderer)
+    return update(pParams);
+}
+
+bool THRenderTarget::update(const THRenderTargetCreationParams* pParams)
+{
+    if (m_pWindow == NULL)
     {
         return false;
     }
 
-    SDL_RenderSetLogicalSize(m_pRenderer, pParams->iWidth, pParams->iHeight);
-    m_pFormat = SDL_AllocFormat(SDL_PIXELFORMAT_ABGR8888);
-
-    SDL_RendererInfo info;
-    SDL_GetRendererInfo(m_pRenderer, &info);
-    m_bSupportsTargetTextures = (info.flags & SDL_RENDERER_TARGETTEXTURE);
-
+    bool bUpdateSize = (m_iWidth != pParams->iWidth) || (m_iHeight != pParams->iHeight);
     m_iWidth = pParams->iWidth;
     m_iHeight = pParams->iHeight;
 
+    bool bIsFullscreen = ((SDL_GetWindowFlags(m_pWindow) & SDL_WINDOW_FULLSCREEN_DESKTOP) == SDL_WINDOW_FULLSCREEN_DESKTOP);
+    if (bIsFullscreen != pParams->bFullscreen)
+    {
+        SDL_SetWindowFullscreen(m_pWindow, (pParams->bFullscreen ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0));
+    }
+
+    if (bUpdateSize || bIsFullscreen != pParams->bFullscreen)
+    {
+        SDL_SetWindowSize(m_pWindow, m_iWidth, m_iHeight);
+    }
+
+    Uint32 iRendererFlags = (pParams->bPresentImmediate ? 0 : SDL_RENDERER_PRESENTVSYNC);
+
+    bool bCreateRenderer = false;
+    SDL_RendererInfo info;
+    if (!m_pRenderer)
+    {
+        bCreateRenderer = true;
+    }
+    else
+    {
+        SDL_GetRendererInfo(m_pRenderer, &info);
+        if (info.flags != iRendererFlags)
+        {
+            SDL_DestroyRenderer(m_pRenderer);
+            bCreateRenderer = true;
+        }
+    }
+
+    if (bCreateRenderer)
+    {
+        m_pRenderer = SDL_CreateRenderer(m_pWindow, -1, iRendererFlags);
+        SDL_GetRendererInfo(m_pRenderer, &info);
+    }
+
+    m_bSupportsTargetTextures = (info.flags & SDL_RENDERER_TARGETTEXTURE);
+
+    if (bCreateRenderer || bUpdateSize)
+    {
+        SDL_RenderSetLogicalSize(m_pRenderer, m_iWidth, m_iHeight);
+    }
+
     return true;
+}
+
+void THRenderTarget::destroy()
+{
+    if (m_pFormat)
+    {
+        SDL_FreeFormat(m_pFormat);
+        m_pFormat = NULL;
+    }
+
+    if (m_pZoomTexture)
+    {
+        SDL_DestroyTexture(m_pZoomTexture);
+        m_pZoomTexture = NULL;
+    }
+
+    if (m_pRenderer)
+    {
+        SDL_DestroyRenderer(m_pRenderer);
+        m_pRenderer = NULL;
+    }
+
+    if (m_pWindow)
+    {
+        SDL_DestroyWindow(m_pWindow);
+        m_pWindow = NULL;
+    }
 }
 
 bool THRenderTarget::setScaleFactor(float fScale, THScaledItems eWhatToScale)
@@ -238,6 +303,7 @@ bool THRenderTarget::setScaleFactor(float fScale, THScaledItems eWhatToScale)
                                            virtWidth,
                                            virtHeight
                                           );
+
         SDL_RenderSetLogicalSize(m_pRenderer, virtWidth, virtHeight);
         if(SDL_SetRenderTarget(m_pRenderer, m_pZoomTexture) != 0)
         {
@@ -245,6 +311,10 @@ bool THRenderTarget::setScaleFactor(float fScale, THScaledItems eWhatToScale)
             m_pZoomTexture = NULL;
             return false;
         }
+
+        // Clear the new texture to transparent/black.
+        SDL_SetRenderDrawColor(m_pRenderer, 0, 0, 0, SDL_ALPHA_TRANSPARENT);
+        SDL_RenderClear(m_pRenderer);
 
         return true;
     }
@@ -332,11 +402,24 @@ bool THRenderTarget::fillRect(uint32_t iColour, int iX, int iY, int iW, int iH)
 void THRenderTarget::getClipRect(THClipRect* pRect) const
 {
     SDL_RenderGetClipRect(m_pRenderer, reinterpret_cast<SDL_Rect*>(pRect));
+    // SDL returns empty rect when clipping is disabled -> return full rect for CTH
+    if (SDL_RectEmpty(pRect))
+    {
+        pRect->x = pRect->y = 0;
+        pRect->w = m_iWidth;
+        pRect->h = m_iHeight;
+    }
 }
 
 void THRenderTarget::setClipRect(const THClipRect* pRect)
 {
     const SDL_Rect *pSDLRect = reinterpret_cast<const SDL_Rect*>(pRect);
+
+    // Full clip rect for CTH means clipping disabled
+    if (pRect && pRect->w == m_iWidth && pRect->h == m_iHeight)
+    {
+        pSDLRect = NULL;
+    }
 
     // For some reason, SDL treats an empty rect (h or w <= 0) as if you turned
     // off clipping, so we replace it with a rect that's outside our viewport.
@@ -431,7 +514,7 @@ void THRenderTarget::_flushZoomBuffer()
 
     SDL_SetRenderTarget(m_pRenderer, NULL);
     SDL_RenderSetScale(m_pRenderer, 1, 1);
-    SDL_SetTextureBlendMode(m_pZoomTexture, SDL_BLENDMODE_NONE);
+    SDL_SetTextureBlendMode(m_pZoomTexture, SDL_BLENDMODE_BLEND);
     SDL_RenderCopy(m_pRenderer, m_pZoomTexture, NULL, NULL);
     SDL_DestroyTexture(m_pZoomTexture);
     m_pZoomTexture = NULL;
@@ -545,24 +628,6 @@ void THRenderTarget::drawLine(THLine *pLine, int iX, int iY)
 
         op = (THLine::THLineOperation*)(op->m_pNext);
     }
-}
-
-//! Helper function to read a word from memory.
-/*! @param pData Pointer to the word to read.
-    @return The read word value.
- */
-static unsigned int readWord(const unsigned char* pData)
-{
-    return *pData | (pData[1] << 8);
-}
-
-//! Helper function to read a long word from memory.
-/*! @param pData Pointer to the word to read.
-    @return The read word value.
- */
-static unsigned int readLong(const unsigned char* pData)
-{
-    return readWord(pData) | (readWord(pData + 2) << 16);
 }
 
 THPalette::THPalette()
@@ -737,49 +802,6 @@ static bool testSprite(const unsigned char* pData, size_t iDataLength, int iWidt
     return iDataLength == 0;
 }
 
-
-bool THRawBitmap::loadFullColour(const unsigned char* pData, size_t iLength,
-                                 THRenderTarget *pEventualCanvas)
-{
-    if(pEventualCanvas == NULL)
-        return false;
-
-    static const unsigned char header[] = {'C', 'T', 'H', 'G', 2, 0};
-
-    if(iLength < 6 || memcmp(header, pData, 6) != 0)
-        return false;
-    pData += 6; iLength -= 6;
-
-    if (iLength < 4+2+2+2) // Length of a sprite header.
-        return false;
-
-    uint32_t iSprLength = readLong(pData);
-    pData += 4; iLength -= 4;
-    if (iSprLength < 2+2+2 || iSprLength > iLength)
-        return false;
-
-    unsigned int iSprite = readWord(pData);
-    int iWidth = readWord(pData + 2);
-    int iHeight = readWord(pData + 4);
-    pData += 6; iLength -= 6;
-    iSprLength -= 6;
-
-    if (iSprite > 0)
-        return false; // Only load sprite 0.
-
-    if (!testSprite(pData, iSprLength, iWidth, iHeight))
-        return false;
-
-    m_pTexture = pEventualCanvas->createPalettizedTexture(iWidth, iHeight, pData, m_pPalette);
-    if(!m_pTexture)
-        return false;
-
-    m_iWidth = iWidth;
-    m_iHeight = iHeight;
-    m_pTarget = pEventualCanvas;
-    return true;
-}
-
 void THRawBitmap::draw(THRenderTarget* pCanvas, int iX, int iY)
 {
     draw(pCanvas, iX, iY, 0, 0, m_iWidth, m_iHeight);
@@ -853,6 +875,36 @@ void THSpriteSheet::setPalette(const THPalette* pPalette)
     m_pPalette = pPalette;
 }
 
+bool THSpriteSheet::setSpriteCount(unsigned int iCount, THRenderTarget* pCanvas)
+{
+    _freeSprites();
+
+    if(pCanvas == NULL)
+        return false;
+    m_pTarget = pCanvas;
+
+    m_iSpriteCount = iCount;
+    m_pSprites = new (std::nothrow) sprite_t[m_iSpriteCount];
+    if(m_pSprites == NULL)
+    {
+        m_iSpriteCount = 0;
+        return false;
+    }
+
+    for (int i = 0; i < m_iSpriteCount; i++)
+    {
+        sprite_t &spr = m_pSprites[i];
+        spr.pTexture = NULL;
+        spr.pAltTexture = NULL;
+        spr.pData = NULL;
+        spr.pAltPaletteMap = NULL;
+        spr.iWidth = 0;
+        spr.iHeight = 0;
+    }
+
+    return true;
+}
+
 bool THSpriteSheet::loadFromTHFile(const unsigned char* pTableData, size_t iTableDataLength,
                                    const unsigned char* pChunkData, size_t iChunkDataLength,
                                    bool bComplexChunks, THRenderTarget* pCanvas)
@@ -861,14 +913,9 @@ bool THSpriteSheet::loadFromTHFile(const unsigned char* pTableData, size_t iTabl
     if(pCanvas == NULL)
         return false;
 
-    m_iSpriteCount = (unsigned int)(iTableDataLength / sizeof(th_sprite_t));
-    m_pSprites = new (std::nothrow) sprite_t[m_iSpriteCount];
-    if(m_pSprites == NULL)
-    {
-        m_iSpriteCount = 0;
+    unsigned int iCount = (unsigned int)(iTableDataLength / sizeof(th_sprite_t));
+    if (!setSpriteCount(iCount, pCanvas))
         return false;
-    }
-    m_pTarget = pCanvas;
 
     for(unsigned int i = 0; i < m_iSpriteCount; ++i)
     {
@@ -894,56 +941,42 @@ bool THSpriteSheet::loadFromTHFile(const unsigned char* pTableData, size_t iTabl
             oRenderer.decodeChunks(pChunkData + pTHSprite->position, iDataLen, bComplexChunks);
             pData = oRenderer.takeData();
             pSprite->pData = convertLegacySprite(pData, pSprite->iWidth * pSprite->iHeight);
-            delete pData;
+            delete[] pData;
         }
     }
     return true;
 }
 
-bool THSpriteSheet::loadFullColour(const unsigned char* pData, size_t iLength,
-                                 THRenderTarget *pEventualCanvas)
+bool THSpriteSheet::setSpriteData(int iSprite, const unsigned char *pData, bool bTakeData,
+                                  int iDataLength, int iWidth, int iHeight)
 {
-    static const unsigned char header[] = {'C', 'T', 'H', 'G', 2, 0};
-
-    if(iLength < 6 || memcmp(header, pData, 6) != 0)
+    if (iSprite >= m_iSpriteCount)
         return false;
-    pData += 6; iLength -= 6;
 
-    while (iLength >= 4+2+2+2) // Length of a sprite header.
+    if (!testSprite(pData, iDataLength, iWidth, iHeight))
     {
-        uint32_t iSprLength = readLong(pData);
-        pData += 4; iLength -= 4;
-        if (iSprLength < 2+2+2 || iSprLength > iLength)
-            return false;
-
-        unsigned int iSprite = readWord(pData);
-        int iWidth = readWord(pData + 2);
-        int iHeight = readWord(pData + 4);
-        pData += 6; iLength -= 6;
-        iSprLength -= 6;
-
-        if (iSprite >= m_iSpriteCount)
-            break;
-
-        if (!testSprite(pData, iSprLength, iWidth, iHeight))
-        {
-            printf("Sprite number %d has a bad encoding, skipping remainder of the file", iSprite);
-            return false;
-        }
-
-        _freeSingleSprite(iSprite);
-        sprite_t *pSprite = m_pSprites + iSprite;
-        pSprite->pData = new (std::nothrow) unsigned char[iSprLength];
-        if (pSprite->pData == NULL)
-            return false;
-
-        memcpy(pSprite->pData, pData, iSprLength);
-        iLength -= iSprLength;
-        pData += iSprLength;
-
-        pSprite->iWidth = iWidth;
-        pSprite->iHeight = iHeight;
+        printf("Sprite number %d has a bad encoding, skipping", iSprite);
+        return false;
     }
+
+    _freeSingleSprite(iSprite);
+    sprite_t *pSprite = m_pSprites + iSprite;
+    if (bTakeData)
+    {
+        pSprite->pData = pData;
+    }
+    else
+    {
+        unsigned char *pNewData = new (std::nothrow) unsigned char[iDataLength];
+        if (pNewData == NULL)
+            return false;
+
+        memcpy(pNewData, pData, iDataLength);
+        pSprite->pData = pNewData;
+    }
+
+    pSprite->iWidth = iWidth;
+    pSprite->iHeight = iHeight;
     return true;
 }
 
@@ -1089,6 +1122,109 @@ SDL_Texture* THSpriteSheet::_makeAltBitmap(sprite_t *pSprite)
     return pSprite->pAltTexture;
 }
 
+/**
+ * Get the colour data of pixel \a iPixelNumber (\a iWidth * y + x)
+ * @param pImg 32bpp image data.
+ * @param iWidth Width of the image.
+ * @param iHeight Height of the image.
+ * @param pPalette Palette of the image, or \c NULL.
+ * @param iPixelNumber Numer of the pixel to retrieve.
+ */
+static unsigned int get32BppPixel(const unsigned char* pImg, int iWidth, int iHeight,
+                                  const THPalette *pPalette, int iPixelNumber)
+{
+    if (iWidth <= 0 || iHeight <= 0 || iPixelNumber < 0 || iPixelNumber >= iWidth * iHeight)
+        return THPalette::packARGB(0, 0, 0,0);
+
+    for (;;) {
+        unsigned char iType = *pImg++;
+        int iLength = iType & 63;
+        switch (iType >> 6)
+        {
+            case 0: // Fixed fully opaque 32bpp pixels
+                if (iPixelNumber >= iLength)
+                {
+                    pImg += 3 * iLength;
+                    iPixelNumber -= iLength;
+                    break;
+                }
+
+                while (iLength > 0)
+                {
+                    if (iPixelNumber == 0)
+                        return THPalette::packARGB(0xFF, pImg[0], pImg[1], pImg[2]);
+
+                    iPixelNumber--;
+                    pImg += 3;
+                    iLength--;
+                }
+                break;
+
+            case 1: // Fixed partially transparent 32bpp pixels
+            {
+                unsigned char iOpacity = *pImg++;
+                if (iPixelNumber >= iLength)
+                {
+                    pImg += 3 * iLength;
+                    iPixelNumber -= iLength;
+                    break;
+                }
+
+                while (iLength > 0)
+                {
+                    if (iPixelNumber == 0)
+                        return THPalette::packARGB(iOpacity, pImg[0], pImg[1], pImg[2]);
+
+                    iPixelNumber--;
+                    pImg += 3;
+                    iLength--;
+                }
+                break;
+            }
+
+            case 2: // Fixed fully transparent pixels
+            {
+                if (iPixelNumber >= iLength)
+                {
+                    iPixelNumber -= iLength;
+                    break;
+                }
+
+                return THPalette::packARGB(0, 0, 0, 0);
+            }
+
+            case 3: // Recolour layer
+            {
+                unsigned char iTable = *pImg++;
+                pImg++; // Skip reading the opacity for now.
+                if (iPixelNumber >= iLength)
+                {
+                    pImg += iLength;
+                    iPixelNumber -= iLength;
+                    break;
+                }
+
+                if (iTable == 0xFF && pPalette != NULL)
+                {
+                    // Legacy sprite data. Use the palette to recolour the layer.
+                    // Note that the iOpacity is ignored here.
+                    const uint32_t* pColours = pPalette->getARGBData();
+                    return pColours[pImg[iPixelNumber]];
+                }
+                else
+                {
+                    // TODO: Add proper recolour layers, where RGB comes from
+                    // table 'iTable' at index *pImg (iLength times), and
+                    // opacity comes from the byte after the iTable byte.
+                    //
+                    // For now just draw black pixels, so it won't go unnoticed.
+                    return THPalette::packARGB(0xFF, 0, 0, 0);
+                }
+            }
+        }
+    }
+}
+
 bool THSpriteSheet::hitTestSprite(unsigned int iSprite, int iX, int iY, unsigned long iFlags) const
 {
     if(iX < 0 || iY < 0 || iSprite >= m_iSpriteCount)
@@ -1103,10 +1239,9 @@ bool THSpriteSheet::hitTestSprite(unsigned int iSprite, int iX, int iY, unsigned
         iX = iWidth - iX - 1;
     if(iFlags & THDF_FlipVertical)
         iY = iHeight - iY - 1;
-    unsigned char cPalIndex = sprite.pData[iY * iWidth + iX];
 
-    const uint32_t* pColours = m_pPalette->getARGBData();
-    return THPalette::getA(pColours[cPalIndex]) != 0;
+    unsigned int iCol = get32BppPixel(sprite.pData, iWidth, iHeight, m_pPalette, iY * iWidth + iX);
+    return THPalette::getA(iCol) != 0;
 }
 
 THCursor::THCursor()

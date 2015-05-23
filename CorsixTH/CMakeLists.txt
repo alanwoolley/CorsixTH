@@ -137,7 +137,7 @@ message( STATUS "CMAKE_MODULE_PATH=${CMAKE_MODULE_PATH}" )
 
 # Find FFMPEG
 IF(CORSIX_TH_USE_FFMPEG)
-	FIND_PACKAGE(FFmpeg COMPONENTS AVFORMAT AVCODEC AVUTIL SWSCALE SWRESAMPLE REQUIRED)
+  FIND_PACKAGE(FFmpeg COMPONENTS AVFORMAT AVCODEC AVUTIL SWSCALE SWRESAMPLE REQUIRED)
   IF(FFMPEG_FOUND)
     TARGET_LINK_LIBRARIES(CorsixTH ${FFMPEG_LIBRARIES})
     INCLUDE_DIRECTORIES(${FFMPEG_INCLUDE_DIRS})
@@ -149,6 +149,20 @@ IF(CORSIX_TH_USE_FFMPEG)
     message("Error: FFmpeg library not found, even though it was selected to be included")
   ENDIF(FFMPEG_FOUND)
 ENDIF(CORSIX_TH_USE_FFMPEG)
+
+IF(CORSIX_TH_USE_LIBAV)
+  FIND_PACKAGE(LibAV COMPONENTS AVFORMAT AVCODEC AVRESAMPLE AVUTIL SWSCALE REQUIRED)
+  IF(LIBAV_FOUND)
+    TARGET_LINK_LIBRARIES(CorsixTH ${LIBAV_LIBRARIES})
+    INCLUDE_DIRECTORIES(${LIBAV_INCLUDE_DIRS})
+    IF(APPLE)
+      TARGET_LINK_LIBRARIES(CorsixTH libz.dylib)
+    ENDIF()
+    message("  LibAV found")
+  ELSE(LIBAV_FOUND)
+    message("Error: LibAV library not found, even though it was selected to be included")
+  ENDIF(LIBAV_FOUND)
+ENDIF(CORSIX_TH_USE_LIBAV)
 
 # Find Freetype2
 IF(CORSIX_TH_USE_FREETYPE2)
@@ -165,18 +179,6 @@ IF(CORSIX_TH_USE_FREETYPE2)
     message("Error: FreeType2 library not found, even though it was selected to be used")
   ENDIF(FREETYPE_FOUND)
 ENDIF(CORSIX_TH_USE_FREETYPE2)
-
-# Find OpenGL
-IF(CORSIX_TH_USE_OGL_RENDERER)
-  FIND_PACKAGE(OpenGL REQUIRED)
-  IF(OPENGL_FOUND)
-    TARGET_LINK_LIBRARIES(CorsixTH ${OPENGL_gl_LIBRARY})
-    INCLUDE_DIRECTORIES(${OPENGL_INCLUDE_DIR})
-    message("  OpenGL found")
-  ELSE(OPENGL_FOUND)
-    message(FATAL_ERROR "Error: OpenGL library not found, it is required to build (consider changing choice of renderer)")
-  ENDIF(OPENGL_FOUND)
-ENDIF(CORSIX_TH_USE_OGL_RENDERER)
 
 # Find DirectX
 IF(CORSIX_TH_USE_DX9_RENDERER)
@@ -202,30 +204,15 @@ ENDIF(MSVC AND NOT CORSIX_TH_HAS_INTTYPES_H)
 
 # Declaration of the install process
 IF(APPLE)
-
   #Just use the prefix as it's sufficient to just set the prefix to /Applications on Mac.
   install(TARGETS CorsixTH BUNDLE DESTINATION .)
 
-  #Copy the required frameworks into the bundle.
-  IF(SDL_FOUND)
-	IF(SDL_LIBRARY MATCHES "\\.framework") #Only copy if it's an actual framework.
-      string(REPLACE "-framework Cocoa" "" SDL_FRAMEWORK_LOC ${SDL_LIBRARY})
-      install(DIRECTORY ${SDL_FRAMEWORK_LOC} DESTINATION CorsixTH.app/Contents/Frameworks)
-    ENDIF()
-  ENDIF()
-
-  IF(SDLMIXER_FOUND)
-    IF(${SDLMIXER_LIBRARY} MATCHES "\\.framework$") #Only copy if it's an actual framework.
-      install(DIRECTORY ${SDLMIXER_LIBRARY} DESTINATION CorsixTH.app/Contents/Frameworks)
-    ENDIF()
-  ENDIF()
-
-  IF(LUA_FOUND)
-    IF(${LUA_LIBRARY} MATCHES "\\.framework$") #Only copy if it's an actual framework.
-  	  install(DIRECTORY ${LUA_LIBRARY} DESTINATION CorsixTH.app/Contents/Frameworks)
-    ENDIF()
-  ENDIF()
-  
+  # Fix the OS X bundle to include required libraries (create a redistributable app)
+  install(CODE "
+    INCLUDE(BundleUtilities)
+    SET(BU_CHMOD_BUNDLE_ITEMS ON)
+    FIXUP_BUNDLE(${CMAKE_INSTALL_PREFIX}/CorsixTH.app \"\" \"\")
+    ")
 ELSE()
   install(TARGETS CorsixTH RUNTIME DESTINATION CorsixTH)
   install(DIRECTORY Lua Levels DESTINATION CorsixTH PATTERN "*.svn" EXCLUDE)

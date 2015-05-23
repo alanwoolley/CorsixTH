@@ -21,6 +21,9 @@ SOFTWARE. --]]
 --! Dialog that informs the player of for example what the goals for the level are.
 class "UIInformation" (Window)
 
+---@type UIInformation
+local UIInformation = _G["UIInformation"]
+
 --! Constructor for the Information Dialog.
 --!param text The text to show, held in a table. All elements of the table will be written
 -- beneath each other. If instead a table within the table is supplied the texts
@@ -62,7 +65,7 @@ function UIInformation:UIInformation(ui, text, use_built_in_font)
   self:onChangeLanguage()
 
   -- Enter closes the window
-  self:addKeyHandler("Enter", self.close)
+  self:addKeyHandler("return", self.close)
 end
 
 function UIInformation:onChangeLanguage()
@@ -122,5 +125,12 @@ function UIInformation:close()
   Window.close(self)
   if self.additional_text and #self.additional_text[1] > 0 then
     self.ui:addWindow(UIInformation(self.ui, self.additional_text))
+  end
+end
+
+function UIInformation:afterLoad(old, new)
+  if old < 101 then
+    self:removeKeyHandler("enter")
+    self:addKeyHandler("return", self.close)
   end
 end

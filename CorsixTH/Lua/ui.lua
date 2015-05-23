@@ -23,6 +23,9 @@ dofile "window"
 --! Top-level container for all other user-interface components.
 class "UI" (Window)
 
+---@type UI
+local UI = _G["UI"]
+
 local TH = require "TH"
 local WM = require "sdl".wm
 local SDL = require "sdl"
@@ -213,32 +216,46 @@ function UI:UI(app, minimal)
   self:setupGlobalKeyHandlers()
 end
 
+function UI:runDebugScript()
+  print("Executing Debug Script...")
+  local path_sep = package.config:sub(1, 1)
+  local lua_dir = debug.getinfo(1, "S").source:sub(2, -8)
+  _ = TheApp.ui and TheApp.ui.debug_cursor_entity
+  local script = assert(loadfile(lua_dir .. path_sep .. "debug_script.lua"))
+  script()
+end
+
 function UI:setupGlobalKeyHandlers()
   -- Add some global keyhandlers
   self:addKeyHandler("escape", self, self.closeWindow)
   self:addKeyHandler("escape", self, self.stopMovie)
   self:addKeyHandler("space", self, self.stopMovie)
   self:addKeyHandler({"ctrl", "s"}, self, self.makeScreenshot)
-  self:addKeyHandler({"alt", "enter"}, self, self.toggleFullscreen)
+  self:addKeyHandler({"alt", "Return"}, self, self.toggleFullscreen)
   self:addKeyHandler({"alt", "f4"}, self, self.exitApplication)
   self:addKeyHandler({"shift", "f10"}, self, self.resetApp)
 
-  if self.app.config.debug then
-    self:addKeyHandler("f12", self, self.showLuaConsole)
+  self:addOrRemoveDebugModeKeyHandlers()
+end
+
+function UI:connectDebugger()
+  local error_message = TheApp:connectDebugger()
+  if error_message then
+    self:addWindow(UIInformation(self, {error_message}))
   end
 end
 
 -- Used for everything except music and announcements
-function UI:playSound(name)
+function UI:playSound(name, played_callback, played_callback_delay)
   if self.app.config.play_sounds then
-    self.app.audio:playSound(name)
+    self.app.audio:playSound(name, nil, false, played_callback, played_callback_delay)
   end
 end
 
 -- Used for announcements only
-function UI:playAnnouncement(name)
+function UI:playAnnouncement(name, played_callback, played_callback_delay)
   if self.app.config.play_announcements then
-    self.app.audio:playSound(name, nil, true)
+    self.app.audio:playSound(name, nil, true, played_callback, played_callback_delay)
   end
 end
 
@@ -393,36 +410,23 @@ function UI:unregisterTextBox(box)
   end
 end
 
-function UI:resetVideo()
-  local width, height = self.app.config.width, self.app.config.height
-
-  self.app.video:endFrame()
-  self.app.video = TH.surface(width, height, unpack(self.app.modes))
-  self.app.gfx:updateTarget(self.app.video)
-  self.app.video:startFrame()
-  -- Redraw cursor
-  local cursor = self.cursor
-  self.cursor = nil
-  self:setCursor(cursor)
-end
-
 function UI:changeResolution(width, height)
   local old_width, old_height = self.app.config.width, self.app.config.height
-  self.app.video:endFrame()
-  local video, error_message = TH.surface(width, height, unpack(self.app.modes))
-  if video then
-    self.app.config.width = width
-    self.app.config.height = height
-  else
-    print("Warning: Could not change resolution to " .. width .. "x" .. height .. ". Reverting to previous resolution.")
+
+  self.app:prepareVideoUpdate()
+  local error_message = self.app.video:update(width, height, unpack(self.app.modes))
+  self.app:finishVideoUpdate()
+
+  if error_message then
+    print("Warning: Could not change resolution to " .. width .. "x" .. height .. ".")
     print("The error was: ")
     print(error_message)
-    video = TH.surface(old_width, old_height, unpack(self.app.modes))
     return false
   end
-  self.app.video = video
-  self.app.gfx:updateTarget(self.app.video)
-  self.app.video:startFrame()
+
+  self.app.config.width = width
+  self.app.config.height = height
+
   -- Redraw cursor
   local cursor = self.cursor
   self.cursor = nil
@@ -459,32 +463,30 @@ function UI:toggleFullscreen()
 
   -- Toggle Fullscreen mode
   toggleMode(index)
-  self.app.video:endFrame()
-  self.app.moviePlayer:deallocatePictureBuffer();
 
   local success = true
-  local video = TH.surface(self.app.config.width, self.app.config.height, unpack(modes))
-  if not video then
+  self.app:prepareVideoUpdate()
+  local error_message = self.app.video:update(self.app.config.width, self.app.config.height, unpack(modes))
+  self.app:finishVideoUpdate()
+
+  if error_message then
     success = false
     local mode_string = modes[index] or "windowed"
     print("Warning: Could not toggle to " .. mode_string .. " mode with resolution of " .. self.app.config.width .. "x" .. self.app.config.height .. ".")
     -- Revert fullscreen mode modifications
     toggleMode(index)
-    video = TH.surface(self.app.config.width, self.app.config.height, unpack(self.app.modes))
   end
 
-  self.app.video = video -- Apply changes
-  self.app.gfx:updateTarget(self.app.video)
-  self.app.moviePlayer:allocatePictureBuffer();
-  self.app.video:startFrame()
   -- Redraw cursor
   local cursor = self.cursor
   self.cursor = nil
   self:setCursor(cursor)
 
-  -- Save new setting in config
-  self.app.config.fullscreen = self.app.fullscreen
-  self.app:saveConfig()
+  if success then
+    -- Save new setting in config
+    self.app.config.fullscreen = self.app.fullscreen
+    self.app:saveConfig()
+  end
 
   return success
 end
@@ -620,8 +622,7 @@ function UI:onMouseUp(code, x, y)
   if Window.onMouseUp(self, button, x, y) then
     repaint = true
   else
-    if self.cursor_entity and self.cursor_entity.onClick
-    and self.app.world.user_actions_allowed then
+    if self:ableToClickEntity(self.cursor_entity) then
       self.cursor_entity:onClick(self, button)
       repaint = true
     end
@@ -633,6 +634,21 @@ end
 
 function UI:onMouseWheel(x, y)
   Window.onMouseWheel(self, x, y)
+end
+
+--[[ Determines if a cursor entity can be clicked
+@param entity (Entity,nil) cursor entity clicked on if any
+@return true if can be clicked on, false otherwise (boolean) ]]
+function UI:ableToClickEntity(entity)
+  if self.cursor_entity and self.cursor_entity.onClick then
+    local hospital = entity.hospital
+    local epidemic = hospital and hospital.epidemic
+
+    return self.app.world.user_actions_allowed and not epidemic or
+      (epidemic and not epidemic.vaccination_mode_active)
+  else
+    return false
+  end
 end
 
 function UI:getScreenOffset()
@@ -669,6 +685,9 @@ end
 
 function UI:onMouseMove(x, y, dx, dy)
   local repaint = UpdateCursorPosition(self.app.video, x, y)
+
+  self.cursor_x = x
+  self.cursor_y = y
 
   if self.drag_mouse_move then
     self.drag_mouse_move(x, y)
@@ -743,6 +762,17 @@ function UI:getCursorPosition(window)
   return x, y
 end
 
+function UI:addOrRemoveDebugModeKeyHandlers()
+  self:removeKeyHandler({"ctrl", "c"}, self)
+  self:removeKeyHandler("f12", self)
+  self:removeKeyHandler({"shift", "d"}, self)
+  if self.app.config.debug then
+    self:addKeyHandler({"ctrl", "c"}, self, self.connectDebugger)
+    self:addKeyHandler("f12", self, self.showLuaConsole)
+    self:addKeyHandler({"shift", "d"}, self, self.runDebugScript)
+  end
+end
+
 function UI:afterLoad(old, new)
   if old < 5 then
     self.editing_allowed = true
@@ -755,6 +785,8 @@ function UI:afterLoad(old, new)
       end
     end
     -- some global key shortcuts were converted to use keyHandlers
+    self:removeKeyHandler("f12", self)
+    self:removeKeyHandler({"shift", "d"}, self)
     self:setupGlobalKeyHandlers()
   end
 
@@ -768,6 +800,12 @@ function UI:afterLoad(old, new)
     self:removeKeyHandler({"alt", "f4"}, self, self.quit)
     self:addKeyHandler({"alt", "f4"}, self, self.exitApplication)
   end
+
+  if old < 100 then
+    self:removeKeyHandler({"alt", "enter"}, self)
+    self:addKeyHandler({"alt", "Return"}, self, self.toggleFullscreen)
+  end
+
   Window.afterLoad(self, old, new)
 end
 
@@ -796,6 +834,10 @@ end
 --! Closes one window (the topmost / active window, if possible)
 --!return true iff a window was closed
 function UI:closeWindow()
+  if not self.windows then
+    return false
+  end
+
   -- Close the topmost window first
   local first = self.windows[1]
   if first.on_top and first.esc_closes then

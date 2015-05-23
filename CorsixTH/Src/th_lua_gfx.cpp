@@ -88,21 +88,6 @@ static int l_rawbitmap_load(lua_State *L)
     return 1;
 }
 
-static int l_rawbitmap_load_colour(lua_State *L)
-{
-    THRawBitmap* pBitmap = luaT_testuserdata<THRawBitmap>(L);
-    size_t iDataLen;
-    const unsigned char* pData = luaT_checkfile(L, 2, &iDataLen);
-    THRenderTarget* pSurface = luaT_testuserdata<THRenderTarget>(L, 3, luaT_upvalueindex(1), false);
-
-    if(pBitmap->loadFullColour(pData, iDataLen, pSurface))
-        lua_pushboolean(L, 1);
-    else
-        lua_pushboolean(L, 0);
-
-    return 1;
-}
-
 static int l_rawbitmap_draw(lua_State *L)
 {
     THRawBitmap* pBitmap = luaT_testuserdata<THRawBitmap>(L);
@@ -148,21 +133,6 @@ static int l_spritesheet_load(lua_State *L)
     THRenderTarget* pSurface = luaT_testuserdata<THRenderTarget>(L, 5, luaT_upvalueindex(1), false);
 
     if(pSheet->loadFromTHFile(pDataTable, iDataLenTable, pDataChunk, iDataLenChunk, bComplex, pSurface))
-        lua_pushboolean(L, 1);
-    else
-        lua_pushboolean(L, 0);
-
-    return 1;
-}
-
-static int l_spritesheet_load_colour(lua_State *L)
-{
-    THSpriteSheet* pSheet = luaT_testuserdata<THSpriteSheet>(L);
-    size_t iDataLen;
-    const unsigned char* pData = luaT_checkfile(L, 2, &iDataLen);
-    THRenderTarget* pSurface = luaT_testuserdata<THRenderTarget>(L, 3, luaT_upvalueindex(1), false);
-
-    if(pSheet->loadFullColour(pData, iDataLen, pSurface))
         lua_pushboolean(L, 1);
     else
         lua_pushboolean(L, 0);
@@ -319,6 +289,14 @@ static int l_freetype_font_set_face(lua_State *L)
     luaT_setenvfield(L, 1, "face");
     return 1;
 }
+
+static int l_freetype_font_clear_cache(lua_State *L)
+{
+    THFreeTypeFont* pFont = luaT_testuserdata<THFreeTypeFont>(L);
+    pFont->clearCache();
+    return 0;
+}
+
 #endif
 
 static int l_font_get_size(lua_State *L)
@@ -567,39 +545,39 @@ static int l_cursor_position(lua_State *L)
     return 1;
 }
 
-static int l_surface_new(lua_State *L)
+static THRenderTargetCreationParams l_surface_creation_params(lua_State *L, int iArgStart)
 {
-    lua_remove(L, 1); // Value inserted by __call
-
     THRenderTargetCreationParams oParams;
-    oParams.iWidth = luaL_checkint(L, 1);
-    oParams.iHeight = luaL_checkint(L, 2);
-    int iArg = 3;
-    if(lua_type(L, iArg) == LUA_TNUMBER)
-        oParams.iBPP = luaL_checkint(L, iArg++);
-    else
-        oParams.iBPP = 0;
-    oParams.iSDLFlags = 0;
+    oParams.iWidth = luaL_checkint(L, iArgStart);
+    oParams.iHeight = luaL_checkint(L, iArgStart + 1);
+
     oParams.bFullscreen = false;
     oParams.bPresentImmediate = false;
     oParams.bReuseContext = false;
 
-#define FLAG(name, field, flag) \
+#define FLAG(name, field) \
     else if(stricmp(sOption, name) == 0) \
-        oParams.field = true, oParams.iSDLFlags |= flag
+        oParams.field = true
 
-    for(int iArgCount = lua_gettop(L); iArg <= iArgCount; ++iArg)
+    for(int iArg = iArgStart + 2, iArgCount = lua_gettop(L); iArg <= iArgCount; ++iArg)
     {
         const char* sOption = luaL_checkstring(L, iArg);
         if(sOption[0] == 0)
             continue;
-        FLAG("fullscreen",          bFullscreen,        SDL_WINDOW_FULLSCREEN_DESKTOP   );
-        FLAG("present immediate",   bPresentImmediate,  0                               );
-        FLAG("reuse context",       bReuseContext,      0                               );
+        FLAG("fullscreen",          bFullscreen       );
+        FLAG("present immediate",   bPresentImmediate );
+        FLAG("reuse context",       bReuseContext     );
     }
 
 #undef FLAG
+    return oParams;
+}
 
+static int l_surface_new(lua_State *L)
+{
+    lua_remove(L, 1); // Value inserted by __call
+
+    THRenderTargetCreationParams oParams = l_surface_creation_params(L, 1);
     THRenderTarget* pCanvas = luaT_stdnew<THRenderTarget>(L);
     if(pCanvas->create(&oParams))
         return 1;
@@ -607,6 +585,28 @@ static int l_surface_new(lua_State *L)
     lua_pushnil(L);
     lua_pushstring(L, pCanvas->getLastError());
     return 2;
+}
+
+static int l_surface_update(lua_State *L)
+{
+    THRenderTarget* pCanvas = luaT_testuserdata<THRenderTarget>(L);
+    THRenderTargetCreationParams oParams = l_surface_creation_params(L, 2);
+    if(pCanvas->update(&oParams))
+    {
+        lua_pushnil(L);
+        return 1;
+    }
+
+    lua_pushstring(L, pCanvas->getLastError());
+    return 1;
+}
+
+static int l_surface_destroy(lua_State *L)
+{
+    THRenderTarget* pCanvas = luaT_testuserdata<THRenderTarget>(L);
+    pCanvas->endFrame();
+    pCanvas->destroy();
+    return 1;
 }
 
 static int l_surface_fill_black(lua_State *L)
@@ -858,7 +858,6 @@ void THLuaRegisterGfx(const THLuaRegisterState_t *pState)
     // Raw bitmap
     luaT_class(THRawBitmap, l_rawbitmap_new, "bitmap", MT_Bitmap);
     luaT_setfunction(l_rawbitmap_load, "load", MT_Surface);
-    luaT_setfunction(l_rawbitmap_load_colour, "loadCustom", MT_Surface);
     luaT_setfunction(l_rawbitmap_set_pal, "setPalette", MT_Palette);
     luaT_setfunction(l_rawbitmap_draw, "draw", MT_Surface);
     luaT_endclass();
@@ -867,7 +866,6 @@ void THLuaRegisterGfx(const THLuaRegisterState_t *pState)
     luaT_class(THSpriteSheet, l_spritesheet_new, "sheet", MT_Sheet);
     luaT_setmetamethod(l_spritesheet_count, "len");
     luaT_setfunction(l_spritesheet_load, "load", MT_Surface);
-    luaT_setfunction(l_spritesheet_load_colour, "loadCustom", MT_Surface);
     luaT_setfunction(l_spritesheet_set_pal, "setPalette", MT_Palette);
     luaT_setfunction(l_spritesheet_size, "size");
     luaT_setfunction(l_spritesheet_draw, "draw", MT_Surface);
@@ -898,6 +896,7 @@ void THLuaRegisterGfx(const THLuaRegisterState_t *pState)
     luaT_setfunction(l_freetype_font_set_spritesheet, "setSheet", MT_Sheet);
     luaT_setfunction(l_freetype_font_set_face, "setFace");
     luaT_setfunction(l_freetype_font_get_copyright, "getCopyrightNotice");
+    luaT_setfunction(l_freetype_font_clear_cache, "clearCache");
     luaT_endclass();
 #endif
 
@@ -918,6 +917,8 @@ void THLuaRegisterGfx(const THLuaRegisterState_t *pState)
 
     // Surface
     luaT_class(THRenderTarget, l_surface_new, "surface", MT_Surface);
+    luaT_setfunction(l_surface_update, "update");
+    luaT_setfunction(l_surface_destroy, "destroy");
     luaT_setfunction(l_surface_fill_black, "fillBlack");
     luaT_setfunction(l_surface_start_frame, "startFrame");
     luaT_setfunction(l_surface_end_frame, "endFrame");

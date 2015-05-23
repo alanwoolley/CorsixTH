@@ -125,6 +125,12 @@ local config_defaults = {
   audio_buffer_size = 2048,
   theme_hospital_install = [[F:\ThemeHospital\hospital]],
   debug = false,
+  DBGp_client_idehost = nil,
+  DBGp_client_ideport = nil,
+  DBGp_client_idekey = nil,
+  DBGp_client_transport = nil,
+  DBGp_client_platform = nil,
+  DBGp_client_workingdir = nil,
   track_fps = false,
   zoom_speed = 80,
   scroll_speed = 2,
@@ -224,13 +230,13 @@ if needs_rewrite then
 ----------------------------------------------- OPTIONS MENU ---------------------------------------------------
 --These settings can also be changed from within the game from the options menu
 -------------------------------------------------------------------------------------------------------------------------
--- Sounds: By default enabled and set at level 0.5 
--- ]=] .. '\n' .. 
+-- Sounds: By default enabled and set at level 0.5
+-- ]=] .. '\n' ..
 'play_sounds = ' .. tostring(config_values.play_sounds) .. '\n' ..
 'sound_volume = ' .. tostring(config_values.sound_volume) .. '\n' .. [=[
 
 -------------------------------------------------------------------------------------------------------------------------
--- Announcements: By default set at level 0.5 
+-- Announcements: By default set at level 0.5
 -- ]=] .. '\n' ..
 'play_announcements = ' .. tostring(config_values.play_announcements) .. '\n' ..
 'announcement_volume = ' .. tostring(config_values.announcement_volume) .. '\n' .. [=[
@@ -255,7 +261,7 @@ if needs_rewrite then
 -------------------------------------------------------------------------------------------------------------------------
 -- Scrolling Momentum.
 -- Determines the amount of momentum when scrolling the map with the mouse.
--- This should be a value between 0 and 1 where 0 is no momentum 
+-- This should be a value between 0 and 1 where 0 is no momentum
 -- ]=] .. '\n' ..
 'scrolling_momentum = ' .. tostring(config_values.scrolling_momentum) .. '\n' .. [=[
 
@@ -425,6 +431,18 @@ audio_mp3 = nil -- [[X:\ThemeHospital\Music]]
 -- and a debug menu will be visible.
 -- ]=] .. '\n' ..
 'debug = ' .. tostring(config_values.debug) .. '\n' .. [=[
+
+--Optional settings for CorsixTH's Lua DBGp client.
+--Default settings are nil values, platform & workingdir will be autodected if nil.
+--https://wiki.eclipse.org/LDT/User_Area/User_Guides/User_Guide_1.2#Attach_session
+-- ]=] .. '\n' ..
+'idehost = ' .. tostring(config_values.DBGp_client_idehost) .. '\n' ..
+'ideport = ' .. tostring(config_values.DBGp_client_ideport) .. '\n' ..
+'idekey = ' .. tostring(config_values.DBGp_client_idekey) .. '\n' ..
+'transport = ' .. tostring(config_values.DBGp_client_transport) .. '\n' ..
+'platform = ' .. tostring(config_values.DBGp_platform) .. '\n' ..
+'workingdir = ' .. tostring(config_values.DBGp_workingdir) .. '\n' .. [=[
+
 -- If set to true, the FPS, Lua memory usage, and entity count will be shown
 -- in the dynamic information bar. Note that setting this to true also turns
 -- off the FPS limiter, causing much higher CPU utilisation, but resulting in

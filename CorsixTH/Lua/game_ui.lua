@@ -23,6 +23,9 @@ dofile "ui"
 --! Variant of UI for running games
 class "GameUI" (UI)
 
+---@type GameUI
+local GameUI = _G["GameUI"]
+
 local TH = require "TH"
 local WM = require "sdl".wm
 local SDL = require "sdl"
@@ -71,6 +74,8 @@ function GameUI:GameUI(app, local_hospital)
 
   self.momentum = app.config.scrolling_momentum
   self.current_momentum = {x = 0.0, y = 0.0, z = 0.0}
+
+  self.speed_up_key_pressed = false
 end
 
 function GameUI:setupGlobalKeyHandlers()
@@ -220,6 +225,7 @@ function GameUI:updateKeyScroll()
 end
 
 function GameUI:keySpeedUp()
+  self.speed_up_key_pressed = true
   self.app.world:speedUp()
 end
 
@@ -249,9 +255,14 @@ function GameUI:onKeyUp(rawchar)
     self:updateKeyScroll()
     return
   end
-  if self.app.world:isCurrentSpeed("Speed Up")  then
+
+  -- Guess that the "Speed Up" key was released because the
+  -- code parameter can't provide UTF-8 key codes:
+  self.speed_up_key_pressed = false
+  if self.app.world:isCurrentSpeed("Speed Up") then
     self.app.world:previousSpeed()
   end
+
   if self.transparent_walls then
     self:removeTransparentWalls()
   end
@@ -316,12 +327,26 @@ function GameUI:onCursorWorldPositionChange()
       self.debug_cursor_entity = entity
     end
 
+    local epidemic = self.hospital.epidemic
+    local infected_cursor = TheApp.gfx:loadMainCursor("epidemic")
+    local epidemic_cursor = TheApp.gfx:loadMainCursor("epidemic_hover")
+
     self.cursor_entity = entity
     if self.cursor ~= self.edit_room_cursor and self.cursor ~= self.waiting_cursor then
       local cursor = self.default_cursor
       if self.app.world.user_actions_allowed then
-        cursor = entity and entity.hover_cursor or
-        (self.down_count ~= 0 and self.down_cursor or self.default_cursor)
+        --- If the patient is infected show the infected cursor
+        if epidemic and epidemic.coverup_in_progress and
+          entity and entity.infected and not epidemic.timer.closed then
+          cursor = infected_cursor
+          -- In vaccination mode display epidemic hover cursor for all entities
+        elseif epidemic and epidemic.vaccination_mode_active then
+          cursor = epidemic_cursor
+          -- Otherwise just show the normal cursor and hover if appropriate
+        else
+          cursor = entity and entity.hover_cursor or
+          (self.down_count ~= 0 and self.down_cursor or self.default_cursor)
+        end
       end
       self:setCursor(cursor)
     end
@@ -514,6 +539,26 @@ function GameUI:onMouseUp(code, x, y)
     end
   end
 
+  -- During vaccination mode you can only interact with
+  -- infected patients
+  local epidemic = self.hospital.epidemic
+  -- infected patients
+  local epidemic = self.hospital.epidemic
+  if epidemic and epidemic.vaccination_mode_active then
+    if button == "left" then
+      if self.cursor_entity then
+        -- Allow click behaviour for infected patients
+        if self.cursor_entity.infected then
+          self.cursor_entity:onClick(self,button)
+        end
+      end
+    elseif button == "right" then
+      --Right click turns vaccination mode off
+      local watch = TheApp.ui:getWindow(UIWatch)
+      watch:toggleVaccinationMode()
+    end
+  end
+
   return UI.onMouseUp(self, code, x, y)
 end
 
@@ -541,10 +586,10 @@ function GameUI:setRandomAnnouncementTarget()
   self.random_announcement_ticks_target = math.random(8000, 12000)
 end
 
-function GameUI:playAnnouncement(name)
+function GameUI:playAnnouncement(name, played_callback, played_callback_delay)
   self.ticks_since_last_announcement = 0
   if self.app.world:getLocalPlayerHospital():hasStaffedDesk() then
-    UI.playAnnouncement(self, name)
+    UI.playAnnouncement(self, name, played_callback, played_callback_delay)
   end
 end
 
@@ -567,7 +612,7 @@ function GameUI:onTick()
       self.app.world:adjustZoom(self.current_momentum.z)
     end
   end
-  do
+  if not self.app.world:isCurrentSpeed("Pause") then
     local ticks_since_last_announcement = self.ticks_since_last_announcement
     if ticks_since_last_announcement >= self.random_announcement_ticks_target then
       self:playAnnouncement("rand*.wav")
@@ -722,7 +767,7 @@ end
 
 function UI:togglePlaySounds()
   self.app.config.play_sounds = not self.app.config.play_sounds
-
+  self.app.audio:playSoundEffects(self.app.config.play_sounds)
   self.app:saveConfig()
 end
 

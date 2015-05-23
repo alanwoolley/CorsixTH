@@ -19,9 +19,14 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE. --]]
 
 local lfs = require "lfs"
+local TH = require "TH"
+local lfsext = TH.lfsExt()
 
 --! A tree node representing a directory in the physical file-system.
 class "DirTreeNode" (FileTreeNode)
+
+---@type DirTreeNode
+local DirTreeNode = _G["DirTreeNode"]
 
 local pathsep = package.config:sub(1, 1)
 
@@ -52,6 +57,9 @@ end
 
 --! This tree only shows directories and highlights valid TH directories.
 class "InstallDirTreeNode" (DirTreeNode)
+
+---@type InstallDirTreeNode
+local InstallDirTreeNode = _G["InstallDirTreeNode"]
 
 function InstallDirTreeNode:InstallDirTreeNode(path)
   self:FileTreeNode(path)
@@ -96,6 +104,9 @@ end
 
 --! Prompter for Theme Hospital install directory
 class "UIDirectoryBrowser" (UIResizable)
+
+---@type UIDirectoryBrowser
+local UIDirectoryBrowser = _G["UIDirectoryBrowser"]
 
 --! Creates a new directory browser window
 --!param ui The active UI to hook into.
@@ -144,7 +155,7 @@ function UIDirectoryBrowser:UIDirectoryBrowser(ui, mode, instruction, treenode_c
   -- Create the root item (or items, on Windows), and set it as the
   -- first_visible_node.
   local root
-  local roots = lfs.volumes()
+  local roots = lfsext.volumes()
   if #roots > 1 then
     for k, v in pairs(roots) do
       roots[k] = _G[treenode_class](v)

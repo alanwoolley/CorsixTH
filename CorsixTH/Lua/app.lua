@@ -25,13 +25,17 @@ local TH = require "TH"
 local SDL = require "sdl"
 local assert, io, type, dofile, loadfile, pcall, tonumber, print, setmetatable
     = assert, io, type, dofile, loadfile, pcall, tonumber, print, setmetatable
+local runDebugger = dofile "run_debugger"
 
 -- Increment each time a savegame break would occur
 -- and add compatibility code in afterLoad functions
 
-local SAVEGAME_VERSION = 83
+local SAVEGAME_VERSION = 101
 
 class "App"
+
+---@type App
+local App = _G["App"]
 
 function App:App()
   self.command_line = {}
@@ -54,8 +58,8 @@ function App:App()
     motion = self.onMouseMove,
     active = self.onWindowActive,
     music_over = self.onMusicOver,
-	movie_over = self.onMovieOver,
-    load = self.load,
+    movie_over = self.onMovieOver,
+    sound_over = self.onSoundOver,
     restart = self.restart,
     save = self.save,
     gamespeed = self.gamespeed,
@@ -66,6 +70,12 @@ function App:App()
   self.strings = {}
   self.savegame_version = SAVEGAME_VERSION
   self.check_for_updates = true
+end
+
+--! Starts a Lua DBGp client & connects it to a DBGp server.
+--!return error_message (String) Returns an error message or nil.
+function App:connectDebugger()
+  return runDebugger()
 end
 
 function App:setCommandLine(...)
@@ -411,7 +421,15 @@ function App:initLanguage()
   return success
 end
 
+function App:worldExited()
+  self.audio:clearCallbacks()
+end
+
 function App:loadMainMenu(message)
+  if self.world then
+    self:worldExited()
+  end
+
   -- Make sure there is no blue filter active.
   self.video:setBlueFilterActive(false)
 
@@ -438,6 +456,10 @@ end
 -- in the "Levels" folder of CorsixTH, if it is a number it tries to load that level from
 -- the original game.
 function App:loadLevel(level, ...)
+  if self.world then
+    self:worldExited()
+  end
+
   -- Check that we can load the data before unloading current map
   local new_map = Map(self)
   local map_objects, errors = new_map:load(level, ...)
@@ -929,6 +951,10 @@ function App:onMovieOver(...)
   self.moviePlayer:onMovieOver(...)
 end
 
+function App:onSoundOver(...)
+  return self.audio:onSoundPlayed(...)
+end
+
 function App:checkInstallFolder()
   self.fs = FileSystem()
   local status, err
@@ -1156,8 +1182,10 @@ end
 -- a specific savegame verion is from.
 function App:getVersion(version)
   local ver = version or self.savegame_version
-  if ver > 78 then
+  if ver > 91 then
     return "Trunk"
+  elseif ver > 78 then
+    return "0.40"
   elseif ver > 72 then
     return "0.30"
   elseif ver > 66 then
@@ -1187,6 +1215,9 @@ end
 
 function App:load(filename)
   print "loading"
+  if self.world then
+    self:worldExited()
+  end
   return LoadGameFile(self.savegame_dir .. filename)
 end
 
@@ -1265,6 +1296,7 @@ function App:restart()
   assert(self.map, "Trying to restart while no map is loaded.")
   self.ui:addWindow(UIConfirmDialog(self.ui, _S.confirmation.restart_level,
   --[[persistable:app_confirm_restart]] function()
+    self:worldExited()
     local level = self.map.level_number
     local difficulty = self.map.difficulty
     local name, file, intro
@@ -1300,6 +1332,7 @@ end
 
 --! This function is automatically called after loading a game and serves for compatibility.
 function App:afterLoad()
+  self.ui:addOrRemoveDebugModeKeyHandlers()
   local old = self.world.savegame_version or 0
   local new = self.savegame_version
 
@@ -1315,6 +1348,7 @@ function App:afterLoad()
   if new == old then
     self.world:gameLog("Savegame version is " .. new .. " (" .. self:getVersion()
       .. "), originally it was " .. first .. " (" .. self:getVersion(first) .. ")")
+    self.world:playLoadedEntitySounds()
     return
   elseif new > old then
     self.world:gameLog("Savegame version changed from " .. old .. " (" .. self:getVersion(old) ..
@@ -1328,8 +1362,11 @@ function App:afterLoad()
   end
   self.world.savegame_version = new
 
-  if new < 79 then
-    self.key_modifiers = {}
+  if old < 87 then
+    local new_object = dofile "objects/gates_to_hell"
+    Object.processTypeDefinition(new_object)
+    self.objects[new_object.id] = new_object
+    self.world:newObjectType(new_object)
   end
 
   self.map:afterLoad(old, new)
@@ -1362,6 +1399,8 @@ function App:checkForUpdates()
     -- LuaSocket is not available, just return
     print "Cannot check for updates since LuaSocket is not available."
     return
+  else
+    self.lua_socket_available = true
   end
   local http = require "socket.http"
   local url = require "socket.url"
@@ -1394,7 +1433,7 @@ function App:checkForUpdates()
     end
   end
   if not valid_url then
-    print ("Update download url is not on the trusted domains list (" .. updateTable["download_url"] .. ")")
+    print ("Update download url is not on the trusted domains list (" .. update_table["download_url"] .. ")")
     return
   end
 
@@ -1410,6 +1449,20 @@ function App:checkForUpdates()
   print ("New version found: " .. new_version)
   -- Display the update window
   self.ui:addWindow(UIUpdate(self.ui, current_version, new_version, changelog, update_table["download_url"]))
+end
+
+-- Free up / stop any resources relying on the current video object
+function App:prepareVideoUpdate()
+  self.video:endFrame()
+  self.moviePlayer:deallocatePictureBuffer()
+end
+
+-- Update / start any resources relying on a video object
+function App:finishVideoUpdate()
+  self.gfx:updateTarget(self.video)
+  self.moviePlayer:updateRenderer()
+  self.moviePlayer:allocatePictureBuffer()
+  self.video:startFrame()
 end
 
 -- Do not remove, for savegame compatibility < r1891

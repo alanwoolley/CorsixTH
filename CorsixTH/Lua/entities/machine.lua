@@ -23,6 +23,9 @@ local TH = require "TH"
 --! An `Object` which needs occasional repair (to prevent explosion).
 class "Machine" (Object)
 
+---@type Machine
+local Machine = _G["Machine"]
+
 function Machine:Machine(world, object_type, x, y, direction, etc)
 
   self.total_usage = -1 -- Incremented in the constructor of Object.
@@ -81,10 +84,11 @@ function Machine:machineUsed(room)
     return
   end
   self:updateDynamicInfo()
-  local threshold = self.times_used/self.strength
-
+  local threshold = self.strength - self.times_used
   local taskIndex = self.hospital:getIndexOfTask(self.tile_x, self.tile_y, "repairing")
-  if threshold >= 0.9 then
+
+  -- Too late it is about to explode
+  if threshold < 1 then
     self.hospital:removeHandymanTask(taskIndex, "repairing")
     room:crashRoom()
     self:setCrashedAnimation()
@@ -96,16 +100,17 @@ function Machine:machineUsed(room)
     end
     self:setRepairing(nil)
     return true
-  elseif threshold >= 0.70 then
-    -- TODO: 3428 is smoke, add it when additional objects can be made
-    -- Urgent
+    -- Urgent repair needed
+  elseif threshold < 4 then
+    -- TODO: Smoke, up to three animations per machine
+    -- i.e. < 4 one plume, < 3 two plumes or < 2 three plumes of smoke
     if taskIndex == -1 then
       local call = self.world.dispatcher:callForRepair(self, true, false, true)
       self.hospital:addHandymanTask(self, "repairing", 2, self.tile_x, self.tile_y, call)
     else
       self.hospital:modifyHandymanTaskPriority(taskIndex, 2, "repairing")
     end
-  elseif threshold >= 0.4 then
+  elseif threshold < 6 then
     -- Not urgent
     if taskIndex == -1 then
       local call = self.world.dispatcher:callForRepair(self)

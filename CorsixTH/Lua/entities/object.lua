@@ -25,6 +25,9 @@ local ignore_next = false
 --! An `Entity` which occupies at least a single map tile and does not move.
 class "Object" (Entity)
 
+---@type Object
+local Object = _G["Object"]
+
 local orient_mirror = {
   north = "west",
   west = "north",
@@ -385,8 +388,22 @@ function Object:setTile(x, y)
       end
     end
   end
+
+  local entity_map = self.world.entity_map
+  -- Remove the reference to the object at it's previous coordinates
+  if entity_map then
+    entity_map:removeEntity(self.tile_x,self.tile_y, self)
+  end
+
+  -- Update the objects coordinates
   self.tile_x = x
   self.tile_y = y
+
+  -- Update the entity map for the new position
+  if entity_map then
+    entity_map:addEntity(x,y,self)
+  end
+
   if x then
     self.th:setDrawingLayer(self:getDrawingLayer())
     self.th:setTile(self.world.map.th, self:getRenderAttachTile())
