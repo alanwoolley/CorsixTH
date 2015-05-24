@@ -27,6 +27,7 @@ SOFTWARE.
 #include "main.h"
 
 extern "C" {
+int luaopen_lpeg(lua_State *L);
 int luaopen_random(lua_State *L);
 }
 #include "rnc.h"
@@ -35,6 +36,7 @@ int luaopen_random(lua_State *L);
 #include "jit_opt.h"
 #include "persist_lua.h"
 #include "iso_fs.h"
+#include "lfs.h"
 
 // Config file checking
 #ifndef CORSIX_TH_USE_PACK_PRAGMAS
@@ -115,6 +117,9 @@ int CorsixTH_lua_main_no_eval(lua_State *L) {
     PRELOAD("ISO_FS", luaopen_iso_fs);
     PRELOAD("persist", luaopen_persist);
     PRELOAD("sdl", luaopen_sdl);
+    // These have been removed from CorsixTH trunk but are required for Android
+    PRELOAD("lfs", luaopen_lfs);
+    PRELOAD("lpeg", luaopen_lpeg);
 #undef PRELOAD
 
     // require "debug" (Harmless in Lua 5.1, useful in 5.2 for compatbility)

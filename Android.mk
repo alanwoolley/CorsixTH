@@ -28,7 +28,8 @@ LOCAL_C_INCLUDES := $(LOCAL_PATH)/$(SDL_PATH)/include \
 					$(LOCAL_PATH)/$(FFMPEG_PATH)/libavformat \
 					$(LOCAL_PATH)/$(FFMPEG_PATH)/libavutil \
 					$(LOCAL_PATH)/$(FFMPEG_PATH)/libswresample \
-					$(LOCAL_PATH)/$(FFMPEG_PATH)/libswscale
+					$(LOCAL_PATH)/$(FFMPEG_PATH)/libswscale \
+					../LFS
 					
 LOCAL_CFLAGS := -DPLAY_MOD 
 
@@ -65,10 +66,9 @@ LOCAL_SRC_FILES := $(CORSIX_TH_SRC)/../appmain.cpp \
 			$(CORSIX_TH_SRC)/th_lua_lfs_ext.cpp \
 			$(CORSIX_TH_SRC)/th_movie.cpp \
 			$(SDL_PATH)/src/main/android/SDL_android_main.cpp
-			
 
-LOCAL_SHARED_LIBRARIES := libLUA SDL2 SDL2_mixer libffmpeg libLFS
-LOCAL_STATIC_LIBRARIES := libfreetype2 libSDL2_gfx
+LOCAL_SHARED_LIBRARIES := libLUA SDL2 SDL2_mixer libffmpeg
+LOCAL_STATIC_LIBRARIES := libfreetype2 libSDL2_gfx libLFS libLPEG
 
 LOCAL_LDLIBS := -llog -lGLESv2
 LOCAL_CPPFLAGS :=-D__STDC_CONSTANT_MACROS -std=c++11
