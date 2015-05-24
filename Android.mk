@@ -9,8 +9,6 @@ LUA_PATH := ../LUA
 SDL_MIXER_PATH :=../SDL_mixer
 AGG_PATH := ../AGG
 CORSIX_TH_SRC := CorsixTH/Src
-LFS_SRC := LFS
-LPEG_SRC := LPEG
 FREETYPE_PATH := ../freetype2
 SDL_GFX_PATH := ../SDL_gfx
 FFMPEG_PATH := ../ffmpeg
@@ -23,8 +21,6 @@ LOCAL_C_INCLUDES := $(LOCAL_PATH)/$(SDL_PATH)/include \
 					$(LOCAL_PATH)/$(SDL_MIXER_PATH) \
 					$(LOCAL_PATH)/$(CORSIX_TH_SRC) \
 					$(LOCAL_PATH)/$(CTH_ASSETS) \
-					$(LOCAL_PATH)/$(LFS_SRC) \
-					$(LOCAL_PATH)/$(LPEG) \
 					$(LOCAL_PATH)/$(SDL_GFX_PATH) \
 					$(LOCAL_PATH)/$(LUA_PATH) \
 					$(LOCAL_PATH)/$(FFMPEG_PATH) \
@@ -66,18 +62,16 @@ LOCAL_SRC_FILES := $(CORSIX_TH_SRC)/../appmain.cpp \
 			$(CORSIX_TH_SRC)/sdl_wm.cpp \
 			$(CORSIX_TH_SRC)/xmi2mid.cpp \
 			$(CORSIX_TH_SRC)/th_lua_movie.cpp \
+			$(CORSIX_TH_SRC)/th_lua_lfs_ext.cpp \
 			$(CORSIX_TH_SRC)/th_movie.cpp \
-			$(LFS_SRC)/lfs.c \
-			$(LFS_SRC)/lfs_ext.c \
-			$(LPEG_SRC)/lpeg.c \
-			$(SDL_PATH)/src/main/android/SDL_android_main.c
+			$(SDL_PATH)/src/main/android/SDL_android_main.cpp
 			
 
-LOCAL_SHARED_LIBRARIES := libLUA SDL2 SDL2_mixer libffmpeg
+LOCAL_SHARED_LIBRARIES := libLUA SDL2 SDL2_mixer libffmpeg libLFS
 LOCAL_STATIC_LIBRARIES := libfreetype2 libSDL2_gfx
 
 LOCAL_LDLIBS := -llog -lGLESv2
-
+LOCAL_CPPFLAGS :=-D__STDC_CONSTANT_MACROS -std=c++11
 LOCAL_CPP_FEATURES += exceptions
 
 include $(BUILD_SHARED_LIBRARY)
