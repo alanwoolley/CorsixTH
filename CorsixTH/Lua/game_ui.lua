@@ -146,7 +146,7 @@ function GameUI:draw(canvas)
   end
   local zoom = self.zoom_factor
   if canvas:scale(zoom) then
-    app.map:draw(canvas, self.screen_offset_x, self.screen_offset_y, config.width / zoom, config.height / zoom, 0, 0)
+    app.map:draw(canvas, self.screen_offset_x, self.screen_offset_y, math.floor(config.width / zoom), math.floor(config.height / zoom), 0, 0)
     canvas:scale(1)
   else
     self:setZoom(1)
@@ -304,8 +304,8 @@ end
 
 function GameUI:onCursorWorldPositionChange()
   local zoom = self.zoom_factor
-  local x = self.screen_offset_x + self.cursor_x / zoom
-  local y = self.screen_offset_y + self.cursor_y / zoom
+  local x = math.floor(self.screen_offset_x + self.cursor_x / zoom)
+  local y = math.floor(self.screen_offset_y + self.cursor_y / zoom)
   local entity = nil
   if self.do_world_hit_test and not self:hitTest(self.cursor_x, self.cursor_y) then
     entity = self.app.map.th:hitTestObjects(x, y)
@@ -647,10 +647,18 @@ function GameUI:onTick()
       dy = dy + self.tick_scroll_amount.y
     end
 
-    -- Faster scrolling with shift key
-    local factor = self.app.config.scroll_speed
+    -- Adjust scroll speed based on config value:
+    -- there is a separate config value for whether or not shift is held.
+    -- the speed is multiplied by 0.5 for consistency between the old and
+    -- new configuration. In the past scroll_speed applied only to shift
+    -- and defaulted to 2, where 1 was regular scroll speed. By
+    -- By multiplying by 0.5, we allow for setting slower than normal
+    -- scroll speeds, and ensure there is no behaviour change for players
+    -- who do not modify their config file.
     if self.app.key_modifiers.shift then
-      mult = mult * factor
+      mult = mult * self.app.config.shift_scroll_speed * 0.5
+    else
+      mult = mult * self.app.config.scroll_speed * 0.5
     end
 
     self:scrollMap(dx * mult, dy * mult)

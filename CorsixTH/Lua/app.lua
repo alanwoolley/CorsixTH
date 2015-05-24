@@ -527,7 +527,7 @@ function App:dumpStrings()
   end
   local dir = self.command_line["config-file"] or ""
   dir = string.sub(dir, 0, -11)
-  local fi = assert(io.open(dir .. "debug-strings-orig.txt", "wt"))
+  local fi = assert(io.open(dir .. "debug-strings-orig.txt", "w"))
   for i, sec in ipairs(_S.deprecated) do
     for j, str in ipairs(sec) do
       fi:write("[" .. i .. "," .. j .. "] " .. ("%q\n"):format(val(str)))
@@ -575,11 +575,11 @@ function App:dumpStrings()
     end
   end
 
-  fi = assert(io.open(dir .. "debug-strings-new-lines.txt", "wt"))
+  fi = assert(io.open(dir .. "debug-strings-new-lines.txt", "w"))
   dump_by_line(fi, _S, "")
   fi:close()
 
-  fi = assert(io.open(dir .. "debug-strings-new-grouped.txt", "wt"))
+  fi = assert(io.open(dir .. "debug-strings-new-grouped.txt", "w"))
   dump_grouped(fi, _S, "")
   fi:close()
 
@@ -650,7 +650,7 @@ function App:checkMissingStringsInLanguage(dir, language)
       end
     end
 
-    local fi = assert(io.open(dir .. "debug-strings-diff-" .. language_english:lower() .. ".txt", "wt"))
+    local fi = assert(io.open(dir .. "debug-strings-diff-" .. language_english:lower() .. ".txt", "w"))
     fi:write("------------------------------------\n")
     fi:write("MISSING STRINGS IN LANGUAGE \"" .. language:upper() .. "\":\n")
     fi:write("------------------------------------\n")
@@ -693,6 +693,15 @@ function App:fixConfig()
 
     if key == "height" and type(value) == "number" and value < 100 then
       self.config[key] = 100
+    end
+
+    if (key == "scroll_speed" or key == "shift_scroll_speed") and
+        type(value) == "number" then
+      if value > 10 then
+        self.config[key] = 10
+      elseif value < 1 then
+        self.config[key] = 1
+      end
     end
   end
 end

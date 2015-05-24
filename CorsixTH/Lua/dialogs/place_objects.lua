@@ -333,13 +333,14 @@ function UIPlaceObjects:setActiveIndex(index)
     self.ui:tutorialStep(1, {4, 5}, 6)
   end
   local anims = self.anims
+  local grey_scale = anims.Alt32_GreyScale
   local _, ghost = self.ui.app.gfx:loadPalette()
   for _, anim in pairs(object.idle_animations) do
-    anims:setAnimationGhostPalette(anim, ghost)
+    anims:setAnimationGhostPalette(anim, ghost, grey_scale)
   end
   if object.slave_type then
     for _, anim in pairs(object.slave_type.idle_animations) do
-      anims:setAnimationGhostPalette(anim, ghost)
+      anims:setAnimationGhostPalette(anim, ghost, grey_scale)
     end
   end
 
@@ -529,8 +530,8 @@ function UIPlaceObjects:draw(canvas, x, y)
       local x, y = self.ui:WorldToScreen(self.object_cell_x, self.object_cell_y)
       local zoom = self.ui.zoom_factor
       if canvas:scale(zoom) then
-        x = x / zoom
-        y = y / zoom
+        x = math.floor(x / zoom)
+        y = math.floor(y / zoom)
       end
       self.object_anim:draw(canvas, x, y)
       if self.objects[self.active_index].object.slave_type then

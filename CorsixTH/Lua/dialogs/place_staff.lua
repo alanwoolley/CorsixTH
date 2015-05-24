@@ -46,7 +46,8 @@ function UIPlaceStaff:UIPlaceStaff(ui, profile, x, y)
   local idle_anim = Humanoid.getIdleAnimation(profile.humanoid_class)
   self.anim:setAnimation(self.world.anims, idle_anim)
   local _, ghost = ui.app.gfx:loadPalette()
-  self.world.anims:setAnimationGhostPalette(idle_anim, ghost)
+  local grey_scale = self.world.anims.Alt32_GreyScale
+  self.world.anims:setAnimationGhostPalette(idle_anim, ghost, grey_scale)
   self:onCursorWorldPositionChange(x, y)
   self:Window()
 end
@@ -87,7 +88,7 @@ function UIPlaceStaff:draw(canvas)
     local zoom = self.ui.zoom_factor
     if canvas:scale(zoom) then
       local x, y = self.ui:WorldToScreen(self.tile_x, self.tile_y)
-      self.anim:draw(canvas, x / zoom, y / zoom)
+      self.anim:draw(canvas, math.floor(x / zoom), math.floor(y / zoom))
       canvas:scale(1)
     else
       self.anim:draw(canvas, self.ui:WorldToScreen(self.tile_x, self.tile_y))
