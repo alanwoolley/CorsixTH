@@ -537,6 +537,11 @@ function Patient:goHome(cured)
   self.going_home = true
   self.waiting = nil
 
+  -- Remove any vaccination calls from patient
+  if not self.vaccinated then
+    self.world.dispatcher:dropFromQueue(self)
+  end
+
   local room = self:getRoom()
   if room then
     room:makeHumanoidLeave(self)
@@ -567,9 +572,10 @@ function Patient:tickDay()
     elseif self.waiting == 30 then
       self:checkWatch()
     end
-  if self.has_vomitted and self.has_vomitted > 0 then
-    self.has_vomitted = 0
-  end
+
+    if self.has_vomitted and self.has_vomitted > 0 then
+      self.has_vomitted = 0
+    end
   end
 
   -- if patients are getting unhappy, then maybe we should see this!
