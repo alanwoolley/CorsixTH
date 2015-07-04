@@ -30,7 +30,7 @@ local runDebugger = dofile "run_debugger"
 -- Increment each time a savegame break would occur
 -- and add compatibility code in afterLoad functions
 
-local SAVEGAME_VERSION = 101
+local SAVEGAME_VERSION = 102
 
 class "App"
 
@@ -183,7 +183,7 @@ function App:init()
   if good_install_folder then
     self.video:startFrame()
     self.gfx:loadRaw("Load01V", 640, 480):draw(self.video,
-      (self.config.width - 640) / 2, (self.config.height - 480) / 2)
+      math.floor((self.config.width - 640) / 2), math.floor((self.config.height - 480) / 2))
     self.video:endFrame()
     -- Add some notices to the loading screen
     local notices = {}
