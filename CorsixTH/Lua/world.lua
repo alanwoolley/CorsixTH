@@ -218,11 +218,14 @@ function World:adjustZoom(delta)
     modifier = 0.05
   end
 
+  print("Virtual width: " .. virtual_width)
+
   virtual_width = virtual_width - delta * factor * modifier
   if virtual_width < 200 then
     return false
   end
 
+  print ("Setting zoom: " .. scr_w/virtual_width)
   return self.ui:setZoom(scr_w/virtual_width)
 end
 
@@ -1057,7 +1060,7 @@ function World:onTick()
       if not lfs.attributes(dir .. "Autosaves", "modification") then
         lfs.mkdir(dir .. "Autosaves")
       end
-      local status, err = pcall(TheApp.save, TheApp, "Autosaves" .. pathsep .. "Autosave" .. self.month .. ".sav")
+      local status, err = pcall(TheApp.save, TheApp, dir .. "Autosaves" .. pathsep .. "Autosave" .. self.month .. ".sav")
       if not status then
         print("Error while autosaving game: " .. err)
       end
@@ -2264,6 +2267,16 @@ function World:getObjectsById(id)
   end
 
   return ret
+end
+
+--! Remove litter from a tile.
+--!param obj (Litter) litter to remove.
+--!param x (int) X position of the tile.
+--!param y (int) Y position of the tile.
+function World:removeLitter(obj, x, y)
+  self:removeObjectFromTile(obj, x, y)
+  self:destroyEntity(obj)
+  self.map.th:setCellFlags(x, y, {buildable = true})
 end
 
 --! Get the room at a given tile location.

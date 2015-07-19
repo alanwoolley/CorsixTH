@@ -584,6 +584,7 @@ function UI:onTextInput(text)
 end
 
 function UI:onMouseDown(code, x, y)
+
   local repaint = false
   local button = self.button_codes[code] or code
   if self.app.moviePlayer.playing then
@@ -634,6 +635,107 @@ end
 
 function UI:onMouseWheel(x, y)
   Window.onMouseWheel(self, x, y)
+end
+
+-- Touch controls
+local gesturing = false
+local fingersdown = 0
+local touchtick = -1
+local downdelayticks = 15
+local lastdown = {-1, -1 }
+local rightdown = false
+
+
+function UI:onTouchUp(finger, x, y)
+  print ("touch up finger: " .. finger .. " x: " .. x .. " y: " .. y)
+  fingersdown = fingersdown - 1
+  if rightdown then
+    rightdown = false
+    return
+  end
+
+  if gesturing and fingersdown == 0 then
+    gesturing = false
+    return
+  end
+
+  if finger > 0 or gesturing then
+    -- Ignore for now
+    return
+  end
+
+  if touchtick > -1  then
+      print ("Pressing left button")
+      self:delayedTouchDown(1)
+  end
+
+    print ("Releasing left button")
+    self:onMouseUp(1, x, y)
+end
+
+function UI:onTouchDown(finger, x, y)
+  fingersdown = fingersdown +1
+
+  print ("touch down finger: " .. finger .. " x: " .. x .. " y: " .. y)
+
+  if finger > 0 and touchtick > -1 then
+    gesturing = true
+    touchtick = -1
+    -- Ignore for now
+    return
+  end
+
+  --self:onMouseDown(1,x,y)
+  touchtick = 0
+  lastdown = {x,y}
+end
+
+function UI:delayedTouchDown(button)
+  touchtick = -1
+  print ("pressing: " .. button .. " coords: " .. lastdown[1] .. ", " .. lastdown[2])
+  self:onMouseDown(button, lastdown[1],lastdown[2])
+  if button == 3 then
+    print ("Right button has been pressed and released")
+    self:onMouseUp(button, lastdown[1],lastdown[2])
+    rightdown = true
+  end
+
+  lastdown = {-1, -1 }
+
+
+end
+
+function UI:onTouchMove(finger, x, y, dx, dy)
+  if finger > 0 or gesturing then
+    -- Ignore for now
+    return
+  end
+
+  if touchtick > -1 then
+    if math.abs(lastdown[1] -x) > 10 or math.abs(lastdown[2]-y) >10 then
+      self:delayedTouchDown(1)
+    end
+  end
+
+  self:onMouseMove(x, y, dx, dy)
+
+
+
+end
+
+function UI:onGesture(num_fingers, d_theta, d_dist, x, y)
+  if not gesturing then
+    return
+  end
+
+
+  print ("gesture. Fingers: " .. num_fingers .. " angle: " .. d_theta .. " dist: " .. d_dist)
+
+  self:onMouseMove(x,y,0,0)
+  --self:onMouseWheel(0, d_dist)
+  if self.app.world then
+    self.app.world:adjustZoom(d_dist)
+  end
 end
 
 --[[ Determines if a cursor entity can be clicked
@@ -714,6 +816,14 @@ function UI:onTick()
   if self.tooltip then
     self:updateTooltip()
   end
+
+  if touchtick == downdelayticks and fingersdown == 1 then
+    print ("Going to press right button")
+    self:delayedTouchDown(3)
+  elseif touchtick > -1 then
+    touchtick = touchtick +1
+  end
+
   return repaint
 end
 

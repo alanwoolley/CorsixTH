@@ -67,10 +67,10 @@ LOCAL_SRC_FILES := $(CORSIX_TH_SRC)/../appmain.cpp \
 			$(CORSIX_TH_SRC)/th_movie.cpp \
 			$(SDL_PATH)/src/main/android/SDL_android_main.cpp
 
-LOCAL_SHARED_LIBRARIES := libLUA SDL2 SDL2_mixer libffmpeg
-LOCAL_STATIC_LIBRARIES := libfreetype2 libSDL2_gfx libLFS libLPEG
+LOCAL_SHARED_LIBRARIES := libLUA SDL2 SDL2_mixer
+LOCAL_STATIC_LIBRARIES := libfreetype2 libSDL2_gfx libLFS libLPEG libavformat libavcodec libswscale libavutil libswscale libswresample
 
-LOCAL_LDLIBS := -llog -lGLESv2
+LOCAL_LDLIBS := -llog -lGLESv2 -lz
 LOCAL_CPPFLAGS :=-D__STDC_CONSTANT_MACROS -std=c++11
 LOCAL_CPP_FEATURES += exceptions
 

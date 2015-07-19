@@ -289,7 +289,19 @@ int THMoviePictureBuffer::write(AVFrame* pFrame, double dPts)
 
         /* Upload it to the texture we render from - note that this works because our OpenGL context shares texture namespace with the main threads' context. */
         SDL_UpdateTexture(pMoviePicture->m_pTexture, NULL, buffer, pMoviePicture->m_iWidth * 3);
+        /*
+        ff_refresh ref;
 
+        ref.texture = pMoviePicture->m_pTexture;
+        ref.buffer = buffer;
+        ref.width = pMoviePicture->m_iWidth * 3;
+        SDL_Event ffevent;
+        ffevent.type = SDL_USEREVENT_FF_REFRESH;
+        ffevent.user.data1 = (void*) &ref;
+        SDL_PushEvent(&ffevent);
+
+        while (SDL_HasEvent(SDL_USEREVENT_FF_REFRESH)) {}
+    */
         av_free(buffer);
         av_frame_free(&pFrameRGB);
 
@@ -677,6 +689,8 @@ void THMovie::play(int iX, int iY, int iWidth, int iHeight, int iChannel)
 
     m_pStreamThread = SDL_CreateThread(th_movie_stream_reader_thread, "Stream", this);
     m_pVideoThread = SDL_CreateThread(th_movie_video_thread, "Video", this);
+
+
 }
 
 void THMovie::stop()

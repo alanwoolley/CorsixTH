@@ -483,7 +483,7 @@ function UIBottomPanel:onTick()
       local fps = self.ui.app:getFPS()
       if fps then
         self.dynamic_info = {text = {
-          ("FPS: %i"):format(fps),
+          ("FPS: %i"):format(math.floor(fps)),
           ("Lua GC: %.1f Kb"):format(collectgarbage"count"),
           ("Entities: %i"):format(#self.ui.app.world.entities),
         }}

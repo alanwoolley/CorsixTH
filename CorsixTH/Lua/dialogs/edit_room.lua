@@ -602,6 +602,10 @@ function UIEditRoom:returnToDoorPhase()
         if not obj or obj == room.door or class.is(obj, SwingDoor) then
           break
         end
+        if obj.object_type.id == "litter" then -- Silently remove litter from the world.
+          self.world:removeLitter(obj, x, y)
+          break
+        end
         self.world:destroyEntity(obj)
         if not obj.master then
           self:addObjects({{
@@ -1001,6 +1005,8 @@ end
 function UIEditRoom:setBlueprintRect(x, y, w, h)
   local rect = self.blueprint_rect
   local map = self.ui.app.map
+  if x < 1 then x = 1 end
+  if y < 1 then y = 1 end
   if x + w > map.width  then w = map.width  - x end
   if y + h > map.height then h = map.height - y end
 

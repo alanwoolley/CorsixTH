@@ -29,6 +29,11 @@ SOFTWARE.
 #include <queue>
 #include "config.h"
 
+
+
+
+
+
 #if defined(CORSIX_TH_USE_FFMPEG) || defined(CORSIX_TH_USE_LIBAV)
 #include "SDL_mixer.h"
 
@@ -54,6 +59,14 @@ struct SDL_Window;
 struct SDL_mutex;
 struct SDL_cond;
 typedef void* SDL_GLContext;
+
+typedef struct {
+    SDL_Texture *texture;
+    uint8_t *buffer;
+    int width;
+
+
+} ff_refresh;
 
 class THMoviePicture
 {
@@ -226,5 +239,6 @@ protected:
     SDL_Thread* m_pVideoThread;
 #endif //CORSIX_TH_USE_FFMPEG || CORSIX_TH_USE_LIBAV
 };
+
 
 #endif // TH_VIDEO_H

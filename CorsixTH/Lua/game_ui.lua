@@ -413,6 +413,11 @@ function GameUI:onWindowActive(gain)
   end
 end
 
+function GameUI:allowDragScroll()
+  local edit_window = self.app.ui:getWindow(UIEditRoom)
+  return not edit_window
+end
+
 -- TODO: try to remove duplication with UI:onMouseMove
 function GameUI:onMouseMove(x, y, dx, dy)
   local repaint = UpdateCursorPosition(self.app.video, x, y)
@@ -425,7 +430,7 @@ function GameUI:onMouseMove(x, y, dx, dy)
   if self:onCursorWorldPositionChange() or self.simulated_cursor then
     repaint = true
   end
-  if self.buttons_down.mouse_middle then
+  if self.buttons_down.mouse_middle or self.buttons_down.mouse_left and self:allowDragScroll() then
     local zoom = self.zoom_factor
     self.current_momentum.x = -dx/zoom
     self.current_momentum.y = -dy/zoom
@@ -442,7 +447,7 @@ function GameUI:onMouseMove(x, y, dx, dy)
 
   local scroll_region_size = self.app.config.scroll_region_size
   local scroll_power = self.app.config.scroll_speed
-  
+
   --if self.app.config.fullscreen then
     -- As the mouse is locked within the window, a 1px region feels a lot
     -- larger than it actually is.
@@ -451,7 +456,7 @@ function GameUI:onMouseMove(x, y, dx, dy)
     -- In windowed mode, a reasonable size is needed, though not too large.
   --  scroll_region_size = 8
   --end
-  
+
   if not self.app.config.prevent_edge_scrolling and (x < scroll_region_size
   or y < scroll_region_size or x >= self.app.config.width - scroll_region_size
   or y >= self.app.config.height - scroll_region_size) then
@@ -595,7 +600,7 @@ end
 
 function GameUI:onTick()
   local repaint = UI.onTick(self)
-  if not self.buttons_down.mouse_middle then
+  if not self.buttons_down.mouse_middle or self.buttons_down.mouse_left then
     if math.abs(self.current_momentum.x) < 0.2 and math.abs(self.current_momentum.y) < 0.2 then
       -- Stop scrolling
       self.current_momentum.x = 0.0
@@ -638,7 +643,7 @@ function GameUI:onTick()
       -- If the middle mouse button is down, then the world is being dragged,
       -- and so the scroll direction due to the cursor being at the map edge
       -- should be opposite to normal to make it feel more natural.
-      if self.buttons_down.mouse_middle then
+      if not self.edit_room and (self.buttons_down.mouse_middle or self.buttons_down.mouse_left) then
         dx, dy = -dx, -dy
       end
     end
@@ -675,6 +680,7 @@ end
 local abs, sqrt_5, floor = math.abs, math.sqrt(1 / 5), math.floor
 
 function GameUI:scrollMapTo(x, y)
+
   local zoom = 2 * self.zoom_factor
   local config = self.app.config
   return self:scrollMap(x - self.screen_offset_x - config.width / zoom,
@@ -732,6 +738,11 @@ function GameUI.limitPointToDiamond(dx, dy, visible_diamond, do_limit)
 end
 
 function GameUI:scrollMap(dx, dy)
+
+  if self.edit_room then
+    return
+  end
+
   dx = dx + self.screen_offset_x
   dy = dy + self.screen_offset_y
 

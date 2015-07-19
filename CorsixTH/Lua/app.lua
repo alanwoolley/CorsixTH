@@ -56,6 +56,10 @@ function App:App()
     buttondown = self.onMouseDown,
     mousewheel = self.onMouseWheel,
     motion = self.onMouseMove,
+    touchup = self.onTouchUp,
+    touchdown = self.onTouchDown,
+    touchmove = self.onTouchMove,
+    gesture = self.onGesture,
     active = self.onWindowActive,
     music_over = self.onMusicOver,
     movie_over = self.onMovieOver,
@@ -167,6 +171,8 @@ function App:init()
   local caption_descs = {self.video:getRendererDetails()}
   if compile_opts.jit then
     caption_descs[#caption_descs + 1] = compile_opts.jit
+  else
+    caption_descs[#caption_descs + 1] = _VERSION
   end
   if compile_opts.arch_64 then
     caption_descs[#caption_descs + 1] = "64 bit"
@@ -312,7 +318,7 @@ function App:init()
 
       -- If a savegame was specified, load it
       if self.command_line.load then
-        local status, err = pcall(self.load, self, self.command_line.load)
+        local status, err = pcall(self.load, self, self.savegame_dir .. self.command_line.load)
         if not status then
           err = _S.errors.load_prefix .. err
           print(err)
@@ -948,6 +954,22 @@ function App:onMouseWheel(...)
   return self.ui:onMouseWheel(...)
 end
 
+function App:onTouchUp(...)
+  return self.ui:onTouchUp(...)
+end
+
+function App:onTouchDown(...)
+  return self.ui:onTouchDown(...)
+end
+
+function App:onTouchMove(...)
+  return self.ui:onTouchMove(...)
+end
+
+function App:onGesture(...)
+  return self.ui:onGesture(...)
+end
+
 function App:onWindowActive(...)
   return self.ui:onWindowActive(...)
 end
@@ -1214,7 +1236,7 @@ end
 
 function App:save(filename)
   print "saving"
-  return SaveGameFile(self.savegame_dir .. filename)
+  return SaveGameFile(filename)
 end
 -- Omit the usual file extension so this file cannot be seen from the normal load and save screen and cannot be overwritten
 function App:quickSave()
@@ -1222,12 +1244,11 @@ function App:quickSave()
   return SaveGameFile(self.savegame_dir .. filename)
 end
 
-function App:load(filename)
-  print "loading"
+function App:load(filepath)
   if self.world then
     self:worldExited()
   end
-  return LoadGameFile(self.savegame_dir .. filename)
+  return LoadGameFile(filepath)
 end
 
 function App:quickLoad()

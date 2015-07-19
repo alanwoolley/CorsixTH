@@ -23,6 +23,7 @@ SOFTWARE.
 #include "config.h"
 #include "lua_sdl.h"
 #include "th_lua.h"
+#include "th_movie.h"
 #include "SDL2_framerate.h"
 #include <string.h>
 #include "../logging.h"
@@ -246,6 +247,39 @@ static int l_mainloop(lua_State *L) {
                 lua_pushinteger(dispatcher, e.motion.yrel);
                 nargs = 5;
                 break;
+            case SDL_FINGERDOWN:
+                lua_pushliteral(dispatcher, "touchdown");
+                lua_pushinteger(dispatcher, e.tfinger.fingerId);
+                lua_pushinteger(dispatcher, e.tfinger.x);
+                lua_pushinteger(dispatcher, e.tfinger.y);
+                nargs = 4;
+                break;
+            case SDL_FINGERUP:
+                lua_pushliteral(dispatcher, "touchup");
+                lua_pushinteger(dispatcher, e.tfinger.fingerId);
+                lua_pushinteger(dispatcher, e.tfinger.x);
+                lua_pushinteger(dispatcher, e.tfinger.y);
+                nargs = 4;
+                break;
+            case SDL_FINGERMOTION:
+                lua_pushliteral(dispatcher, "touchmove");
+                lua_pushinteger(dispatcher, e.tfinger.fingerId);
+                lua_pushinteger(dispatcher, e.tfinger.x);
+                lua_pushinteger(dispatcher, e.tfinger.y);
+                lua_pushinteger(dispatcher, e.tfinger.dx);
+                lua_pushinteger(dispatcher, e.tfinger.dy);
+                nargs = 6;
+                break;
+            case SDL_MULTIGESTURE:
+                lua_pushliteral(dispatcher, "gesture");
+                lua_pushinteger(dispatcher, e.mgesture.numFingers);
+                lua_pushinteger(dispatcher, e.mgesture.dTheta);
+                lua_pushinteger(dispatcher, e.mgesture.dDist);
+                lua_pushinteger(dispatcher, e.mgesture.x);
+                lua_pushinteger(dispatcher, e.mgesture.y);
+                nargs = 6;
+                break;
+
             case SDL_WINDOWEVENT:
                 switch (e.window.event) {
                     case SDL_WINDOWEVENT_FOCUS_GAINED:
@@ -335,6 +369,12 @@ static int l_mainloop(lua_State *L) {
 
 			}
 				break;
+			case SDL_USEREVENT_FF_REFRESH: {
+			    SDL_Log("Updating");
+			    ff_refresh* refresh  = (ff_refresh*) e.user.data1;
+			    SDL_UpdateTexture(refresh->texture, NULL, refresh->buffer, refresh->width);
+			    }
+			    break;
 			case SDL_USEREVENT_SHOWCHEATS:
 			    lua_pushliteral(dispatcher, "showcheats");
 			    nargs = 1;

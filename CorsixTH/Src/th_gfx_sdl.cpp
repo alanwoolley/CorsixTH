@@ -364,6 +364,9 @@ bool THRenderTarget::setScaleFactor(double fScale, THScaledItems eWhatToScale)
         SDL_RenderSetLogicalSize(m_pRenderer, virtWidth, virtHeight);
         if(SDL_SetRenderTarget(m_pRenderer, m_pZoomTexture) != 0)
         {
+            std::cout << "Warning: Could not render to zoom texture - " << SDL_GetError() << std::endl;
+
+            SDL_RenderSetScale(m_pRenderer, 1, 1);
             SDL_DestroyTexture(m_pZoomTexture);
             m_pZoomTexture = NULL;
             return false;
@@ -1505,16 +1508,12 @@ bool THFreeTypeFont::_isMonochrome() const
     return true;
 }
 
-void THFreeTypeFont::_setNullTexture(cached_text_t* pCacheEntry) const
-{
-    pCacheEntry->pTexture = NULL;
-}
-
 void THFreeTypeFont::_freeTexture(cached_text_t* pCacheEntry) const
 {
     if(pCacheEntry->pTexture != NULL)
     {
         SDL_DestroyTexture(reinterpret_cast<SDL_Texture*>(pCacheEntry->pTexture));
+        pCacheEntry->pTexture = NULL;
     }
 }
 
@@ -1541,11 +1540,11 @@ void THFreeTypeFont::_makeTexture(THRenderTarget *pEventualCanvas, cached_text_t
 
 void THFreeTypeFont::_drawTexture(THRenderTarget* pCanvas, cached_text_t* pCacheEntry, int iX, int iY) const
 {
-    if(pCacheEntry->iTexture == 0)
+    if(pCacheEntry->pTexture == NULL)
         return;
 
     SDL_Rect rcDest = { iX, iY, pCacheEntry->iWidth, pCacheEntry->iHeight };
-    pCanvas->draw(reinterpret_cast<SDL_Texture*>(pCacheEntry->pTexture), NULL, &rcDest, 0);
+    pCanvas->draw(static_cast<SDL_Texture*>(pCacheEntry->pTexture), NULL, &rcDest, 0);
 }
 
 #endif // CORSIX_TH_USE_FREETYPE2
