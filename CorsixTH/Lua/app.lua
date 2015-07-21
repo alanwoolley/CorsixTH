@@ -66,6 +66,7 @@ function App:App()
     sound_over = self.onSoundOver,
     restart = self.restart,
     save = self.save,
+    load = self.load,
     gamespeed = self.gamespeed,
     tryautosave = self.tryAutoSave,
     configupdate = self.updateConfig,
@@ -1235,20 +1236,26 @@ function App:getVersion(version)
 end
 
 function App:save(filename)
-  print "saving"
-  return SaveGameFile(filename)
+  print ("saving : " .. filename)
+  return SaveGameFile(self.savegame_dir .. filename)
 end
 -- Omit the usual file extension so this file cannot be seen from the normal load and save screen and cannot be overwritten
 function App:quickSave()
   local filename = "quicksave"
+  print ("saving quicksave: " ..self.savegame_dir .. filename)
   return SaveGameFile(self.savegame_dir .. filename)
 end
 
 function App:load(filepath)
+  print ("Loading : " .. filepath)
   if self.world then
     self:worldExited()
   end
-  return LoadGameFile(filepath)
+
+  self.video:setBlueFilterActive(false)
+
+  
+  return LoadGameFile(self.savegame_dir .. filepath)
 end
 
 function App:quickLoad()

@@ -1,7 +1,9 @@
 #include "commands.h"
+#include "logging.h"
 
 
 int sendCommandInt(JavaVM* jvm, jint cmd, jint data) {
+	LOG_INFO("Sending command int data");
 	JNIEnv* jEnv;
 	jvm->AttachCurrentThread(&jEnv, NULL);
 	jclass cls = jEnv->FindClass("uk/co/armedpineapple/cth/SDLActivity");
@@ -11,6 +13,7 @@ int sendCommandInt(JavaVM* jvm, jint cmd, jint data) {
 }
 
 int sendCommand(JavaVM* jvm, jint cmd) {
+	LOG_INFO("Sending command");
 	JNIEnv* jEnv;
 	jvm->AttachCurrentThread(&jEnv, NULL);
 	jclass cls = jEnv->FindClass("uk/co/armedpineapple/cth/SDLActivity");
