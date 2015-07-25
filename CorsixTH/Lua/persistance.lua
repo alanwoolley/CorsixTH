@@ -263,6 +263,7 @@ function SaveGameFile(filename)
   local f = assert(io.open(filename, "wb"))
   f:write(data)
   f:close()
+  gamesaveupdated(filename, 1, 2, "hello")
 end
 
 function LoadGame(data)

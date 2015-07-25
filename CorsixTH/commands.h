@@ -23,8 +23,10 @@
 #define COMMAND_HIDE_MENU 18
 #define COMMAND_START_VIBRATION 19
 #define COMMAND_STOP_VIBRATION 20
+#define COMMAND_GAME_SAVE_UPDATED 21
 
 int sendCommandInt(JavaVM* jvm, jint cmd, jint data);
 int sendCommand(JavaVM* jvm, jint cmd);
+int sendCommandObj(JavaVM* jvm, jint cmd, jobject obj);
 
 #endif
