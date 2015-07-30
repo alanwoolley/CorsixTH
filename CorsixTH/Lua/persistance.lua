@@ -263,7 +263,10 @@ function SaveGameFile(filename)
   local f = assert(io.open(filename, "wb"))
   f:write(data)
   f:close()
-  gamesaveupdated(filename, 1, 2, "hello")
+  local ss = TheApp.ui:makeScreenshot()
+  gamesaveupdated(filename, 1, 2, "hello", ss)
+
+
 end
 
 function LoadGame(data)

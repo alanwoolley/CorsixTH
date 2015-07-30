@@ -937,7 +937,8 @@ function UI:makeScreenshot()
   if not res then
     print("Screenshot failed: " .. err)
   else
-    self.app.audio:playSound("SNAPSHOT.WAV")
+    --self.app.audio:playSound("SNAPSHOT.WAV")
+    return filename
   end
 end
 

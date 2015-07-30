@@ -33,6 +33,8 @@ SOFTWARE.
 #define max(a, b) ((a) > (b) ? (a) : (b))
 #endif
 
+#include "lodepng.h"
+
 FullColourRenderer::FullColourRenderer(int iWidth, int iHeight) : m_iWidth(iWidth), m_iHeight(iHeight)
 {
     m_iX = 0;
@@ -418,9 +420,9 @@ bool THRenderTarget::endFrame()
     }
     if(m_bBlueFilterActive)
     {
-        SDL_SetRenderDrawBlendMode(m_pRenderer, SDL_BLENDMODE_BLEND);
-        SDL_SetRenderDrawColor(m_pRenderer, 51, 51, 255, 128); // r=0.2, g=0.2, b=1, a=0.5 .
-        SDL_RenderFillRect(m_pRenderer, NULL);
+        //SDL_SetRenderDrawBlendMode(m_pRenderer, SDL_BLENDMODE_BLEND);
+        //SDL_SetRenderDrawColor(m_pRenderer, 51, 51, 255, 128); // r=0.2, g=0.2, b=1, a=0.5 .
+        //SDL_RenderFillRect(m_pRenderer, NULL);
     }
 
     SDL_RenderPresent(m_pRenderer);
@@ -527,8 +529,62 @@ void THRenderTarget::setCursorPosition(int iX, int iY)
     m_iCursorY = iY;
 }
 
+Uint32 getpixel(SDL_Surface *surface,int x,int y){
+  int bpp = surface->format->BytesPerPixel;
+  Uint8 *p = (Uint8 *)surface->pixels + y * surface->pitch + x * bpp;
+  switch(bpp) {
+    case 1:
+      return *p;
+    case 2:
+      return *(Uint16 *)p;
+    case 3:
+      if(SDL_BYTEORDER == SDL_BIG_ENDIAN)
+        return p[0] << 16 | p[1] << 8 | p[2];
+      else
+        return p[0] | p[1] << 8 | p[2] << 16;
+    case 4:
+      return *(Uint32 *)p;
+    default:
+      return 0;
+  }
+}
+
+void THRenderTarget::savePNG(const char* sFile, SDL_Surface* rgbSurface, int w, int h) {
+
+    	Uint32 color=0;
+
+    	SDL_PixelFormat *fmt = rgbSurface->format;
+    	Uint32 rmask=fmt->Rmask,rshift=fmt->Rshift,rloss=fmt->Rloss;
+    	Uint32 gmask=fmt->Gmask,gshift=fmt->Gshift,gloss=fmt->Gloss;
+    	Uint32 bmask=fmt->Bmask,bshift=fmt->Bshift,bloss=fmt->Bloss;
+
+    	std::vector<unsigned char> image;
+    	image.resize(w * h * 4);
+    	for(int y = 0; y < h; y++) {
+          for(int x = 0; x < w; x++){
+            color = getpixel(rgbSurface,x,y);
+            image[4 * w * y + 4 * x + 0] = (unsigned char)((color&rmask)>>rshift)<<rloss;
+            image[4 * w * y + 4 * x + 1] = (unsigned char)((color&gmask)>>gshift)<<gloss;
+            image[4 * w * y + 4 * x + 2] = (unsigned char)((color&bmask)>>bshift)<<bloss;
+            image[4 * w * y + 4 * x + 3] = (unsigned char)255;
+          }
+    	}
+
+        lodepng::State state;
+    	//create encoder and set settings and info (optional)
+    	state.encoder.zlibsettings.windowsize = 2048;
+
+    	//encode and save
+    	std::vector<unsigned char> buffer;
+    	lodepng::encode(buffer, image.empty() ? 0 : &image[0], w, h, state);
+    	lodepng::save_file(buffer, sFile);
+
+
+}
+
 bool THRenderTarget::takeScreenshot(const char* sFile)
 {
+
     int width = 0, height = 0;
     if (SDL_GetRendererOutputSize(m_pRenderer, &width, &height) == -1)
         return false;
@@ -551,7 +607,9 @@ bool THRenderTarget::takeScreenshot(const char* sFile)
         SDL_UnlockSurface(pRgbSurface);
 
         if (readStatus != -1)
-            SDL_SaveBMP(pRgbSurface, sFile);
+            //SDL_SaveBMP(pRgbSurface, sFile);
+            // Use PNG for Android
+            savePNG(sFile, pRgbSurface, width, height);
     }
 
     SDL_FreeSurface(pRgbSurface);

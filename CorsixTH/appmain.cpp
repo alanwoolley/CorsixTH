@@ -126,6 +126,7 @@ static int gamesaveupdated(lua_State *L) {
 	const int rep = lua_tointeger(L, 2);
 	const long money = lua_tointeger(L, 3);
 	const char* level = lua_tostring(L, 4);
+	const char* ssPath = lua_tostring(L, 5);
 
 	JNIEnv* jEnv;
   jvm->AttachCurrentThread(&jEnv, NULL);
@@ -139,9 +140,11 @@ static int gamesaveupdated(lua_State *L) {
 
   jstring saveString = jEnv->NewStringUTF(saveName);
   jstring levelString = jEnv->NewStringUTF(level);
+  jstring ssString = jEnv->NewStringUTF(ssPath);
 
   jEnv->SetObjectField(saveObj, jEnv->GetFieldID(cls, "saveName", "Ljava/lang/String;"), saveString);
   jEnv->SetObjectField(saveObj, jEnv->GetFieldID(cls, "levelName", "Ljava/lang/String;"), levelString);
+  jEnv->SetObjectField(saveObj, jEnv->GetFieldID(cls, "screenshotPath", "Ljava/lang/String;"), ssString);
 
   sendCommandObj(jvm, COMMAND_GAME_SAVE_UPDATED, saveObj);
 

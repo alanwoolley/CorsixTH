@@ -185,6 +185,8 @@ public: // External API
     void setCursorPosition(int iX, int iY);
 
     //! Take a screenshot and save it as a bitmap
+    void savePNG(const char* sFile, SDL_Surface* rgbSurface, int width, int height);
+
     bool takeScreenshot(const char* sFile);
 
     //! Set the amount by which future draw operations are scaled.
