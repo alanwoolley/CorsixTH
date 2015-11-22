@@ -264,9 +264,17 @@ function SaveGameFile(filename)
   f:write(data)
   f:close()
   local ss = TheApp.ui:makeScreenshot()
-  gamesaveupdated(filename, 1, 2, "hello", ss)
+  local lname = TheApp.map.level_number
 
+  if not tonumber(lname) then
+  	lname = TheApp.map.level_name
+  else
+    lname = "Level " .. lname
+  end
 
+  local rep = TheApp.world:getLocalPlayerHospital().reputation
+  local balance = TheApp.world:getLocalPlayerHospital().balance
+  gamesaveupdated(filename, rep, "$" .. balance, lname, ss)
 end
 
 function LoadGame(data)
