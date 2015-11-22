@@ -118,6 +118,7 @@ function UIFurnishCorridor:UIFurnishCorridor(ui, objects, edit_dialog)
   self:makeTooltip(_S.tooltip.buy_objects_window.total_value, 20, 196, 127, 215)
 
   self:addKeyHandler("return", self.confirm)
+  self:addKeyHandler("keypad enter", self.confirm)
 end
 
 function UIFurnishCorridor:purchaseItem(index, quantity)
@@ -236,5 +237,8 @@ function UIFurnishCorridor:afterLoad(old, new)
   if old < 101 then
     self:removeKeyHandler("enter")
     self:addKeyHandler("return", self.confirm)
+  end
+  if old < 104 then
+    self:addKeyHandler("keypad enter", self.confirm)
   end
 end

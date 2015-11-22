@@ -1,6 +1,8 @@
 ![](http://i.imgur.com/fYp148T.jpg)
 ### Latest Release [![Release 0.40](https://img.shields.io/badge/release-0.40-brightgreen.svg)](https://github.com/CorsixTH/CorsixTH/releases) [![Build Status](https://travis-ci.org/CorsixTH/CorsixTH.svg?branch=master)](https://travis-ci.org/CorsixTH/CorsixTH)
 
+##### [Forum](http://forums.corsixth.com) | [IRC Chat](http://webchat.freenode.net/?channels=corsix-th) | [Report Issue](https://github.com/CorsixTH/CorsixTH/issues/new)
+
 A reimplementation of the 1997 Bullfrog business sim Theme Hospital. As well as faithfully recreating the original CorsixTH adds support for modern operating systems (Windows, Mac OSX and Linux), high resolutions and much more.
 
 ![](http://i.imgur.com/qHV60Ui.png)
@@ -20,7 +22,7 @@ You will need the following:
 ## Developers
 ### Coders and non-coders we want you!
 
-We are always looking for help with improving CorsixTH. The code base is made up of LUA and C++ (with a little C added in for fun) however most of the game logic is written in LUA, we love LUA and the nature that its approachable and easy to pickup so hit fork and get started!. But don't worry if you don't code as we can always use in other areas and if you have ideas for the project please contact us!
+We are always looking for help with improving CorsixTH. The code base is made up of Lua and C++ (with a little C added in for fun) however most of the game logic is written in Lua, we love Lua and its approachable and easy to pickup nature, so hit fork and get started! But don't worry if you don't code as we can always use your help in other areas and if you have ideas for the project please contact us or open a new issue!
 
 
 ###### Features & Bugfixes ######
