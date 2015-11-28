@@ -57,12 +57,17 @@ const char *speeds[] = { "Pause", "Slowest", "Slower", "Normal", "Max speed",
 
 static int showkeyboard(lua_State *L) {
 	LOG_INFO("Showing keyboard");
-	return sendCommand(jvm, COMMAND_SHOW_KEYBOARD);
+	//return sendCommand(jvm, COMMAND_SHOW_KEYBOARD);
+	SDL_StartTextInput();
+	return 0;
+
 }
 
 static int hidekeyboard(lua_State *L) {
 	LOG_INFO("Hiding keyboard");
-	return sendCommand(jvm, COMMAND_HIDE_KEYBOARD);
+	//return sendCommand(jvm, COMMAND_HIDE_KEYBOARD);
+	SDL_StopTextInput();
+	return 0;
 }
 
 static int showmenu(lua_State *L) {
