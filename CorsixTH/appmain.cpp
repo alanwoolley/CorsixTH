@@ -62,7 +62,6 @@ static int showkeyboard(lua_State *L) {
 	return 0;
 
 }
-
 static int hidekeyboard(lua_State *L) {
 	LOG_INFO("Hiding keyboard");
 	//return sendCommand(jvm, COMMAND_HIDE_KEYBOARD);
@@ -182,6 +181,15 @@ extern "C" void Java_uk_co_armedpineapple_cth_SDLActivity_cthShowCheats(
 	LOG_INFO("Showing cheats menu");
 	SDL_Event e;
 	e.type = SDL_USEREVENT_SHOWCHEATS;
+	SDL_PushEvent(&e);
+	LOG_INFO("Done");
+}
+
+extern "C" void Java_uk_co_armedpineapple_cth_SDLActivity_cthShowJukebox(
+		JNIEnv* env, jclass cls) {
+	LOG_INFO("Showing Jukebox");
+	SDL_Event e;
+	e.type = SDL_USEREVENT_SHOWJUKEBOX;
 	SDL_PushEvent(&e);
 	LOG_INFO("Done");
 }

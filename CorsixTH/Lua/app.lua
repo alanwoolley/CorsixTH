@@ -71,6 +71,7 @@ function App:App()
     tryautosave = self.tryAutoSave,
     configupdate = self.updateConfig,
     showcheats = self.showCheats,
+    showjukebox = self.showJukebox,
   }
   self.strings = {}
   self.savegame_version = SAVEGAME_VERSION
@@ -1291,6 +1292,11 @@ end
 function App:showCheats()
   print "Showing cheats menu"
   self.ui:showCheatsWindow()
+end
+
+function App:showJukebox()
+  print "Showing jukebox"
+  self.ui:addWindow(UIJukebox(self))
 end
 
 function App:updateConfig(newconfig)
