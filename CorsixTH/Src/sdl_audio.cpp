@@ -27,19 +27,18 @@ SOFTWARE.
 #include "xmi2mid.h"
 #include <SDL_mixer.h>
 #ifdef _MSC_VER
-#pragma comment(lib, "SDL_mixer")
+#pragma comment(lib, "SDL2_mixer")
 #pragma warning(disable: 4996) // CRT deprecation
 #endif
+#include <cstring>
 
 struct music_t
 {
     Mix_Music* pMusic;
-    SDL_RWops* pRWop;
 
     music_t()
     {
         pMusic = NULL;
-        pRWop = NULL;
     }
 
     ~music_t()
@@ -48,15 +47,6 @@ struct music_t
         {
             Mix_FreeMusic(pMusic);
             pMusic = NULL;
-        }
-        if(pRWop)
-        {
-            // Some SDL_Mixer backends will free this for you, and some will
-            // not. As we do not know what the backend will do, we have to do
-            // the same in every case, and a minor memory leak is less serious
-            // (see http://code.google.com/p/corsix-th/issues/detail?id=3).
-            //SDL_FreeRW(pRWop);
-            pRWop = NULL;
         }
     }
 };
@@ -70,10 +60,10 @@ static void audio_music_over_callback()
 
 static int l_init(lua_State *L)
 {
-    if(Mix_OpenAudio(luaL_optint(L, 1, MIX_DEFAULT_FREQUENCY),
+    if(Mix_OpenAudio(static_cast<int>(luaL_optinteger(L, 1, MIX_DEFAULT_FREQUENCY)),
         MIX_DEFAULT_FORMAT,
-        luaL_optint(L, 2, MIX_DEFAULT_CHANNELS),
-        luaL_optint(L, 3, 2048) /* chunk size */) != 0)
+        static_cast<int>(luaL_optinteger(L, 2, MIX_DEFAULT_CHANNELS)),
+        static_cast<int>(luaL_optinteger(L, 3, 2048)) /* chunk size */) != 0)
     {
         lua_pushboolean(L, 0);
         lua_pushstring(L, Mix_GetError());
@@ -140,14 +130,10 @@ static int l_load_music_async_callback(lua_State *L)
             lua_xmove(L, cbL, 1);
         music_t* pLMusic = (music_t*)lua_touserdata(cbL, -1);
         pLMusic->pMusic = async->music;
-        pLMusic->pRWop = async->rwop;
         async->music = NULL;
-        async->rwop = NULL;
     }
 
     // Finish cleanup
-    if(async->rwop)
-        SDL_FreeRW(async->rwop);
     lua_pushvalue(L, 1);
     lua_pushnil(L);
     lua_settable(L, LUA_REGISTRYINDEX);
@@ -172,9 +158,14 @@ static int l_load_music_async_callback(lua_State *L)
 static int load_music_async_thread(void* arg)
 {
     load_music_async_t *async = (load_music_async_t*)arg;
-    async->music = Mix_LoadMUS_RW(async->rwop);
+    async->music = Mix_LoadMUS_RW(async->rwop, 1);
+    async->rwop = NULL;
     if(async->music == NULL)
-        async->err = strdup(Mix_GetError());
+    {
+        size_t iLen = strlen(Mix_GetError()) + 1;
+        async->err = (char*)malloc(iLen);
+        memcpy(async->err, Mix_GetError(), iLen);
+    }
     SDL_Event e;
     e.type = SDL_USEREVENT_CPCALL;
     e.user.data1 = (void*)l_load_music_async_callback;
@@ -186,7 +177,7 @@ static int load_music_async_thread(void* arg)
 static int l_load_music_async(lua_State *L)
 {
     size_t iLength;
-    const unsigned char *pData = luaT_checkfile(L, 1, &iLength);
+    const uint8_t *pData = luaT_checkfile(L, 1, &iLength);
     luaL_checktype(L, 2, LUA_TFUNCTION);
     SDL_RWops* rwop = SDL_RWFromConstMem(pData, (int)iLength);
     lua_settop(L, 2);
@@ -223,16 +214,17 @@ static int l_load_music_async(lua_State *L)
         call the callback and remove the new entries from the registry.
     */
 
-    SDL_CreateThread(load_music_async_thread, async);
+    SDL_CreateThread(load_music_async_thread, "music_thread", async);
+
     return 0;
 }
 
 static int l_load_music(lua_State *L)
 {
     size_t iLength;
-    const unsigned char *pData = luaT_checkfile(L, 1, &iLength);
+    const uint8_t *pData = luaT_checkfile(L, 1, &iLength);
     SDL_RWops* rwop = SDL_RWFromConstMem(pData, (int)iLength);
-    Mix_Music* pMusic = Mix_LoadMUS_RW(rwop);
+    Mix_Music* pMusic = Mix_LoadMUS_RW(rwop, 1);
     if(pMusic == NULL)
     {
         lua_pushnil(L);
@@ -241,7 +233,6 @@ static int l_load_music(lua_State *L)
     }
     music_t* pLMusic = luaT_stdnew<music_t>(L, luaT_environindex, true);
     pLMusic->pMusic = pMusic;
-    pLMusic->pRWop = rwop;
     lua_pushvalue(L, 1);
     luaT_setenvfield(L, -2, "data");
     return 1;
@@ -262,8 +253,8 @@ static int l_music_volume(lua_State *L)
 
 static int l_play_music(lua_State *L)
 {
-    music_t* pLMusic = luaT_testuserdata<music_t>(L);
-    if(Mix_PlayMusic(pLMusic->pMusic, luaL_optint(L, 2, 1)) != 0)
+    music_t* pLMusic = luaT_testuserdata<music_t>(L, -1);
+    if(Mix_PlayMusic(pLMusic->pMusic, static_cast<int>(luaL_optinteger(L, 2, 1))) != 0)
     {
         lua_pushnil(L);
         lua_pushstring(L, Mix_GetError());
@@ -296,9 +287,9 @@ static int l_stop_music(lua_State *L)
 static int l_transcode_xmi(lua_State *L)
 {
     size_t iLength, iMidLength;
-    const unsigned char *pData = luaT_checkfile(L, 1, &iLength);
+    const uint8_t *pData = luaT_checkfile(L, 1, &iLength);
 
-    unsigned char *pMidData = TranscodeXmiToMid(pData, iLength, &iMidLength);
+    uint8_t *pMidData = TranscodeXmiToMid(pData, iLength, &iMidLength);
     if(pMidData == NULL)
     {
         lua_pushnil(L);
@@ -311,13 +302,13 @@ static int l_transcode_xmi(lua_State *L)
     return 1;
 }
 
-static const struct luaL_reg sdl_audiolib[] = {
+static const struct luaL_Reg sdl_audiolib[] = {
     {"init", l_init},
     {"transcodeXmiToMid", l_transcode_xmi},
     {NULL, NULL}
 };
 
-static const struct luaL_reg sdl_musiclib[] = {
+static const struct luaL_Reg sdl_musiclib[] = {
     {"loadMusic", l_load_music},
     {"loadMusicAsync", l_load_music_async},
     {"playMusic", l_play_music},
@@ -331,7 +322,7 @@ static const struct luaL_reg sdl_musiclib[] = {
 int luaopen_sdl_audio(lua_State *L)
 {
     lua_newtable(L);
-    luaL_register(L, NULL, sdl_audiolib);
+    luaT_setfuncs(L, sdl_audiolib);
     lua_pushboolean(L, 1);
     lua_setfield(L, -2, "loaded");
 
@@ -339,12 +330,12 @@ int luaopen_sdl_audio(lua_State *L)
     lua_pushvalue(L, -1);
     lua_replace(L, luaT_environindex);
     lua_pushvalue(L, luaT_environindex);
-    lua_pushcclosure(L, luaT_stdgc<music_t, luaT_environindex>, 1);
+    luaT_pushcclosure(L, luaT_stdgc<music_t, luaT_environindex>, 1);
     lua_setfield(L, -2, "__gc");
     lua_pushvalue(L, 1);
     lua_setfield(L, -2, "__index");
     lua_pop(L, 1);
-    luaT_register(L, NULL, sdl_musiclib);
+    luaT_setfuncs(L, sdl_musiclib);
 
     return 1;
 }

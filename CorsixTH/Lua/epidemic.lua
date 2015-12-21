@@ -20,6 +20,9 @@ SOFTWARE. --]]
 
 class "Epidemic"
 
+---@type Epidemic
+local Epidemic = _G["Epidemic"]
+
 --[[Manages the epidemics that occur in hospitals. Generally, any epidemic
 logic that happens outside this class will call functions contained here.]]
 function Epidemic:Epidemic(hospital, contagious_patient)
@@ -376,6 +379,9 @@ end
  any epidemic-specific icons from their heads.]]
 function Epidemic:clearAllInfectedPatients()
   for _, infected_patient in ipairs(self.infected_patients) do
+    -- Remove any vaccination calls still open
+    infected_patient:removeVaccinationCandidateStatus()
+    self.world.dispatcher:dropFromQueue(infected_patient)
     infected_patient.vaccinated = true
     infected_patient:setMood("epidemy1","deactivate")
     infected_patient:setMood("epidemy2","deactivate")
@@ -521,6 +527,10 @@ end
 --[[ Forces evacuation of the hospital - it makes ALL patients leave and storm out. ]]
 function Epidemic:evacuateHospital()
   for _, patient in ipairs(self.hospital.patients) do
+    local patient_room = patient:getRoom()
+    if patient_room then
+      patient_room:makeHumanoidDressIfNecessaryAndThenLeave(patient)
+    end
     if patient.has_passed_reception then
       patient:clearDynamicInfo()
       patient:setDynamicInfo('text', {_S.dynamic_info.patient.actions.epidemic_sent_home})

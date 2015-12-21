@@ -24,6 +24,9 @@ SOFTWARE. --]]
 -- OR
 --  class "Name" (SuperclassName)
 --
+--  ---@type Name
+--  local Name = _G["Name"]
+--
 --  function Name:Name(arguments)
 --    self:SuperclassName(arguments) -- required when there is a superclass
 --    --(constructor)--

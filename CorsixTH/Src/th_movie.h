@@ -29,7 +29,12 @@ SOFTWARE.
 #include <queue>
 #include "config.h"
 
-#ifdef CORSIX_TH_USE_FFMPEG
+
+
+
+
+
+#if defined(CORSIX_TH_USE_FFMPEG) || defined(CORSIX_TH_USE_LIBAV)
 #include "SDL_mixer.h"
 
 extern "C"
@@ -40,14 +45,28 @@ extern "C"
 #endif
 #include <libavformat/avformat.h>
 #include <libavutil/avutil.h>
-#include <libswresample/swresample.h>
 #include <libswscale/swscale.h>
+#ifdef CORSIX_TH_USE_FFMPEG
+#include <libswresample/swresample.h>
+#elif defined(CORSIX_TH_USE_LIBAV)
+#include <libavresample/avresample.h>
+#endif
 }
 
-class SDL_Overlay;
-class SDL_Surface;
+struct SDL_Renderer;
+struct SDL_Texture;
+struct SDL_Window;
 struct SDL_mutex;
 struct SDL_cond;
+typedef void* SDL_GLContext;
+
+typedef struct {
+    SDL_Texture *texture;
+    uint8_t *buffer;
+    int width;
+
+
+} ff_refresh;
 
 class THMoviePicture
 {
@@ -55,13 +74,12 @@ public:
     THMoviePicture();
     ~THMoviePicture();
 
-    void allocate(int iX, int iY, int iWidth, int iHeight);
+    void allocate(SDL_Renderer *pRenderer, int iX, int iY, int iWidth, int iHeight);
     void deallocate();
-    void draw();
+    void draw(SDL_Renderer *pRenderer);
 
-    SDL_Overlay *m_pOverlay;
+    SDL_Texture *m_pTexture;
     PixelFormat m_pixelFormat;
-    SDL_Surface *m_pSurface;
     int m_iX, m_iY, m_iWidth, m_iHeight;
     double m_dPts;
     SDL_mutex *m_pMutex;
@@ -77,11 +95,10 @@ public:
     //NB: The following functions are called by the main program thread
     void abort();
     void reset();
-    void allocate(int iX, int iY, int iWidth, int iHeight);
+    void allocate(SDL_Renderer *pRenderer, int iX, int iY, int iWidth, int iHeight);
     void deallocate();
     bool advance();
-    void draw();
-    double getCurrentPts();
+    void draw(SDL_Renderer *pRenderer);
     double getNextPts();
     bool empty();
 
@@ -115,13 +132,15 @@ private:
     SDL_mutex *m_pMutex;
     SDL_cond *m_pCond;
 };
-#endif //CORSIX_TH_USE_FFMPEG
+#endif //CORSIX_TH_USE_FFMPEG || CORSIX_TH_USE_LIBAV
 
 class THMovie
 {
 public:
     THMovie();
     ~THMovie();
+
+    void setRenderer(struct SDL_Renderer *pRenderer);
 
     bool moviesEnabled();
 
@@ -134,7 +153,6 @@ public:
     int getNativeHeight();
     int getNativeWidth();
     bool hasAudioTrack();
-    bool requiresVideoReset();
 
     const char* getLastError();
     void clearLastError();
@@ -147,9 +165,14 @@ public:
     void runVideo();
     void copyAudioToStream(uint8_t *pbStream, int iStreamSize);
 protected:
-#ifdef CORSIX_TH_USE_FFMPEG
+#if defined(CORSIX_TH_USE_FFMPEG) || defined(CORSIX_TH_USE_LIBAV)
     int decodeAudioFrame(bool fFirst);
     int getVideoFrame(AVFrame *pFrame, int64_t *piPts);
+
+    SDL_Renderer *m_pRenderer;
+    SDL_GLContext m_shareContext;
+    // Sadly we have to keep this around, since SDL_GL_MakeCurrent requires a window.
+    SDL_Window *m_pShareWindow;
 
     //last error
     std::string m_sLastError;
@@ -157,6 +180,7 @@ protected:
 
     //abort playing movie
     bool m_fAborting;
+    SDL_mutex *m_pDecodingAudioMutex;
 
     //current movie dimensions and placement
     int m_iX, m_iY, m_iWidth, m_iHeight;
@@ -178,7 +202,11 @@ protected:
     double m_iCurSyncPts;
 
     //audio resample context
-    SwrContext* m_pSwrContext;
+#ifdef CORSIX_TH_USE_FFMPEG
+    SwrContext* m_pAudioResampleContext;
+#elif defined(CORSIX_TH_USE_LIBAV)
+    AVAudioResampleContext* m_pAudioResampleContext;
+#endif
 
     //decoded audio buffer
     int m_iAudioBufferSize;
@@ -209,7 +237,8 @@ protected:
     //threads
     SDL_Thread* m_pStreamThread;
     SDL_Thread* m_pVideoThread;
-#endif //CORSIX_TH_USE_FFMPEG
+#endif //CORSIX_TH_USE_FFMPEG || CORSIX_TH_USE_LIBAV
 };
+
 
 #endif // TH_VIDEO_H

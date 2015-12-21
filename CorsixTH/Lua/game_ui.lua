@@ -23,6 +23,9 @@ dofile "ui"
 --! Variant of UI for running games
 class "GameUI" (UI)
 
+---@type GameUI
+local GameUI = _G["GameUI"]
+
 local TH = require "TH"
 local WM = require "sdl".wm
 local SDL = require "sdl"
@@ -78,8 +81,8 @@ end
 function GameUI:setupGlobalKeyHandlers()
   UI.setupGlobalKeyHandlers(self)
 
-  self:addKeyHandler("esc", self, self.setEditRoom, false)
-  self:addKeyHandler("esc", self, self.showMenuBar)
+  self:addKeyHandler("escape", self, self.setEditRoom, false)
+  self:addKeyHandler("escape", self, self.showMenuBar)
   self:addKeyHandler("z", self, self.keySpeedUp)
   self:addKeyHandler("x", self, self.keyTransparent)
   self:addKeyHandler({"shift", "a"}, self, self.toggleAdviser)
@@ -143,7 +146,7 @@ function GameUI:draw(canvas)
   end
   local zoom = self.zoom_factor
   if canvas:scale(zoom) then
-    app.map:draw(canvas, self.screen_offset_x, self.screen_offset_y, config.width / zoom, config.height / zoom, 0, 0)
+    app.map:draw(canvas, self.screen_offset_x, self.screen_offset_y, math.floor(config.width / zoom), math.floor(config.height / zoom), 0, 0)
     canvas:scale(1)
   else
     self:setZoom(1)
@@ -195,8 +198,6 @@ function GameUI:resync(ui)
 
   self.key_remaps = ui.key_remaps
   self.key_to_button_remaps = ui.key_to_button_remaps
-  self.key_codes = ui.key_codes
-  self.key_code_to_rawchar = ui.key_code_to_rawchar
 end
 
 local scroll_keys = {
@@ -224,43 +225,38 @@ function GameUI:updateKeyScroll()
 end
 
 function GameUI:keySpeedUp()
-  if self.key_codes[122] then
-    self.speed_up_key_pressed = true
-    self.app.world:speedUp()
-  end
+  self.speed_up_key_pressed = true
+  self.app.world:speedUp()
 end
 
 function GameUI:keyTransparent()
-  if self.key_codes[120] then
-    self:makeTransparentWalls()
-  end
+  self:makeTransparentWalls()
 end
 
-function GameUI:onKeyDown(code, rawchar)
-  if UI.onKeyDown(self, code, rawchar) then
+function GameUI:onKeyDown(rawchar, modifiers, is_repeat)
+  if UI.onKeyDown(self, rawchar, modifiers, is_repeat) then
     -- Key has been handled already
     return true
   end
-  rawchar = self.key_code_to_rawchar[code] -- UI may have translated rawchar
-  local key = self:_translateKeyCode(code, rawchar)
+  local key = rawchar:lower()
   if scroll_keys[key] then
     self:updateKeyScroll()
     return
   end
 end
 
-function GameUI:onKeyUp(code)
-  local rawchar = self.key_code_to_rawchar[code] or ""
-  if UI.onKeyUp(self, code) then
+function GameUI:onKeyUp(rawchar)
+  if UI.onKeyUp(self, rawchar) then
     return true
   end
-  local key = self:_translateKeyCode(code, rawchar)
+
+  local key = rawchar:lower()
   if scroll_keys[key] then
     self:updateKeyScroll()
     return
   end
 
-  -- Guess that the "Speed Up" key was released because the 
+  -- Guess that the "Speed Up" key was released because the
   -- code parameter can't provide UTF-8 key codes:
   self.speed_up_key_pressed = false
   if self.app.world:isCurrentSpeed("Speed Up") then
@@ -308,8 +304,8 @@ end
 
 function GameUI:onCursorWorldPositionChange()
   local zoom = self.zoom_factor
-  local x = self.screen_offset_x + self.cursor_x / zoom
-  local y = self.screen_offset_y + self.cursor_y / zoom
+  local x = math.floor(self.screen_offset_x + self.cursor_x / zoom)
+  local y = math.floor(self.screen_offset_y + self.cursor_y / zoom)
   local entity = nil
   if self.do_world_hit_test and not self:hitTest(self.cursor_x, self.cursor_y) then
     entity = self.app.map.th:hitTestObjects(x, y)
@@ -417,6 +413,11 @@ function GameUI:onWindowActive(gain)
   end
 end
 
+function GameUI:allowDragScroll()
+  local edit_window = self.app.ui:getWindow(UIEditRoom)
+  return not edit_window
+end
+
 -- TODO: try to remove duplication with UI:onMouseMove
 function GameUI:onMouseMove(x, y, dx, dy)
   local repaint = UpdateCursorPosition(self.app.video, x, y)
@@ -429,7 +430,7 @@ function GameUI:onMouseMove(x, y, dx, dy)
   if self:onCursorWorldPositionChange() or self.simulated_cursor then
     repaint = true
   end
-  if self.buttons_down.mouse_middle then
+  if self.buttons_down.mouse_middle or self.buttons_down.mouse_left and self:allowDragScroll() then
     local zoom = self.zoom_factor
     self.current_momentum.x = -dx/zoom
     self.current_momentum.y = -dy/zoom
@@ -446,7 +447,7 @@ function GameUI:onMouseMove(x, y, dx, dy)
 
   local scroll_region_size = self.app.config.scroll_region_size
   local scroll_power = self.app.config.scroll_speed
-  
+
   --if self.app.config.fullscreen then
     -- As the mouse is locked within the window, a 1px region feels a lot
     -- larger than it actually is.
@@ -455,7 +456,7 @@ function GameUI:onMouseMove(x, y, dx, dy)
     -- In windowed mode, a reasonable size is needed, though not too large.
   --  scroll_region_size = 8
   --end
-  
+
   if not self.app.config.prevent_edge_scrolling and (x < scroll_region_size
   or y < scroll_region_size or x >= self.app.config.width - scroll_region_size
   or y >= self.app.config.height - scroll_region_size) then
@@ -513,18 +514,6 @@ function GameUI:onMouseUp(code, x, y)
     return UI.onMouseUp(self, code, x, y)
   end
 
-  if code == 4 or code == 5 then
-    -- Mouse wheel
-    local window = self:getWindow(UIFullscreen)
-    if not window or not window:hitTest(x - window.x, y - window.y) then
-
-      -- Apply momentum to the zoom
-      if math.abs(self.current_momentum.z) < 12 then
-        self.current_momentum.z = self.current_momentum.z + (4.5 - code)*2
-      end
-    end
-  end
-
   local button = self.button_codes[code]
   if button == "right" and not _MAP_EDITOR and highlight_x then
     local window = self:getWindow(UIPatient)
@@ -578,6 +567,25 @@ function GameUI:onMouseUp(code, x, y)
   return UI.onMouseUp(self, code, x, y)
 end
 
+function GameUI:onMouseWheel(x, y)
+  local inside_window = false
+  if self.windows then
+    for _, window in ipairs(self.windows) do
+      if window:hitTest(self.cursor_x - window.x, self.cursor_y - window.y) then
+        inside_window = true
+        break
+      end
+    end
+  end
+  if not inside_window then
+    -- Apply momentum to the zoom
+    if math.abs(self.current_momentum.z) < 12 then
+      self.current_momentum.z = self.current_momentum.z + y
+    end
+  end
+  return UI.onMouseWheel(self, x, y)
+end
+
 function GameUI:setRandomAnnouncementTarget()
   -- NB: Every tick is 30ms, so 2000 ticks is 1 minute
   self.random_announcement_ticks_target = math.random(8000, 12000)
@@ -592,7 +600,7 @@ end
 
 function GameUI:onTick()
   local repaint = UI.onTick(self)
-  if not self.buttons_down.mouse_middle then
+  if not self.buttons_down.mouse_middle or self.buttons_down.mouse_left then
     if math.abs(self.current_momentum.x) < 0.2 and math.abs(self.current_momentum.y) < 0.2 then
       -- Stop scrolling
       self.current_momentum.x = 0.0
@@ -635,7 +643,7 @@ function GameUI:onTick()
       -- If the middle mouse button is down, then the world is being dragged,
       -- and so the scroll direction due to the cursor being at the map edge
       -- should be opposite to normal to make it feel more natural.
-      if self.buttons_down.mouse_middle then
+      if not self.edit_room and (self.buttons_down.mouse_middle or self.buttons_down.mouse_left) then
         dx, dy = -dx, -dy
       end
     end
@@ -644,10 +652,18 @@ function GameUI:onTick()
       dy = dy + self.tick_scroll_amount.y
     end
 
-    -- Faster scrolling with shift key
-    local factor = self.app.config.scroll_speed
-    if self.buttons_down.shift then
-      mult = mult * factor
+    -- Adjust scroll speed based on config value:
+    -- there is a separate config value for whether or not shift is held.
+    -- the speed is multiplied by 0.5 for consistency between the old and
+    -- new configuration. In the past scroll_speed applied only to shift
+    -- and defaulted to 2, where 1 was regular scroll speed. By
+    -- By multiplying by 0.5, we allow for setting slower than normal
+    -- scroll speeds, and ensure there is no behaviour change for players
+    -- who do not modify their config file.
+    if self.app.key_modifiers.shift then
+      mult = mult * self.app.config.shift_scroll_speed * 0.5
+    else
+      mult = mult * self.app.config.scroll_speed * 0.5
     end
 
     self:scrollMap(dx * mult, dy * mult)
@@ -664,6 +680,7 @@ end
 local abs, sqrt_5, floor = math.abs, math.sqrt(1 / 5), math.floor
 
 function GameUI:scrollMapTo(x, y)
+
   local zoom = 2 * self.zoom_factor
   local config = self.app.config
   return self:scrollMap(x - self.screen_offset_x - config.width / zoom,
@@ -700,8 +717,8 @@ function GameUI.limitPointToDiamond(dx, dy, visible_diamond, do_limit)
         vx, vy = -sqrt_5, -2 * sqrt_5
         d = (rx * vx + ry * vy) - (p1x * vx)
       end
-      -- In the unit vector parallel to the diamond edge, resolve the two verticies and
-      -- the point, and either move the point to the edge or to one of the two verticies.
+      -- In the unit vector parallel to the diamond edge, resolve the two vertices and
+      -- the point, and either move the point to the edge or to one of the two vertices.
       -- NB: vx, vy, p1x, p1y, p2x, p2y are set such that p1 < p2.
       local p1 = vx * p1y - vy * p1x
       local p2 = vx * p2y - vy * p2x
@@ -713,6 +730,7 @@ function GameUI.limitPointToDiamond(dx, dy, visible_diamond, do_limit)
       else--if p1 <= pd and pd <= p2 then
         dx, dy = dx - d * vx, dy - d * vy
       end
+      return math.floor(dx), math.floor(dy), true
     else
       return dx, dy, false
     end
@@ -721,6 +739,11 @@ function GameUI.limitPointToDiamond(dx, dy, visible_diamond, do_limit)
 end
 
 function GameUI:scrollMap(dx, dy)
+
+  if self.edit_room then
+    return
+  end
+
   dx = dx + self.screen_offset_x
   dy = dy + self.screen_offset_y
 

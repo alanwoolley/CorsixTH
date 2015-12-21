@@ -57,12 +57,16 @@ const char *speeds[] = { "Pause", "Slowest", "Slower", "Normal", "Max speed",
 
 static int showkeyboard(lua_State *L) {
 	LOG_INFO("Showing keyboard");
-	return sendCommand(jvm, COMMAND_SHOW_KEYBOARD);
-}
+	//return sendCommand(jvm, COMMAND_SHOW_KEYBOARD);
+	SDL_StartTextInput();
+	return 0;
 
+}
 static int hidekeyboard(lua_State *L) {
 	LOG_INFO("Hiding keyboard");
-	return sendCommand(jvm, COMMAND_HIDE_KEYBOARD);
+	//return sendCommand(jvm, COMMAND_HIDE_KEYBOARD);
+	SDL_StopTextInput();
+	return 0;
 }
 
 static int showmenu(lua_State *L) {
@@ -125,6 +129,37 @@ static int gamespeedupdated(lua_State *L) {
 	return sendCommandInt(jvm, COMMAND_GAME_SPEED_UPDATED, 4);
 }
 
+static int gamesaveupdated(lua_State *L) {
+	LOG_INFO("Save game updated");
+	int arg = lua_gettop(L);
+	const char* saveName = lua_tostring(L, 1);
+	const int rep = lua_tointeger(L, 2);
+	const long money = lua_tointeger(L, 3);
+	const char* level = lua_tostring(L, 4);
+	const char* ssPath = lua_tostring(L, 5);
+
+	JNIEnv* jEnv;
+  jvm->AttachCurrentThread(&jEnv, NULL);
+  jclass cls = jEnv->FindClass("uk/co/armedpineapple/cth/persistence/SaveData");
+  jmethodID mid  = jEnv->GetMethodID(cls, "<init>", "()V");
+
+  jobject saveObj = jEnv->NewObject(cls, mid);
+
+  jEnv->SetIntField(saveObj, jEnv->GetFieldID(cls, "rep", "I"), rep);
+  jEnv->SetLongField(saveObj, jEnv->GetFieldID(cls, "money", "J"), money);
+
+  jstring saveString = jEnv->NewStringUTF(saveName);
+  jstring levelString = jEnv->NewStringUTF(level);
+  jstring ssString = jEnv->NewStringUTF(ssPath);
+
+  jEnv->SetObjectField(saveObj, jEnv->GetFieldID(cls, "saveName", "Ljava/lang/String;"), saveString);
+  jEnv->SetObjectField(saveObj, jEnv->GetFieldID(cls, "levelName", "Ljava/lang/String;"), levelString);
+  jEnv->SetObjectField(saveObj, jEnv->GetFieldID(cls, "screenshotPath", "Ljava/lang/String;"), ssString);
+
+  sendCommandObj(jvm, COMMAND_GAME_SAVE_UPDATED, saveObj);
+
+}
+
 extern "C" void Java_uk_co_armedpineapple_cth_SDLActivity_onNativeLowMemory(
 		JNIEnv* env, jclass cls) {
 	LOG_INFO("Calling Lua GC");
@@ -152,6 +187,15 @@ extern "C" void Java_uk_co_armedpineapple_cth_SDLActivity_cthShowCheats(
 	LOG_INFO("Showing cheats menu");
 	SDL_Event e;
 	e.type = SDL_USEREVENT_SHOWCHEATS;
+	SDL_PushEvent(&e);
+	LOG_INFO("Done");
+}
+
+extern "C" void Java_uk_co_armedpineapple_cth_SDLActivity_cthShowJukebox(
+		JNIEnv* env, jclass cls) {
+	LOG_INFO("Showing Jukebox");
+	SDL_Event e;
+	e.type = SDL_USEREVENT_SHOWJUKEBOX;
 	SDL_PushEvent(&e);
 	LOG_INFO("Done");
 }
@@ -330,6 +374,7 @@ int SDL_main(int argc, char** argv, JavaVM* vm, jobject configuration) {
 		lua_register(L, "showsettings", showsettingsdialog);
 		lua_register(L, "startvibration", startvibration);
 		lua_register(L, "stopvibration", stopvibration);
+		lua_register(L, "gamesaveupdated", gamesaveupdated);
 
 		lua_settop(L, 0);
 		lua_pushcfunction(L, CorsixTH_lua_stacktrace);

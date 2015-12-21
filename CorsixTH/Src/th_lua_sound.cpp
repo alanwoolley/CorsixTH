@@ -24,6 +24,7 @@ SOFTWARE.
 #include "th_sound.h"
 #include "th_lua.h"
 #include "lua_sdl.h"
+#include <cstring>
 #include <map>
 
 static int m_a_iPlayedSoundCallbackIDs[1000];
@@ -40,7 +41,7 @@ static int l_soundarc_load(lua_State *L)
 {
     THSoundArchive* pArchive = luaT_testuserdata<THSoundArchive>(L);
     size_t iDataLen;
-    const unsigned char* pData = luaT_checkfile(L, 2, &iDataLen);
+    const uint8_t* pData = luaT_checkfile(L, 2, &iDataLen);
 
     if(pArchive->loadFromTHFile(pData, iDataLen))
         lua_pushboolean(L, 1);
@@ -132,7 +133,7 @@ static int l_soundarc_filedata(lua_State *L)
     SDL_RWops *pRWops = pArchive->loadSound(iIndex);
     if(!pRWops)
         return 0;
-    int iLength = SDL_RWseek(pRWops, 0, SEEK_END);
+    size_t iLength = SDL_RWseek(pRWops, 0, SEEK_END);
     SDL_RWseek(pRWops, 0, SEEK_SET);
     // There is a potential leak of pRWops if either of these Lua calls cause
     // a memory error, but it isn't very likely, and this a debugging function
@@ -190,7 +191,7 @@ static Uint32 played_sound_callback(Uint32 interval, void* param)
     SDL_Event e;
     e.type = SDL_USEREVENT_SOUND_OVER;
     e.user.data1 = param;
-    short iSoundID = *(static_cast<int*>(param));
+    int iSoundID = *(static_cast<int*>(param));
     SDL_RemoveTimer(m_mapSoundTimers[iSoundID]);
     m_mapSoundTimers.erase(iSoundID);
     SDL_PushEvent(&e);
@@ -221,22 +222,23 @@ static int l_soundfx_play(lua_State *L)
     }
     else
     {
-        pEffects->playSoundAt(iIndex, luaL_checknumber(L, 3), luaL_checkint(L, 4), luaL_checkint(L, 5));
+        pEffects->playSoundAt(iIndex, luaL_checknumber(L, 3), static_cast<int>(luaL_checkinteger(L, 4)), static_cast<int>(luaL_checkinteger(L, 5)));
     }
     //SDL SOUND_OVER Callback Timer:
     //6: unusedPlayedCallbackID
-    if(lua_isnil(L, 6) == false)
+    if(!lua_isnil(L, 6))
     {
         //7: Callback delay
         int iPlayedCallbackDelay = 0; //ms
-        if(lua_isnil(L, 7) == false)
-            iPlayedCallbackDelay = luaL_checknumber(L, 7);
+        if(!lua_isnil(L, 7))
+            iPlayedCallbackDelay = static_cast<int>(luaL_checknumber(L, 7));
 
         if(m_iPlayedSoundCallbackIDsPointer == sizeof(m_a_iPlayedSoundCallbackIDs))
             m_iPlayedSoundCallbackIDsPointer = 0;
 
-        m_a_iPlayedSoundCallbackIDs[m_iPlayedSoundCallbackIDsPointer] = luaL_checkint(L, 6);
-        SDL_TimerID timersID = SDL_AddTimer(pArchive->getSoundDuration(iIndex) + iPlayedCallbackDelay,
+        m_a_iPlayedSoundCallbackIDs[m_iPlayedSoundCallbackIDsPointer] = static_cast<int>(luaL_checkinteger(L, 6));
+        size_t interval = pArchive->getSoundDuration(iIndex) + iPlayedCallbackDelay;
+        SDL_TimerID timersID = SDL_AddTimer(static_cast<Uint32>(interval),
                                             played_sound_callback,
                                             &(m_a_iPlayedSoundCallbackIDs[m_iPlayedSoundCallbackIDsPointer]));
         m_mapSoundTimers.insert(std::pair<int, SDL_TimerID>(m_a_iPlayedSoundCallbackIDs[m_iPlayedSoundCallbackIDsPointer], timersID));
@@ -250,7 +252,7 @@ static int l_soundfx_play(lua_State *L)
 static int l_soundfx_set_camera(lua_State *L)
 {
     THSoundEffects *pEffects = luaT_testuserdata<THSoundEffects>(L);
-    pEffects->setCamera(luaL_checkint(L, 2), luaL_checkint(L, 3), luaL_checkint(L, 4));
+    pEffects->setCamera(static_cast<int>(luaL_checkinteger(L, 2)), static_cast<int>(luaL_checkinteger(L, 3)), static_cast<int>(luaL_checkinteger(L, 4)));
     return 0;
 }
 
@@ -266,7 +268,7 @@ static int l_soundfx_reserve_channel(lua_State *L)
 static int l_soundfx_release_channel(lua_State *L)
 {
     THSoundEffects *pEffects = luaT_testuserdata<THSoundEffects>(L);
-    pEffects->releaseChannel(luaL_checkinteger(L, 2));
+    pEffects->releaseChannel(static_cast<int>(luaL_checkinteger(L, 2)));
     return 1;
 }
 

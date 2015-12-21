@@ -20,6 +20,9 @@ SOFTWARE. --]]
 
 class "UIMachine" (Window)
 
+---@type UIMachine
+local UIMachine = _G["UIMachine"]
+
 function UIMachine:UIMachine(ui, machine, room)
   self:Window()
 
@@ -87,12 +90,12 @@ end
 function UIMachine:callHandyman()
   if self.machine.times_used ~= 0 then
     local taskIndex = self.machine.hospital:getIndexOfTask(self.machine.tile_x, self.machine_tile_y, "repairing")
-  if taskIndex == -1 then
-    local call = self.ui.app.world.dispatcher:callForRepair(self.machine, false, true)
-    self.machine.hospital:addHandymanTask(self.machine, "repairing", 2, self.machine.tile_x, self.machine.tile_y, call)
-  else
-    self.machine.hospital:modifyHandymanTaskPriority(taskIndex, 2, "repairing")
-  end
+    if taskIndex == -1 then
+      local call = self.ui.app.world.dispatcher:callForRepair(self.machine, false, true)
+      self.machine.hospital:addHandymanTask(self.machine, "repairing", 2, self.machine.tile_x, self.machine.tile_y, call)
+    else
+      self.machine.hospital:modifyHandymanTaskPriority(taskIndex, 2, "repairing")
+    end
   end
 end
 
@@ -115,10 +118,10 @@ function UIMachine:replaceMachine()
       machine.total_usage = 0
       machine.times_used = 0
       self.machine.strength = strength
-    local index = machine.hospital:getIndexOfTask(machine.tile_x, machine.tile_y, "repairing")
-    if index ~= -1 then
-    machine.hospital:removeHandymanTask(index, "repairing")
-    end
+      local index = machine.hospital:getIndexOfTask(machine.tile_x, machine.tile_y, "repairing")
+      if index ~= -1 then
+        machine.hospital:removeHandymanTask(index, "repairing")
+      end
       machine:setRepairing(nil)
     end
   ))

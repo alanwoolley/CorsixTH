@@ -25,19 +25,24 @@ local TH = require "TH"
 local SDL = require "sdl"
 local assert, io, type, dofile, loadfile, pcall, tonumber, print, setmetatable
     = assert, io, type, dofile, loadfile, pcall, tonumber, print, setmetatable
+local runDebugger = dofile "run_debugger"
 
 -- Increment each time a savegame break would occur
 -- and add compatibility code in afterLoad functions
 
-local SAVEGAME_VERSION = 91
+local SAVEGAME_VERSION = 105
 
 class "App"
+
+---@type App
+local App = _G["App"]
 
 function App:App()
   self.command_line = {}
   self.config = {}
   self.runtime_config = {}
   self.running = false
+  self.key_modifiers = {}
   self.gfx = {}
   self.last_dispatch_type = ""
   self.eventHandlers = {
@@ -45,23 +50,38 @@ function App:App()
     timer = self.onTick,
     keydown = self.onKeyDown,
     keyup = self.onKeyUp,
+    textediting = self.onEditingText,
+    textinput = self.onTextInput,
     buttonup = self.onMouseUp,
     buttondown = self.onMouseDown,
+    mousewheel = self.onMouseWheel,
     motion = self.onMouseMove,
+    touchup = self.onTouchUp,
+    touchdown = self.onTouchDown,
+    touchmove = self.onTouchMove,
+    gesture = self.onGesture,
     active = self.onWindowActive,
     music_over = self.onMusicOver,
     movie_over = self.onMovieOver,
     sound_over = self.onSoundOver,
     restart = self.restart,
     save = self.save,
+    load = self.load,
     gamespeed = self.gamespeed,
     tryautosave = self.tryAutoSave,
     configupdate = self.updateConfig,
     showcheats = self.showCheats,
+    showjukebox = self.showJukebox,
   }
   self.strings = {}
   self.savegame_version = SAVEGAME_VERSION
   self.check_for_updates = true
+end
+
+--! Starts a Lua DBGp client & connects it to a DBGp server.
+--!return error_message (String) Returns an error message or nil.
+function App:connectDebugger()
+  return runDebugger()
 end
 
 function App:setCommandLine(...)
@@ -127,16 +147,8 @@ function App:init()
       " fail to run until you recompile the binary.")
     end
   end
-  local caption_descs = {compile_opts.renderer}
-  if compile_opts.jit then
-    caption_descs[#caption_descs + 1] = compile_opts.jit
-  end
-  if compile_opts.arch_64 then
-    caption_descs[#caption_descs + 1] = "64 bit"
-  end
-  self.caption = "CorsixTH (" .. table.concat(caption_descs, ", ") .. ")"
-  SDL.wm.setCaption(self.caption)
-  local modes = {"hardware", "doublebuf"}
+
+  local modes = {}
   if compile_opts.renderer == "OpenGL" then
     modes[#modes + 1] = "opengl"
   end
@@ -158,6 +170,17 @@ function App:init()
   self.video:setBlueFilterActive(false)
   SDL.wm.setIconWin32()
 
+  local caption_descs = {self.video:getRendererDetails()}
+  if compile_opts.jit then
+    caption_descs[#caption_descs + 1] = compile_opts.jit
+  else
+    caption_descs[#caption_descs + 1] = _VERSION
+  end
+  if compile_opts.arch_64 then
+    caption_descs[#caption_descs + 1] = "64 bit"
+  end
+  self.caption = "CorsixTH (" .. table.concat(caption_descs, ", ") .. ")"
+  self.video:setCaption(self.caption)
 
   -- Prereq 2: Load and initialise the graphics subsystem
   dofile "persistance"
@@ -168,7 +191,7 @@ function App:init()
   if good_install_folder then
     self.video:startFrame()
     self.gfx:loadRaw("Load01V", 640, 480):draw(self.video,
-      (self.config.width - 640) / 2, (self.config.height - 480) / 2)
+      math.floor((self.config.width - 640) / 2), math.floor((self.config.height - 480) / 2))
     self.video:endFrame()
     -- Add some notices to the loading screen
     local notices = {}
@@ -181,9 +204,9 @@ function App:init()
     if notices ~= "" then
       self.video:startFrame()
       self.gfx:loadRaw("Load01V", 640, 480):draw(self.video,
-        (self.config.width - 640) / 2, (self.config.height - 480) / 2)
+        math.floor((self.config.width - 640) / 2), math.floor((self.config.height - 480) / 2))
       font:drawWrapped(self.video, notices, 32,
-        (self.config.height + 400) / 2, self.config.width - 64, "center")
+        math.floor((self.config.height + 400) / 2), math.floor(self.config.width - 64), "center")
       self.video:endFrame()
     end
   end
@@ -210,7 +233,7 @@ function App:init()
 
   -- Load movie player
   dofile "movie_player"
-  self.moviePlayer = MoviePlayer(self, self.audio)
+  self.moviePlayer = MoviePlayer(self, self.audio, self.video)
   if good_install_folder then
     self.moviePlayer:init()
   end
@@ -297,7 +320,7 @@ function App:init()
 
       -- If a savegame was specified, load it
       if self.command_line.load then
-        local status, err = pcall(self.load, self, self.command_line.load)
+        local status, err = pcall(self.load, self, self.savegame_dir .. self.command_line.load)
         if not status then
           err = _S.errors.load_prefix .. err
           print(err)
@@ -512,7 +535,7 @@ function App:dumpStrings()
   end
   local dir = self.command_line["config-file"] or ""
   dir = string.sub(dir, 0, -11)
-  local fi = assert(io.open(dir .. "debug-strings-orig.txt", "wt"))
+  local fi = assert(io.open(dir .. "debug-strings-orig.txt", "w"))
   for i, sec in ipairs(_S.deprecated) do
     for j, str in ipairs(sec) do
       fi:write("[" .. i .. "," .. j .. "] " .. ("%q\n"):format(val(str)))
@@ -560,11 +583,11 @@ function App:dumpStrings()
     end
   end
 
-  fi = assert(io.open(dir .. "debug-strings-new-lines.txt", "wt"))
+  fi = assert(io.open(dir .. "debug-strings-new-lines.txt", "w"))
   dump_by_line(fi, _S, "")
   fi:close()
 
-  fi = assert(io.open(dir .. "debug-strings-new-grouped.txt", "wt"))
+  fi = assert(io.open(dir .. "debug-strings-new-grouped.txt", "w"))
   dump_grouped(fi, _S, "")
   fi:close()
 
@@ -635,7 +658,7 @@ function App:checkMissingStringsInLanguage(dir, language)
       end
     end
 
-    local fi = assert(io.open(dir .. "debug-strings-diff-" .. language_english:lower() .. ".txt", "wt"))
+    local fi = assert(io.open(dir .. "debug-strings-diff-" .. language_english:lower() .. ".txt", "w"))
     fi:write("------------------------------------\n")
     fi:write("MISSING STRINGS IN LANGUAGE \"" .. language:upper() .. "\":\n")
     fi:write("------------------------------------\n")
@@ -678,6 +701,15 @@ function App:fixConfig()
 
     if key == "height" and type(value) == "number" and value < 100 then
       self.config[key] = 100
+    end
+
+    if (key == "scroll_speed" or key == "shift_scroll_speed") and
+        type(value) == "number" then
+      if value > 10 then
+        self.config[key] = 10
+      elseif value < 1 then
+        self.config[key] = 1
+      end
     end
   end
 end
@@ -868,13 +900,15 @@ local fps_sum = 0 -- Sum of fps_history array
 local fps_next = 1 -- Used to loop through fps_history when [over]writing
 
 function App:drawFrame()
+  self.video:startFrame()
   if(self.moviePlayer.playing) then
+    self.key_modifiers = {}
     self.moviePlayer:refresh()
   else
-    self.video:startFrame()
+    self.key_modifiers = SDL.getKeyModifiers()
     self.ui:draw(self.video)
-    self.video:endFrame()
   end
+  self.video:endFrame()
 
   if self.config.track_fps then
     fps_sum = fps_sum - fps_history[fps_next]
@@ -898,6 +932,14 @@ function App:onKeyUp(...)
   return self.ui:onKeyUp(...)
 end
 
+function App:onEditingText(...)
+  return self.ui:onEditingText(...)
+end
+
+function App:onTextInput(...)
+  return self.ui:onTextInput(...)
+end
+
 function App:onMouseUp(...)
   return self.ui:onMouseUp(...)
 end
@@ -908,6 +950,26 @@ end
 
 function App:onMouseMove(...)
   return self.ui:onMouseMove(...)
+end
+
+function App:onMouseWheel(...)
+  return self.ui:onMouseWheel(...)
+end
+
+function App:onTouchUp(...)
+  return self.ui:onTouchUp(...)
+end
+
+function App:onTouchDown(...)
+  return self.ui:onTouchDown(...)
+end
+
+function App:onTouchMove(...)
+  return self.ui:onTouchMove(...)
+end
+
+function App:onGesture(...)
+  return self.ui:onGesture(...)
 end
 
 function App:onWindowActive(...)
@@ -1153,8 +1215,10 @@ end
 -- a specific savegame verion is from.
 function App:getVersion(version)
   local ver = version or self.savegame_version
-  if ver > 91 then
+  if ver > 105 then
     return "Trunk"
+  elseif ver > 91 then
+    return "0.50"
   elseif ver > 78 then
     return "0.40"
   elseif ver > 72 then
@@ -1175,20 +1239,27 @@ function App:getVersion(version)
 end
 
 function App:save(filename)
-  print "saving"
+  print ("saving : " .. filename)
   return SaveGameFile(self.savegame_dir .. filename)
 end
 -- Omit the usual file extension so this file cannot be seen from the normal load and save screen and cannot be overwritten
 function App:quickSave()
   local filename = "quicksave"
+  print ("saving quicksave: " ..self.savegame_dir .. filename)
   return SaveGameFile(self.savegame_dir .. filename)
 end
 
-function App:load(filename)
+
+function App:load(filepath)
+  print ("Loading : " .. filepath)
   if self.world then
     self:worldExited()
   end
-  return LoadGameFile(self.savegame_dir .. filename)
+
+  self.video:setBlueFilterActive(false)
+
+  
+  return LoadGameFile(self.savegame_dir .. filepath)
 end
 
 function App:quickLoad()
@@ -1222,6 +1293,11 @@ end
 function App:showCheats()
   print "Showing cheats menu"
   self.ui:showCheatsWindow()
+end
+
+function App:showJukebox()
+  print "Showing jukebox"
+  self.ui:addWindow(UIJukebox(self))
 end
 
 function App:updateConfig(newconfig)
@@ -1369,6 +1445,8 @@ function App:checkForUpdates()
     -- LuaSocket is not available, just return
     print "Cannot check for updates since LuaSocket is not available."
     return
+  else
+    self.lua_socket_available = true
   end
   local http = require "socket.http"
   local url = require "socket.url"
@@ -1401,7 +1479,7 @@ function App:checkForUpdates()
     end
   end
   if not valid_url then
-    print ("Update download url is not on the trusted domains list (" .. updateTable["download_url"] .. ")")
+    print ("Update download url is not on the trusted domains list (" .. update_table["download_url"] .. ")")
     return
   end
 
@@ -1417,6 +1495,20 @@ function App:checkForUpdates()
   print ("New version found: " .. new_version)
   -- Display the update window
   self.ui:addWindow(UIUpdate(self.ui, current_version, new_version, changelog, update_table["download_url"]))
+end
+
+-- Free up / stop any resources relying on the current video object
+function App:prepareVideoUpdate()
+  self.video:endFrame()
+  self.moviePlayer:deallocatePictureBuffer()
+end
+
+-- Update / start any resources relying on a video object
+function App:finishVideoUpdate()
+  self.gfx:updateTarget(self.video)
+  self.moviePlayer:updateRenderer()
+  self.moviePlayer:allocatePictureBuffer()
+  self.video:startFrame()
 end
 
 -- Do not remove, for savegame compatibility < r1891

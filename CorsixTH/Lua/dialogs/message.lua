@@ -21,6 +21,9 @@ SOFTWARE. --]]
 --! Small fax notification window which sits on the bottom bar.
 class "UIMessage" (Window)
 
+---@type UIMessage
+local UIMessage = _G["UIMessage"]
+
 function UIMessage:UIMessage(ui, x, stop_x, onClose, type, message, owner, timeout, default_choice, callback)
   self:Window()
 
@@ -132,7 +135,7 @@ function UIMessage:removeMessage(choice_number)
     if not self.fax then
       self.fax = UIFax(self.ui, self) -- NB: just create, don't add to ui
     end
-    self.fax:choice(self.message.choices[choice_number].choice)
+    self.fax:choice(choice_number)
   else
     if self.fax then
       self.fax:close()

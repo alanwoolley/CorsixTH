@@ -30,6 +30,9 @@ local ATTACH_BLUEPRINT_TO_TILE = false
 --! The dialog shown when placing objects.
 class "UIPlaceObjects" (Window)
 
+---@type UIPlaceObjects
+local UIPlaceObjects = _G["UIPlaceObjects"]
+
 --[[ Constructor for the class.
 !param ui (UI) The active ui.
 !param object_list (table) a list of tables with objects to place. Keys are "object", "qty" and
@@ -64,7 +67,7 @@ function UIPlaceObjects:UIPlaceObjects(ui, object_list, pay_for)
   end
   self:addPanel(114,   0, 90) -- Dialog mid-piece
   self:addPanel(115,   0, 100):makeButton(9, 8, 41, 42, 116, self.cancel):setSound"no4.wav":setTooltip(_S.tooltip.place_objects_window.cancel)
-  self:addKeyHandler("esc", self.cancel)
+  self:addKeyHandler("escape", self.cancel)
   self.purchase_button =
   self:addPanel(117,  50, 100):makeButton(1, 8, 41, 42, 118, self.purchaseItems):setTooltip(_S.tooltip.place_objects_window.buy_sell)
     :setDisabledSprite(127):enable(false) -- Disabled purchase items button
@@ -83,7 +86,7 @@ function UIPlaceObjects:UIPlaceObjects(ui, object_list, pay_for)
   self.num_slots = 0
 
   self:addObjects(object_list, pay_for)
-  self:addKeyHandler(" ", self.tryNextOrientation)
+  self:addKeyHandler("space", self.tryNextOrientation)
 
   ui:setWorldHitTest(false)
 end
@@ -184,7 +187,8 @@ function UIPlaceObjects:addObjects(object_list, pay_for)
         object.qty = object.qty + new_object.qty
         if pay_for then
           local build_cost = self.ui.hospital:getObjectBuildCost(new_object.object.id)
-          self.ui.hospital:spendMoney(new_object.qty * build_cost, _S.transactions.buy_object .. ": " .. object.object.name, new_object.qty * build_cost)
+          local msg = _S.transactions.buy_object .. ": " .. object.object.name
+          self.ui.hospital:spendMoney(new_object.qty * build_cost, msg, new_object.qty * build_cost)
         end
         -- If this is an object that has been created in the world already, add it to the
         -- associated list of objects to re-place.
@@ -330,13 +334,14 @@ function UIPlaceObjects:setActiveIndex(index)
     self.ui:tutorialStep(1, {4, 5}, 6)
   end
   local anims = self.anims
+  local grey_scale = anims.Alt32_GreyScale
   local _, ghost = self.ui.app.gfx:loadPalette()
   for _, anim in pairs(object.idle_animations) do
-    anims:setAnimationGhostPalette(anim, ghost)
+    anims:setAnimationGhostPalette(anim, ghost, grey_scale)
   end
   if object.slave_type then
     for _, anim in pairs(object.slave_type.idle_animations) do
-      anims:setAnimationGhostPalette(anim, ghost)
+      anims:setAnimationGhostPalette(anim, ghost, grey_scale)
     end
   end
 
@@ -526,8 +531,8 @@ function UIPlaceObjects:draw(canvas, x, y)
       local x, y = self.ui:WorldToScreen(self.object_cell_x, self.object_cell_y)
       local zoom = self.ui.zoom_factor
       if canvas:scale(zoom) then
-        x = x / zoom
-        y = y / zoom
+        x = math.floor(x / zoom)
+        y = math.floor(y / zoom)
       end
       self.object_anim:draw(canvas, x, y)
       if self.objects[self.active_index].object.slave_type then
@@ -653,7 +658,7 @@ function UIPlaceObjects:setBlueprintCell(x, y)
           is_object_allowed = map:getCellFlags(x, y, flags)[flag]
         end
 
-        -- Having checked if the tile is good set its blueprint appearance flag: 
+        -- Having checked if the tile is good set its blueprint appearance flag:
         if is_object_allowed then
           if not tile.invisible then
             map:setCell(x, y, 4, good_tile)

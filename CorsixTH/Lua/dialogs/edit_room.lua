@@ -26,19 +26,24 @@ dofile "dialogs/place_objects"
 
 class "UIEditRoom" (UIPlaceObjects)
 
+---@type UIEditRoom
+local UIEditRoom = _G["UIEditRoom"]
+
 function UIEditRoom:UIEditRoom(ui, room_type)
 
   -- NB: UIEditRoom:onCursorWorldPositionChange is called by the UIPlaceObjects
   -- constructor, hence the initialisation of required fields prior to the call.
   self.UIPlaceObjects(self, ui)
-  self:addKeyHandler("Enter", self.confirm) -- UIPlaceObjects does not need this
+  self:addKeyHandler("return", self.confirm) -- UIPlaceObjects does not need this
+  self:addKeyHandler("keypad enter", self.confirm)
 
   local app = ui.app
+  local blue_red_swap = self.anims.Alt32_BlueRedSwap
   -- Set alt palette on wall blueprint to make it red
-  self.anims:setAnimationGhostPalette(124, app.gfx:loadGhost("QData", "Ghost1.dat", 6))
+  self.anims:setAnimationGhostPalette(124, app.gfx:loadGhost("QData", "Ghost1.dat", 6), blue_red_swap)
   -- Set on door and window blueprints too
-  self.anims:setAnimationGhostPalette(126, app.gfx:loadGhost("QData", "Ghost1.dat", 6))
-  self.anims:setAnimationGhostPalette(130, app.gfx:loadGhost("QData", "Ghost1.dat", 6))
+  self.anims:setAnimationGhostPalette(126, app.gfx:loadGhost("QData", "Ghost1.dat", 6), blue_red_swap)
+  self.anims:setAnimationGhostPalette(130, app.gfx:loadGhost("QData", "Ghost1.dat", 6), blue_red_swap)
   self.cell_outline = TheApp.gfx:loadSpriteTable("Bitmap", "aux_ui", true)
   if not room_type.room_info then
     self.blueprint_rect = {
@@ -598,6 +603,10 @@ function UIEditRoom:returnToDoorPhase()
         if not obj or obj == room.door or class.is(obj, SwingDoor) then
           break
         end
+        if obj.object_type.id == "litter" then -- Silently remove litter from the world.
+          self.world:removeLitter(obj, x, y)
+          break
+        end
         self.world:destroyEntity(obj)
         if not obj.master then
           self:addObjects({{
@@ -931,8 +940,8 @@ function UIEditRoom:draw(canvas, ...)
     local x, y = ui:WorldToScreen(self.mouse_cell_x, self.mouse_cell_y)
     local zoom = self.ui.zoom_factor
     if canvas:scale(zoom) then
-      x = x / zoom
-      y = y / zoom
+      x = math.floor(x / zoom)
+      y = math.floor(y / zoom)
     end
     self.cell_outline:draw(canvas, 2, x - 32, y)
     canvas:scale(1)
@@ -997,6 +1006,8 @@ end
 function UIEditRoom:setBlueprintRect(x, y, w, h)
   local rect = self.blueprint_rect
   local map = self.ui.app.map
+  if x < 1 then x = 1 end
+  if y < 1 then y = 1 end
   if x + w > map.width  then w = map.width  - x end
   if y + h > map.height then h = map.height - y end
 
@@ -1410,5 +1421,15 @@ function UIEditRoom:placeObject()
   local obj = UIPlaceObjects.placeObject(self, true)
   if obj then
     self:checkEnableConfirm()
+  end
+end
+
+function UIEditRoom:afterLoad(old, new)
+  if old < 101 then
+    self:removeKeyHandler("enter")
+    self:addKeyHandler("return", self.confirm)
+  end
+  if old < 104 then
+    self:addKeyHandler("keypad enter", self.confirm)
   end
 end

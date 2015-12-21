@@ -20,6 +20,9 @@ SOFTWARE. --]]
 
 class "UIResearch" (UIFullscreen)
 
+---@type UIResearch
+local UIResearch = _G["UIResearch"]
+
 local research_categories = {
   "cure",
   "diagnosis",
@@ -107,7 +110,7 @@ function UIResearch:updateCategories()
   ]]
   local function get_localized_string(string_name)
     local var_table = _G["_S"]
-    for token in string.gfind(string_name, "[%w_]+") do
+    for token in string.gmatch(string_name, "[%w_]+") do
         var_table = var_table[token]
     end
     return var_table
@@ -133,9 +136,9 @@ end
 function UIResearch:adjustResearch(area, mode)
   local res = self.research
   local amount = 1
-  if self.buttons_down.ctrl then
+  if self.ui.app.key_modifiers.ctrl then
     amount = amount * 20
-  elseif self.buttons_down.shift then
+  elseif self.ui.app.key_modifiers.shift then
     amount = amount * 5
   end
   if mode == "less" then

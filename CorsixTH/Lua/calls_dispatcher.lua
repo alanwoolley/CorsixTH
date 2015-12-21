@@ -20,6 +20,9 @@ SOFTWARE. --]]
 
 class "CallsDispatcher"
 
+---@type CallsDispatcher
+local CallsDispatcher = _G["CallsDispatcher"]
+
 local debug = false -- Turn on for debug message
 
 function CallsDispatcher:CallsDispatcher(world, entities)
@@ -197,11 +200,15 @@ function CallsDispatcher.verifyStaffForVaccination(patient, staff)
 
     local px,py = patient.tile_x, patient.tile_y
     local nx,ny = staff.tile_x, staff.tile_y
+
+    -- If any of the nurse or the patient tiles are nil
+    if not px or not py or not nx or not ny then return false end
+
     local x_diff = math.abs(px-nx)
     local y_diff = math.abs(py-ny)
     local test_radius = 5
 
-    -- Test if the patient's room is still empty incase they are just entering
+    -- Test if the patient's room is still empty in case they are just entering
     -- a room when they call for a staff to vaccinate them
     return x_diff and y_diff and x_diff <= test_radius
     and y_diff <= test_radius and not patient:getRoom()
@@ -303,12 +310,12 @@ function CallsDispatcher:findSuitableStaff(call)
   for _, e in ipairs(self.world.entities) do
     if class.is(e, Staff) then
       if e.humanoid_class ~= "Handyman" then
-    local score = call.verification(e) and call.priority(e) or nil
-    if score ~= nil and score < min_score then
-      min_score = score
-      min_staff = e
-    end
-    end
+        local score = call.verification(e) and call.priority(e) or nil
+        if score ~= nil and score < min_score then
+          min_score = score
+          min_staff = e
+        end
+      end
     end
   end
 
@@ -331,8 +338,8 @@ function CallsDispatcher:answerCall(staff)
   local min_call = nil
   local min_key = nil
   assert(not staff.on_call, "Staff should be idea before he can answer another call")
-  assert(staff.hospital, "Staff should still be a member of the hospital to answer a call"); 
-  
+  assert(staff.hospital, "Staff should still be a member of the hospital to answer a call");
+
   if staff.humanoid_class == "Handyman" then
    staff:searchForHandymanTask()
    return true

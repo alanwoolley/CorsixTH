@@ -20,6 +20,10 @@ SOFTWARE. --]]
 
 --! Lua extensions to the C++ THMap class
 class "Map"
+
+---@type Map
+local Map = _G["Map"]
+
 local pathsep = package.config:sub(1, 1)
 local math_floor, tostring, table_concat
     = math.floor, tostring, table.concat
@@ -39,11 +43,11 @@ end
 
 local flag_cache = {}
 function Map:getCellFlag(x, y, flag)
-  return self.th:getCellFlags(x, y, flag_cache)[flag]
+  return self.th:getCellFlags(math.floor(x), math.floor(y), flag_cache)[flag]
 end
 
 function Map:getRoomId(x, y)
-  return self.th:getCellFlags(x, y).roomId
+  return self.th:getCellFlags(math.floor(x), math.floor(y)).roomId
 end
 
 function Map:setTemperatureDisplayMethod(method)
@@ -84,9 +88,16 @@ function Map:ScreenToWorld(x, y)
   --  1/64 1/32
   -- -1/64 1/32
   -- And then adjust origin from (0, 0) to (1, 1)
-  y = (y / 32) + 1
+  y = y / 32 + 1
   x = x / 64
-  return y + x, y - x
+  local tile_x, tile_y = y + x, y - x
+  if self.width ~= nil and self.height ~= nil then
+    if tile_x < 1 then tile_x = 1 end
+    if tile_x > self.width then tile_x = self.width end
+    if tile_y < 1 then tile_y = 1 end
+    if tile_y > self.height then tile_y = self.height end
+  end
+  return tile_x, tile_y
 end
 
 local function bits(n)

@@ -9,8 +9,6 @@ LUA_PATH := ../LUA
 SDL_MIXER_PATH :=../SDL_mixer
 AGG_PATH := ../AGG
 CORSIX_TH_SRC := CorsixTH/Src
-LFS_SRC := LFS
-LPEG_SRC := LPEG
 FREETYPE_PATH := ../freetype2
 SDL_GFX_PATH := ../SDL_gfx
 FFMPEG_PATH := ../ffmpeg
@@ -23,8 +21,6 @@ LOCAL_C_INCLUDES := $(LOCAL_PATH)/$(SDL_PATH)/include \
 					$(LOCAL_PATH)/$(SDL_MIXER_PATH) \
 					$(LOCAL_PATH)/$(CORSIX_TH_SRC) \
 					$(LOCAL_PATH)/$(CTH_ASSETS) \
-					$(LOCAL_PATH)/$(LFS_SRC) \
-					$(LOCAL_PATH)/$(LPEG) \
 					$(LOCAL_PATH)/$(SDL_GFX_PATH) \
 					$(LOCAL_PATH)/$(LUA_PATH) \
 					$(LOCAL_PATH)/$(FFMPEG_PATH) \
@@ -32,13 +28,13 @@ LOCAL_C_INCLUDES := $(LOCAL_PATH)/$(SDL_PATH)/include \
 					$(LOCAL_PATH)/$(FFMPEG_PATH)/libavformat \
 					$(LOCAL_PATH)/$(FFMPEG_PATH)/libavutil \
 					$(LOCAL_PATH)/$(FFMPEG_PATH)/libswresample \
-					$(LOCAL_PATH)/$(FFMPEG_PATH)/libswscale
+					$(LOCAL_PATH)/$(FFMPEG_PATH)/libswscale \
+					../LFS
 					
 LOCAL_CFLAGS := -DPLAY_MOD 
 
 # Add your application source files here...
-LOCAL_SRC_FILES := $(SDL_PATH)/src/main/android/SDL_android_main.cpp \
-			$(CORSIX_TH_SRC)/../appmain.cpp \
+LOCAL_SRC_FILES := $(CORSIX_TH_SRC)/../appmain.cpp \
 			$(CORSIX_TH_SRC)/../logging.cpp \
 			$(CORSIX_TH_SRC)/../commands.cpp \
 			$(CORSIX_TH_SRC)/main.cpp \
@@ -67,17 +63,15 @@ LOCAL_SRC_FILES := $(SDL_PATH)/src/main/android/SDL_android_main.cpp \
 			$(CORSIX_TH_SRC)/sdl_wm.cpp \
 			$(CORSIX_TH_SRC)/xmi2mid.cpp \
 			$(CORSIX_TH_SRC)/th_lua_movie.cpp \
+			$(CORSIX_TH_SRC)/th_lua_lfs_ext.cpp \
 			$(CORSIX_TH_SRC)/th_movie.cpp \
-			$(LFS_SRC)/lfs.c \
-			$(LFS_SRC)/lfs_ext.c \
-			$(LPEG_SRC)/lpeg.c
-			
+			$(SDL_PATH)/src/main/android/SDL_android_main.cpp
 
-LOCAL_SHARED_LIBRARIES := libLUA libSDL libSDL_mixer libffmpeg
-LOCAL_STATIC_LIBRARIES := libfreetype2 libSDL_gfx libAGG
+LOCAL_SHARED_LIBRARIES := libLUA SDL2 SDL2_mixer
+LOCAL_STATIC_LIBRARIES := libfreetype2 libSDL2_gfx libLFS libLPEG libavformat libavcodec libswscale libavutil libswscale libswresample liblodepng
 
-LOCAL_LDLIBS := -llog
-
+LOCAL_LDLIBS := -llog -lGLESv2 -lz
+LOCAL_CPPFLAGS :=-D__STDC_CONSTANT_MACROS -std=c++11
 LOCAL_CPP_FEATURES += exceptions
 
 include $(BUILD_SHARED_LIBRARY)

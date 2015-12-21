@@ -21,6 +21,9 @@ SOFTWARE. --]]
 --! Bank manager (for loans / insurance companies) and bank statement fullscreen windows.
 class "UIBankManager" (UIFullscreen)
 
+---@type UIBankManager
+local UIBankManager = _G["UIBankManager"]
+
 function UIBankManager:UIBankManager(ui)
   self:UIFullscreen(ui)
   local gfx = ui.app.gfx
@@ -398,7 +401,7 @@ function UIBankManager:increaseLoan()
   local hospital = self.ui.hospital
   local max_loan = not self.world.free_build_mode and (math.floor((hospital.value * 0.33) / 5000) * 5000) + 10000 or 0
   if hospital.loan + 5000 <= max_loan  then
-    local amount = self.buttons_down.ctrl and max_loan - hospital.loan or 5000
+    local amount = self.ui.app.key_modifiers.ctrl and max_loan - hospital.loan or 5000
     hospital.loan = hospital.loan + amount
     hospital:receiveMoney(amount, _S.transactions.bank_loan)
     self.ui:playSound("selectx.wav")
@@ -410,7 +413,7 @@ end
 function UIBankManager:decreaseLoan()
   local hospital = self.ui.hospital
   local amount = 5000
-  if self.buttons_down.ctrl then
+  if self.ui.app.key_modifiers.ctrl then
     -- Repay as much as possible in increments of 5000
     if hospital.balance > 5000 then
       amount = math.min(hospital.loan, math.floor(hospital.balance / 5000) * 5000)

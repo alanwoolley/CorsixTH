@@ -38,6 +38,9 @@ dofile "entity_map"
 --! Manages entities, rooms, and the date.
 class "World"
 
+---@type World
+local World = _G["World"]
+
 local local_criteria_variable = {
   {name = "reputation",       icon = 10, formats = 2},
   {name = "balance",          icon = 11, formats = 2},
@@ -107,12 +110,21 @@ function World:World(app)
   -- Also preserve this throughout future updates.
   self.original_savegame_version = app.savegame_version
 
-  self:initLevel(app)
-  self.hospitals[1] = Hospital(self, app.config.player_name) -- Player's hospital
-  self:initCompetitors()
-  self:initRooms()
-  -- Now the hospitals can concentrate their research.
-  for i, hospital in ipairs(self.hospitals) do
+  -- Initialize available rooms.
+  local avail_rooms = self:getAvailableRooms()
+  self.available_rooms = {} -- Both a list and a set, use ipairs to iterate through the available rooms.
+  for _, avail_room in ipairs(avail_rooms) do
+    local room = avail_room.room
+    self.available_rooms[#self.available_rooms + 1] = room
+    self.available_rooms[room.id] = room
+  end
+
+  -- Initialize available diseases and winning conditions.
+  self:initLevel(app, avail_rooms)
+
+  self.hospitals[1] = Hospital(self, avail_rooms, app.config.player_name) -- Player's hospital
+  self:initCompetitors(avail_rooms)
+  for _, hospital in ipairs(self.hospitals) do
     hospital.research:setResearchConcentration()
   end
 
@@ -186,6 +198,8 @@ function World:setUI(ui)
   self.ui:addKeyHandler("4", self, self.setSpeed, "Max speed")
   self.ui:addKeyHandler("5", self, self.setSpeed, "And then some more")
 
+  self.ui:addKeyHandler("=", self, self.adjustZoom,  1)
+  self.ui:addKeyHandler({"shift", "="}, self, self.adjustZoom, 5)
   self.ui:addKeyHandler("+", self, self.adjustZoom,  1)
   self.ui:addKeyHandler({"shift", "+"}, self, self.adjustZoom, 5)
   self.ui:addKeyHandler("-", self, self.adjustZoom, -1)
@@ -204,28 +218,46 @@ function World:adjustZoom(delta)
     modifier = 0.05
   end
 
+  print("Virtual width: " .. virtual_width)
+
   virtual_width = virtual_width - delta * factor * modifier
   if virtual_width < 200 then
     return false
   end
 
+  print ("Setting zoom: " .. scr_w/virtual_width)
   return self.ui:setZoom(scr_w/virtual_width)
 end
 
 --! Initialize the game level (available diseases, winning conditions).
 --!param app Game application.
-function World:initLevel(app)
-  local level_config = self.map.level_config
+--!param avail_rooms (list) Available rooms in the level.
+function World:initLevel(app, avail_rooms)
+  local existing_rooms = {}
+  for _, avail_room in ipairs(avail_rooms) do
+    existing_rooms[avail_room.room.id] = true
+  end
+
   -- Determine available diseases
   self.available_diseases = {}
+  local level_config = self.map.level_config
   local visual = level_config.visuals
   local non_visual = level_config.non_visuals
-  for i, disease in ipairs(app.diseases) do
+  for _, disease in ipairs(app.diseases) do
     if not disease.pseudo then
       local vis = 1
       if visual and (visual[disease.visuals_id] or non_visual[disease.non_visuals_id]) then
         vis = disease.visuals_id and visual[disease.visuals_id].Value
         or non_visual[disease.non_visuals_id].Value
+      end
+      if vis ~= 0 then
+        for _, room_id in ipairs(disease.treatment_rooms) do
+          if existing_rooms[room_id] == nil then
+            print("Warning: Removing disease \"" .. disease.id .. "\" due to missing treatment room \"" .. room_id .. "\".")
+            vis = 0 -- Missing treatment room, disease cannot be treated. Remove it.
+            break
+          end
+        end
       end
       -- TODO: Where the value is greater that 0 should determine the frequency of the patients
       if vis ~= 0 then
@@ -365,13 +397,14 @@ function World:determineWinningConditions()
   self.winning_goal_count = winning_goal_count
 end
 
-function World:initRooms()
-  -- Combination of set and list. Use ipairs to iterate through all available rooms.
-  self.available_rooms = {}
+--! Find the rooms available at the level.
+--!return (list) Available rooms, with discovery state at start, and build_cost.
+function World:getAvailableRooms()
+  local avail_rooms = {}
 
   local obj = self.map.level_config.objects
   local rooms = self.map.level_config.rooms
-  for i, room in ipairs(TheApp.rooms) do
+  for _, room in ipairs(TheApp.rooms) do
     -- Add build cost based on level files for all rooms.
     -- For now, sum it up so that the result is the same as before.
     -- TODO: Change the whole build process so that this value is
@@ -386,43 +419,29 @@ function World:initRooms()
         -- It won't be possible to build this room at all on the level.
         available = false
       elseif spec.StartAvail == 0 then
-        -- Ok, it will be availabe at some point just not from the beginning.
+        -- Ok, it will be available at some point just not from the beginning.
         is_discovered = false
       end
       -- Add cost for this object.
       build_cost = build_cost + obj[TheApp.objects[name].thob].StartCost * no
     end
-    -- Now define the total build cost for the room. In free build mode nothing
-    -- costs anything.
-    for _, hospital in ipairs(self.hospitals) do
-      hospital.research.research_progress[room] = {
-        build_cost = not self.free_build_mode and build_cost or 0,
-      }
-    end
-    if available then
-      self.available_rooms[#self.available_rooms + 1] = room
-      self.available_rooms[room.id] = room
 
-      if is_discovered then
-        for _, hospital in ipairs(self.hospitals) do
-          hospital.discovered_rooms[room] = true
-        end
-      else
-        for _, hospital in ipairs(self.hospitals) do
-          hospital.undiscovered_rooms[room] = true
-        end
-      end
+    if available then
+      avail_rooms[#avail_rooms + 1] = {room = room, is_discovered = is_discovered, build_cost = build_cost}
     end
   end
+  return avail_rooms
 end
 
-function World:initCompetitors()
+--! Initialize competing hospitals
+--!param avail_rooms (list) Available rooms in the level.
+function World:initCompetitors(avail_rooms)
   -- Add computer players
   -- TODO: Right now they're only names
   local level_config = self.map.level_config
   for key, value in pairs(level_config.computer) do
     if value.Playing == 1 then
-      self.hospitals[#self.hospitals + 1] = AIHospital(tonumber(key) + 1, self)
+      self.hospitals[#self.hospitals + 1] = AIHospital(tonumber(key) + 1, self, avail_rooms)
     end
   end
 end
@@ -539,12 +558,14 @@ function World:spawnPatient(hospital)
   end
 end
 
+--A VIP is invited (or he invited himself) to the player hospital.
+--!param name Name of the VIP
 function World:spawnVIP(name)
   local hospital = self:getLocalPlayerHospital()
 
   local spawn_point = self.spawn_points[math.random(1, #self.spawn_points)]
   local vip = self:newEntity("Vip", 2)
-  vip:setType "VIP"
+  vip:setType("VIP")
   vip.name = name
   vip.enter_deaths = hospital.num_deaths
   vip.enter_visitors = hospital.num_visitors
@@ -985,7 +1006,7 @@ function World:setSpeed(speed)
   local numerator, denominator = unpack(tick_rates[speed])
   self.hours_per_tick = numerator
   self.tick_rate = denominator
-  
+
   if was_paused then
     TheApp.audio:onEndPause()
   end
@@ -1039,7 +1060,7 @@ function World:onTick()
       if not lfs.attributes(dir .. "Autosaves", "modification") then
         lfs.mkdir(dir .. "Autosaves")
       end
-      local status, err = pcall(TheApp.save, TheApp, "Autosaves" .. pathsep .. "Autosave" .. self.month .. ".sav")
+      local status, err = pcall(TheApp.save, TheApp, dir .. "Autosaves" .. pathsep .. "Autosave" .. self.month .. ".sav")
       if not status then
         print("Error while autosaving game: " .. err)
       end
@@ -1653,6 +1674,7 @@ local face_dir = {
 function World:getFreeBench(x, y, distance)
   local bench, rx, ry, bench_distance
   local object_type = self.object_types.bench
+  x, y, distance = math.floor(x), math.floor(y), math.ceil(distance)
   self.pathfinder:findObject(x, y, object_type.thob, distance, function(x, y, d, dist)
     local b = self:getObject(x, y, "bench")
     if b and not b.user and not b.reserved_for then
@@ -1834,7 +1856,7 @@ function World:findRoomNear(humanoid, room_type_id, distance, mode)
     if r.built and (not room_type_id or r.room_info.id == room_type_id) and r.is_active and r.door.queue.max_size ~= 0 then
       local x, y = r:getEntranceXY(false)
       local d = self:getPathDistance(humanoid.tile_x, humanoid.tile_y, x, y)
-      if d > distance then
+      if not d or d > distance then
         break -- continue
       end
       local this_score = d
@@ -2014,7 +2036,7 @@ function World:isFootprintTileBuildableOrPassable(x, y, tile, footprint, require
   end
 end
 
---- 
+---
 -- Check that pathfinding still works, i.e. that placing the object
 -- wouldn't disconnect one part of the hospital from another. To do
 -- this, we provisionally mark the footprint as unpassable (as it will
@@ -2245,6 +2267,16 @@ function World:getObjectsById(id)
   end
 
   return ret
+end
+
+--! Remove litter from a tile.
+--!param obj (Litter) litter to remove.
+--!param x (int) X position of the tile.
+--!param y (int) Y position of the tile.
+function World:removeLitter(obj, x, y)
+  self:removeObjectFromTile(obj, x, y)
+  self:destroyEntity(obj)
+  self.map.th:setCellFlags(x, y, {buildable = true})
 end
 
 --! Get the room at a given tile location.
@@ -2560,6 +2592,19 @@ function World:afterLoad(old, new)
     self.ui:addKeyHandler({"shift", "+"}, self, self.adjustZoom,  5)
     self.ui:addKeyHandler({"shift", "-"}, self, self.adjustZoom, -5)
   end
+
+  if old < 103 then
+    -- If a room has patients who no longer exist in its
+    -- humanoids_enroute table because of #133 remove them:
+    for _, room in pairs(self.rooms) do
+      for patient, _ in pairs(room.humanoids_enroute) do
+        if patient.tile_x == nil then
+          room.humanoids_enroute[patient] = nil
+        end
+      end
+    end
+  end
+
   -- Now let things inside the world react.
   for _, cat in pairs({self.hospitals, self.entities, self.rooms}) do
     for _, obj in pairs(cat) do

@@ -25,6 +25,9 @@ local TH = require "TH"
 --! The ingame menu bar which sits (nominally hidden) at the top of the screen.
 class "UIMenuBar" (Window)
 
+---@type UIMenuBar
+local UIMenuBar = _G["UIMenuBar"]
+
 function UIMenuBar:UIMenuBar(ui)
   self:Window()
 
@@ -455,6 +458,9 @@ end
 
 class "UIMenu"
 
+---@type UIMenu
+local UIMenu = _G["UIMenu"]
+
 function UIMenu:UIMenu()
   self.items = {}
   self.parent = false
@@ -722,6 +728,7 @@ function UIMenuBar:makeMenu(app)
   if self.ui.app.config.debug then
     self:addMenu(_S.menu.debug, UIMenu() -- Debug
       :appendMenu(_S.menu_debug.jump_to_level, levels_menu)
+      :appendItem(_S.menu_debug.connect_debugger, function() self.ui:connectDebugger() end)
       :appendCheckItem(_S.menu_debug.limit_camera,         true, limit_camera, nil, function() return self.ui.limit_to_visible_diamond end)
       :appendCheckItem(_S.menu_debug.disable_salary_raise, false, disable_salary_raise, nil, function() return self.ui.app.world.debug_disable_salary_raise end)
       :appendItem(_S.menu_debug.make_debug_fax,     function() self.ui:makeDebugFax() end)

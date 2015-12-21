@@ -20,7 +20,10 @@ SOFTWARE. --]]
 
 class "Hospital"
 
-function Hospital:Hospital(world, name)
+---@type Hospital
+local Hospital = _G["Hospital"]
+
+function Hospital:Hospital(world, avail_rooms, name)
   self.world = world
   local level_config = world.map.level_config
   local level = world.map.level_number
@@ -142,8 +145,17 @@ function Hospital:Hospital(world, name)
   self.disease_casebook = {}
   self.policies = {}
   self.discovered_diseases = {} -- a list
+
   self.discovered_rooms = {} -- a set; keys are the entries of TheApp.rooms, values are true or nil
   self.undiscovered_rooms = {} -- NB: These two together must form the list world.available_rooms
+  for _, avail_room in ipairs(avail_rooms) do
+    if avail_room.is_discovered then
+      self.discovered_rooms[avail_room.room] = true
+    else
+      self.undiscovered_rooms[avail_room.room] = true
+    end
+  end
+
   self.policies["staff_allowed_to_move"] = true
   self.policies["send_home"] = 0.1
   self.policies["guess_cure"] = 0.9
@@ -213,6 +225,14 @@ function Hospital:Hospital(world, name)
     end
   end
   self.research = ResearchDepartment(self)
+
+  -- Initialize build cost for all available rooms.
+  for _, avail_room in ipairs(avail_rooms) do
+    self.research.research_progress[avail_room.room] = {
+        -- In free build mode, everything is freely available.
+        build_cost = not self.free_build_mode and avail_room.build_cost or 0,
+      }
+  end
 end
 
 -- Seasoned players will know these things, but it does not harm to be reminded if there is no staff room or toilet!
@@ -1252,7 +1272,7 @@ function Hospital:resolveEmergency()
   self.world:nextEmergency()
 end
 
--- Creates VIP
+-- Creates VIP and sends a FAX to query the user.
 function Hospital:createVip()
   local vipName =  _S.vip_names[math.random(1,10)]
   local message = {
@@ -1744,6 +1764,9 @@ end
 
 class "AIHospital" (Hospital)
 
+---@type AIHospital
+local AIHospital = _G["AIHospital"]
+
 function AIHospital:AIHospital(competitor, ...)
   self:Hospital(...)
   if _S.competitor_names[competitor] then
@@ -1763,7 +1786,6 @@ function AIHospital:logTransaction()
 end
 
 function Hospital:addHandymanTask(object, taskType, priority, x, y, call)
-
   local parcelId = self.world.map.th:getCellFlags(x, y).parcelId
   local subTable = self:findHandymanTaskSubtable(taskType)
   table.insert(subTable, {["object"] = object, ["priority"] = priority, ["tile_x"] = x, ["tile_y"] = y, ["parcelId"] = parcelId, ["call"] = call});
@@ -1772,7 +1794,7 @@ end
 function Hospital:modifyHandymanTaskPriority(taskIndex, newPriority, taskType)
   if taskIndex ~= -1 then
     local subTable = self:findHandymanTaskSubtable(taskType)
-    self:findHandymanTaskSubtable(taskType)[taskIndex].priority = newPriority;
+    subTable[taskIndex].priority = newPriority;
   end
 end
 
@@ -1807,10 +1829,10 @@ function Hospital:assignHandymanToTask(handyman, taskIndex, taskType)
   if taskIndex ~= -1 then
     local subTable = self:findHandymanTaskSubtable(taskType)
     if not subTable[taskIndex].assignedHandyman then
-      subTable[taskIndex].assignedHandyman  = handyman
+      subTable[taskIndex].assignedHandyman = handyman
     else
       local formerHandyman = subTable[taskIndex].assignedHandyman
-      subTable[taskIndex].assignedHandyman  = handyman
+      subTable[taskIndex].assignedHandyman = handyman
       formerHandyman:interruptHandymanTask()
     end
   end

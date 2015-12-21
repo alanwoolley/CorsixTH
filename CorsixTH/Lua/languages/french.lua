@@ -1,4 +1,4 @@
-﻿--[[ Copyright (c) 2010-2011 Nicolas "MeV" Elie
+--[[ Copyright (c) 2010-2015 Nicolas "MeV" Elie
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of
 this software and associated documentation files (the "Software"), to deal in
@@ -157,6 +157,7 @@ adviser.multiplayer.poaching = {
 }
 adviser.vomit_wave.ended = "Ouf ! On dirait que le virus qui provoquait des nausées est enfin enrayé. Gardez l'hôpital propre, à l'avenir."
 adviser.research.new_available = "Nouveau : un(e) %s est disponible."
+adviser.research.drug_improved_1 = "Le traitement contre la %s a été amélioré par votre département de recherche."
 adviser.goals.lose.kill = "Tuez encore %d patients pour perdre !"
 adviser.warnings = {
   money_low = "Les fonds sont en baisse !",
@@ -166,7 +167,7 @@ adviser.warnings = {
   too_many_plants = "Il y a bien trop de plantes. C'est la jungle, ici !",
   many_killed = "Vous avez laissé mourir %d personnes. Idiot ! Vous êtes censé les soigner.",
   falling_1 = "Hé ! Ce n'est pas drôle, regardez ou vous cliquez, quelqu'un pourrait être blessé !",
-  falling_2 = "Arrêtez de faire n'importe quoi, vous en pensez quoi ?",
+  falling_2 = "Arrêtez de faire n'importe quoi, qu'en penseriez-vous à leur place ?",
   falling_3 = "Aïe, ça doit faire mal,  qu'on appelle un médecin !",
   falling_4 = "C'est un hôpital, pas un parc d'attraction !",
   falling_5 = "Ce n'est pas un endroit pour bousculer les gens, ils sont malades vous savez ?",
@@ -572,12 +573,11 @@ misc.no_heliport = "Aucune maladie n'a été découverte pour l'instant, ou il n
 menu_options = {
   lock_windows = "  FIGER LES FENETRES  ",
   edge_scrolling = "  DEFILEMENT PAR BORD  ",
-  settings = "  PARAMETRES  ",
   adviser_disabled = "  ASSISTANT  ",
   warmth_colors = "  COULEURS CHAUDES  ",
   wage_increase = " AUGMENTATION DE SALAIRE ",
   twentyfour_hour_clock = " HORLOGE 24 HEURES ",
-  }
+}
 
  menu_options_warmth_colors = {
   choice_1 = "  ROUGE  ",
@@ -615,6 +615,7 @@ menu_charts = {
 -- Debug menu
 menu_debug = {
   jump_to_level               = "  ALLER AU NIVEAU  ",
+  connect_debugger            = " (CTRL + C) CONNECTER AU SERVEUR DE DÉBOGUAGE ",
   transparent_walls           = "  (X) MURS TRANSPARENTS  ",
   limit_camera                = "  LIMITER LA CAMERA  ",
   disable_salary_raise        = "  DESACTIVER LES AUGMENTATIONS DE SALAIRE  ",
@@ -657,7 +658,7 @@ main_menu = {
 }
 
 tooltip.main_menu = {
-  new_game = "Commencer une partie totalement nouvelle",
+  new_game = "Commencer une nouvelle partie",
   custom_level = "Construire votre hôpital dans un niveau personnalisé",
   continue = "Continuer la partie",
   load_game = "Charger une partie sauvegardée",
@@ -688,7 +689,7 @@ tooltip.new_game_window = {
   cancel = "Oh, je n'avais pas vraiment l'intention de commencer une nouvelle partie !",
   difficulty = "Sélectionnez le niveau de difficulté que vous voulez dans le jeu",
   start = "Démarrer le jeu avec les paramètres sélectionnés",
-  player_name = "Entrez le nom avec lequel vous voulez être appelé dans le jeu",
+  player_name = "Entrez le nom par lequel vous voulez être appelé dans le jeu",
 }
 
 -- Load game window
@@ -753,8 +754,8 @@ options_window = {
   apply = "Appliquer",
   resolution = "Résolution",
   audio = "Audio Global",
-  customize = "Personnaliser",
   folder = "Dossier",
+  customise = "Personnaliser",
 }
 
 tooltip.options_window = {
@@ -766,7 +767,6 @@ tooltip.options_window = {
   height = "Entrez la hauteur désirée",
   change_resolution = "Changer la résolution pour les dimensions entrées à gauche",
   language = "Utiliser la langue %s",
-  original_path = "Le dossier d'installation du Theme Hospital originel qui est actuellement sélectionné",
   back = "Fermer la fenêtre des options",
   cancel = "Retour sans changement de résolution",
   apply = "Appliquer la résolution choisie",
@@ -774,17 +774,17 @@ tooltip.options_window = {
   select_language = "Sélectionner la langue du jeu",
   audio_button = "Activer ou désactiver le système audio dans le jeu",
   audio_toggle = "Activer ou désactiver",
-  customize_button = "Paramètres supplémentaires qui peuvent être modifiés pour personnaliser votre expérience de jeu",
   folder_button = "Dossier des paramètres",
+  customise_button = "Paramètres supplémentaires qui peuvent être modifiés pour personnaliser votre expérience de jeu",
 }
 
-customize_window = {
+customise_window = {
   caption = "Paramètres Supplémentaires",
   option_on = "Activer",
   option_off = "Désactiver",
   back = "Retour",
-  movies = "Contrôle des films",
-  intro = "Jouer le film d'intro",
+  movies = "Contrôle des cinématiques",
+  intro = "Jouer la cinématique d'intro",
   paused = "Construction en pause",
   volume = "Touche de raccourci pour diminuer le volume",
   aliens = "Extraterrestres",
@@ -793,8 +793,8 @@ customize_window = {
 }
 
 tooltip.customise_window = {
-  movies = "Sélectionnez si les films doivent être joués.",
-  intro = "Passer le film d'introduction lorsque vous démarrez le jeu. Le contrôle des films doit être activé si vous jouez le film d'introduction à chaque fois que vous chargez CorsixTH",
+  movies = "Sélectionnez si les cinématiques doivent être joués.",
+  intro = "Passer la cinématique d'introduction lorsque vous démarrez le jeu. Le contrôle des cinématiques doit être activé si vous jouez la cinématique d'introduction à chaque fois que vous chargez CorsixTH",
   paused = "Dans Theme Hospital le joueur ne sera autorisé à utiliser le menu principal que si le jeu est en pause. C'est le paramètre par défaut dans CorsixTH aussi, mais en l'activant tout est permis pendant que le jeu est en pause",
   volume = "Si la touche de réduction du volume ouvre également le journal de médecine, activer cette option pour modifier le raccourci des dossiers médicaux à Maj + C",
   aliens = "Comme il y a des animations appropriées, nous avons fait de sorte que les patients avec l'ADN extraterrestre montrent seulement comme des situations d'urgence. Désactivez cette option pour obtenir cas de l'ADN extraterrestre visites régulières",
@@ -873,6 +873,8 @@ cheats_window = {
     end_year = "Fin de l'année",
     lose_level = "Perdre le niveau",
     win_level = "Gagner le niveau",
+    epidemic = "Reproduire des patients contagieux",
+    toggle_infected = "Faire apparaître des patients contagieux.",
   },
   close = "Fermer",
 }
@@ -882,7 +884,7 @@ tooltip.cheats_window = {
   cheats = {
     money = "Ajoute $10.000 à votre solde bancaire.",
     all_research = "Termine toutes les recherches.",
-    emergency = "Créer une situation d'urgence.",
+    emergency = "Crée une situation d'urgence.",
     vip = "Crée un VIP.",
     earthquake = "Crée un tremblement de terre.",
     create_patient = "Crée un patient au bord de la carte.",
@@ -890,6 +892,8 @@ tooltip.cheats_window = {
     end_year = "Va directement à la fin de l'année.",
     lose_level = "Vous fait perdre le niveau actuel.",
     win_level = "Vous fait gagner le niveau actuel.",
+    epidemic = "Crée un patient contagieux qui peut causer une épidémie.",
+    toggle_infected = "Bascule les icônes infectés pour l'épidémie, découverte active.",
   }
 }
 
@@ -941,6 +945,8 @@ tooltip.lua_console = {
 confirmation = {
   needs_restart = "Changer ce paramètre va nécessiter un redémarrage de CorsixTH. Tout progrès non sauvegardé sera perdu. Êtes-vous sûr de vouloir faire cela ?",
   abort_edit_room = "Vous êtes actuellement en train de construire ou d'éditer une pièce. Si tous les objets requis sont placés, elle sera validée, mais sinon elle sera détruite. Continuer ?",
+  maximum_screen_size = "La taille de l'écran que vous avez entrée est supérieure à 3000 x 2000. Des plus hautes résolutions sont possibles, mais il faudra un meilleur matériel afin de maintenir un taux de trame jouable. Êtes-vous sûr de vouloir continuer?",
+  music_warning = "Avant de choisir d'utiliser des MP3 pour votre musique dans le jeu, vous aurez besoin d'avoir smpeg.dll ou l'équivalent pour votre système d'exploitation, sinon vous n'aurez pas de musique dans le jeu. Actuellement, il n'y a pas de fichier équivalent pour les systèmes 64 bits. Voulez-vous continuer?",
 }
 
 -- Information dialog
@@ -1046,6 +1052,23 @@ errors = {
   no_games_to_contine = "Pas de parties sauvegardées.",
   map_file_missing = "Impossible de trouver le fichier de carte %s pour ce niveau !",
   minimum_screen_size = "Veuillez entrer une résolution supérieure à 640x480.",
-  maximum_screen_size = "Veuillez entrer une résolution inférieure à 3000x2000.",
   unavailable_screen_size = "La résolution que vous avez demandée n'est pas disponible en plein écran.",
+  alien_dna = "NOTE: Il n'y a pas d'animations pour les patients étrangers pour s'asseoir, ouvrir ou de frapper aux portes, etc. Donc, comme avec Theme Hospital pour faire ces choses, ils semblent changer à la normale et ensuite changer de nouveau. Les patients avec l'ADN Alien apparaîtront seulement s'ils sont définis dans le fichier de niveau.",
+  fractured_bones = "NOTE: L'animation pour les patients de sexe féminin avec des os fracturés n'est pas parfaite.",
+  load_quick_save = "Erreur, impossible de charger la sauvegarde rapide car elle n'existe pas, ne vous inquiétez pas nous avons créé une pour vous !",
 }
+
+-- Updates
+update_window = {
+  caption = "Une mise à jour est disponible !",
+  new_version = "Nouvelle version:",
+  current_version = "Version actuelle:",
+  download = "Aller à la page de téléchargement",
+  ignore = "Sauter et aller au menu principal",
+}
+
+tooltip.update_window = {
+  download = "Accédez à la page de téléchargement pour la toute dernière version de CorsixTH",
+  ignore = "Ignorer cette mise à jour pour l'instant. Vous serez averti à nouveau lorsque vous ouvrez CorsixTH de nouveau",
+}
+

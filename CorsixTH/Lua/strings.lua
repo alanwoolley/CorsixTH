@@ -20,13 +20,16 @@ SOFTWARE. --]]
 
 local lfs = require "lfs"
 local TH = require "TH"
-local type, loadfile, pcall, tostring, setfenv, setmetatable, math_random
-    = type, loadfile, pcall, tostring, setfenv, setmetatable, math.random
+local type, loadfile, pcall, tostring, setmetatable, math_random, math_floor
+    = type, loadfile, pcall, tostring, setmetatable, math.random, math.floor
 local rawset, rawget
     = rawset, rawget
 
 --! Layer which handles the loading of localised text.
 class "Strings"
+
+---@type Strings
+local Strings = _G["Strings"]
 
 function Strings:Strings(app)
   self.app = app
@@ -474,21 +477,21 @@ local function utf8encode(codepoint)
     return string.char(codepoint)
   elseif codepoint <= 0x7FF then
     local sextet = codepoint % 64
-    codepoint = (codepoint - sextet) / 64
+    codepoint = math_floor((codepoint - sextet) / 64)
     return string.char(0xC0 + codepoint, 0x80 + sextet)
   elseif codepoint <= 0xFFFF then
     local sextet2 = codepoint % 64
-    codepoint = (codepoint - sextet2) / 64
+    codepoint = math_floor((codepoint - sextet2) / 64)
     local sextet1 = codepoint % 64
-    codepoint = (codepoint - sextet2) / 64
+    codepoint = math_floor((codepoint - sextet2) / 64)
     return string.char(0xE0 + codepoint, 0x80 + sextet1, 0x80 + sextet2)
   else
     local sextet3 = codepoint % 64
-    codepoint = (codepoint - sextet3) / 64
+    codepoint = math_floor((codepoint - sextet3) / 64)
     local sextet2 = codepoint % 64
-    codepoint = (codepoint - sextet2) / 64
+    codepoint = math_floor((codepoint - sextet2) / 64)
     local sextet1 = codepoint % 64
-    codepoint = (codepoint - sextet2) / 64
+    codepoint = math_floor((codepoint - sextet2) / 64)
     return string.char(0xF0 + codepoint, 0x80 + sextet1, 0x80 + sextet2,
                        0x80 + sextet3)
   end

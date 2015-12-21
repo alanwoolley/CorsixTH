@@ -23,6 +23,9 @@ local TH = require "TH"
 --! Progress Report fullscreen window (check level goals, competitors and alerts).
 class "UIProgressReport" (UIFullscreen)
 
+---@type UIProgressReport
+local UIProgressReport = _G["UIProgressReport"]
+
 function UIProgressReport:UIProgressReport(ui)
   -- TODO: Refactor this file!
   self:UIFullscreen(ui)
@@ -86,9 +89,9 @@ function UIProgressReport:UIProgressReport(ui)
     if res_value then
       local tooltip
       if world.level_criteria[tab.criterion].formats == 2 then
-        tooltip = _S.tooltip.status[crit_name]:format(res_value, cur_value)
+        tooltip = _S.tooltip.status[crit_name]:format(math.floor(res_value), math.floor(cur_value))
       else
-        tooltip = _S.tooltip.status[crit_name]:format(res_value)
+        tooltip = _S.tooltip.status[crit_name]:format(math.floor(res_value))
       end
       self:addPanel(world.level_criteria[tab.criterion].icon, x, 240)
       self:makeTooltip(tooltip, x, 180, x + 30, 180 + 90)
@@ -143,10 +146,22 @@ function UIProgressReport:drawMarkers(canvas, x, y)
   local warmth = self.ui.hospital:getAveragePatientAttribute("warmth")
   local world = self.ui.app.world
 
-  warmth = UIPatient.normaliseWarmth(warmth)
-  self.panel_sprites:draw(canvas, 5, x + x_min + width * happiness, y + 193)
-  self.panel_sprites:draw(canvas, 5, x + x_min + width * thirst, y + 223)
-  self.panel_sprites:draw(canvas, 5, x + x_min + width * warmth, y + 254)
+  -- in lua, NaN value comparisons always return false
+  local function isnan(val)
+    return val ~= 0 and not (val < 0 or val > 0)
+  end
+
+  if isnan(happiness) then happiness = 0.5 end
+  if isnan(thirst) then thirst = 0.5 end
+  if isnan(warmth) then
+    warmth = 0.5
+  else
+    warmth = UIPatient.normaliseWarmth(warmth)
+  end
+
+  self.panel_sprites:draw(canvas, 5, math.floor(x + x_min + width * happiness), y + 193)
+  self.panel_sprites:draw(canvas, 5, math.floor(x + x_min + width * thirst), y + 223)
+  self.panel_sprites:draw(canvas, 5, math.floor(x + x_min + width * warmth), y + 254)
 
   if world.free_build_mode then
     self.normal_font:drawWrapped(canvas, _S.progress_report.free_build, x + 265, y + 194, 150, "center")

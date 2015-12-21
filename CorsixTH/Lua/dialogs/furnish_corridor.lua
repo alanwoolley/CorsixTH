@@ -25,6 +25,9 @@ local math_floor
 --! Dialog for purchasing `Object`s (for the corridor or for rooms).
 class "UIFurnishCorridor" (Window)
 
+---@type UIFurnishCorridor
+local UIFurnishCorridor = _G["UIFurnishCorridor"]
+
 function UIFurnishCorridor:UIFurnishCorridor(ui, objects, edit_dialog)
   self:Window()
 
@@ -114,15 +117,16 @@ function UIFurnishCorridor:UIFurnishCorridor(ui, objects, edit_dialog)
   self:makeTooltip(_S.tooltip.buy_objects_window.price,       20, 168, 127, 187)
   self:makeTooltip(_S.tooltip.buy_objects_window.total_value, 20, 196, 127, 215)
 
-  self:addKeyHandler("Enter", self.confirm)
+  self:addKeyHandler("return", self.confirm)
+  self:addKeyHandler("keypad enter", self.confirm)
 end
 
 function UIFurnishCorridor:purchaseItem(index, quantity)
   local o = self.objects[index]
   local is_negative_quantity = quantity < 0
-  if self.buttons_down.ctrl then
+  if self.ui.app.key_modifiers.ctrl then
     quantity = quantity * 10
-  elseif self.buttons_down.shift then
+  elseif self.ui.app.key_modifiers.shift then
     quantity = quantity * 5
   end
   quantity = quantity + o.qty
@@ -227,4 +231,14 @@ function UIFurnishCorridor:onMouseMove(x, y, dx, dy)
   end
 
   return repaint
+end
+
+function UIFurnishCorridor:afterLoad(old, new)
+  if old < 101 then
+    self:removeKeyHandler("enter")
+    self:addKeyHandler("return", self.confirm)
+  end
+  if old < 104 then
+    self:addKeyHandler("keypad enter", self.confirm)
+  end
 end

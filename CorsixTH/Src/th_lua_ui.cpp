@@ -42,8 +42,8 @@ static int l_town_map_draw(lua_State *L)
     luaL_checktype(L, 1, LUA_TTABLE);
     THMap *pMap = luaT_testuserdata<THMap>(L, 2);
     THRenderTarget *pCanvas = luaT_testuserdata<THRenderTarget>(L, 3);
-    int iCanvasXBase = luaL_checkint(L, 4);
-    int iCanvasYBase = luaL_checkint(L, 5);
+    int iCanvasXBase = static_cast<int>(luaL_checkinteger(L, 4));
+    int iCanvasYBase = static_cast<int>(luaL_checkinteger(L, 5));
     bool bShowHeat = lua_toboolean(L, 6) != 0;
 
     uint32_t iColourMyHosp = pCanvas->mapColour(0, 0, 70);
@@ -79,12 +79,12 @@ static int l_town_map_draw(lua_State *L)
                     else if(iTemp > 32767) // More than 25 degrees
                         iTemp = 255;
                     else // NB: 108 == (32767 - 5200) / 255
-                        iTemp = (iTemp - 5200) / 108;
+                        iTemp = static_cast<uint16_t>((iTemp - 5200) / 108);
 
 #define MIN_OK_TEMP 140
 #define MAX_OK_TEMP 180
 #define RangeScale(low, high, val, start, end) \
-    Clamp8(start + (end - start) * (val - low) / (high - low))
+    Clamp8(static_cast<uint16_t>(start + (end - start) * (val - low) / (high - low)))
                     switch(pMap->getTemperatureDisplay())
                     {
                     case THMT_MultiColour:

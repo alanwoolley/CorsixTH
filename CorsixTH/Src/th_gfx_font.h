@@ -172,6 +172,9 @@ public:
     */
     FT_Error initialise();
 
+    //! Remove all cached strings, as our graphics context has changed
+    void clearCache();
+
     //! Set the font face to be used.
     /*!
         @param pData Pointer to the start of a font file loaded into memory.
@@ -179,7 +182,7 @@ public:
             of the THFreeTypeFont objcect.
         @param iLength The size, in bytes, of the font file at pData.
     */
-    FT_Error setFace(const unsigned char* pData, size_t iLength);
+    FT_Error setFace(const uint8_t* pData, size_t iLength);
 
     //! Set the font size and colour to match that of a bitmap font.
     /*!
@@ -213,19 +216,37 @@ public:
 protected:
     struct cached_text_t
     {
+        //! The text being converted to pixels
         char* sMessage;
-        unsigned char* pData;
-        union {
-            void* pTexture;
-            int iTexture;
-        };
+
+        //! Raw pixel data in row major 8-bit greyscale
+        uint8_t* pData;
+
+        //! Generated texture ready to be rendered
+        void* pTexture;
+
+        //! The length of sMessage
         size_t iMessageLength;
+
+        //! The size of the buffer allocated to store sMessage
         size_t iMessageBufferLength;
+
+        //! Width of the image to draw
         int iWidth;
+
+        //! Height of the image to draw
         int iHeight;
+
+        //! The width of the longest line of text in in the textbox in pixels
         int iWidestLine;
+
+        //! X Coordinate trailing the last character in canvas coordinates
         int iLastX;
+
+        //! Alignment of the message in the box
         eTHAlign eAlign;
+
+        //! True when the pData reflects the sMessage given the size constraints
         bool bIsValid;
     };
 
@@ -253,27 +274,21 @@ protected:
     */
     bool _isMonochrome() const;
 
-    //! Set the texture field of a cache entry to indicate no texture.
-    /*!
-        @param pCacheEntry A cache entry whose pTexture or iTexture field
-            should be set to a null value, whatever that means for the
-            rendering engine.
-    */
-    void _setNullTexture(cached_text_t* pCacheEntry) const;
-
     //! Convert a cache canvas containing rendered text into a texture.
     /*!
+        @param pEventualCanvas A pointer to the rendertarget we'll be using to
+            draw this.
         @param pCacheEntry A cache entry whose pData field points to a pixmap
             of size iWidth by iHeight. This method will convert said pixmap to
             an object which can be used by the rendering engine, and store the
             result in the pTexture or iTexture field.
     */
-    void _makeTexture(cached_text_t* pCacheEntry) const;
+    void _makeTexture(THRenderTarget *pEventualCanvas, cached_text_t* pCacheEntry) const;
 
     //! Free a previously-made texture of a cache entry.
     /*!
         This call should free all the resources previously allocated by a call
-        to _makeTexture().
+        to _makeTexture() and set the texture field to indicate no texture.
 
         @param pCacheEntry A cache entry previously passed to _makeTexture().
     */

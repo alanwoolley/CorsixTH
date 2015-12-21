@@ -23,6 +23,9 @@ local math_floor = math.floor
 --! Staff management screen
 class "UIStaffManagement" (UIFullscreen)
 
+---@type UIStaffManagement
+local UIStaffManagement = _G["UIStaffManagement"]
+
 function UIStaffManagement:UIStaffManagement(ui, disease_selection)
   self:UIFullscreen(ui)
   local gfx = ui.app.gfx
@@ -428,14 +431,13 @@ function UIStaffManagement:onMouseDown(code, x, y)
   return UIFullscreen.onMouseDown(self, code, x, y)
 end
 
-function UIStaffManagement:onMouseUp(code, x, y)
-  if not UIFullscreen.onMouseUp(self, code, x, y) then
-    if self:hitTest(x, y) then
-      if code == 4 then
-        -- Mouse wheel, scroll.
+function UIStaffManagement:onMouseWheel(x, y)
+  if not UIFullscreen.onMouseWheel(self, x, y) then
+    if self:hitTest(self.cursor_x, self.cursor_y) then
+      if y > 0 then
         self:scrollUp()
         return true
-      elseif code == 5 then
+      else
         self:scrollDown()
         return true
       end
@@ -495,7 +497,7 @@ function UIStaffManagement:scrollUp()
   if self.scroll_dot.visible and self.page > 1 then
     self.selected_staff = nil
     self.page = self.page - 1
-    self.scroll_dot.y = 168 + 83*((self.page - 1)/math.floor((#self.staff_members[self.category]-1)/10))
+    self.scroll_dot.y = 168 + math_floor(83*((self.page - 1)/(#self.staff_members[self.category]-1)/10))
   end
   self:updateTooltips()
 end
@@ -504,7 +506,7 @@ function UIStaffManagement:scrollDown()
   if self.scroll_dot.visible and self.page*10 < #self.staff_members[self.category] then
     self.selected_staff = nil
     self.page = self.page + 1
-    self.scroll_dot.y = 168 + 83*((self.page - 1)/math.floor((#self.staff_members[self.category]-1)/10))
+    self.scroll_dot.y = 168 + math_floor(83*((self.page - 1)/(#self.staff_members[self.category]-1)/10))
   end
   self:updateTooltips()
 end

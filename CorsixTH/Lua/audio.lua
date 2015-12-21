@@ -29,6 +29,9 @@ local ipairs
 --! Layer which handles the Lua-facing side of loading and playing audio.
 class "Audio"
 
+---@type Audio
+local Audio = _G["Audio"]
+
 function Audio:Audio(app)
   self.app = app
 
@@ -163,9 +166,6 @@ function Audio:init()
     print "Notice: Audio system loaded, but found no background tracks"
     self.has_bg_music = false
   else
-    table.sort(self.background_playlist, function(left, right)
-      return left.title:upper() < right.title:upper()
-    end)
     self.has_bg_music = true
   end
 
@@ -232,14 +232,14 @@ function Audio:initSpeech(speech_file)
       self.sound_fx = TH.soundEffects()
       self.sound_fx:setSoundArchive(self.sound_archive)
       local w, h = self.app.config.width / 2, self.app.config.height / 2
-      self.sound_fx:setCamera(w, h, (w^2 + h^2)^0.5)
+      self.sound_fx:setCamera(math.floor(w), math.floor(h), math.floor((w^2 + h^2)^0.5))
       --self:dumpSoundArchive[[E:\CPP\2K8\CorsixTH\DataRaw\Sound\]]
     end
   end
 end
 
 function Audio:dumpSoundArchive(out_dir)
-  local info,warning = io.open(out_dir .. "info.csv", "wt")
+  local info,warning = io.open(out_dir .. "info.csv", "w")
 
   if info == nil then
     print("Error: Audio dump failed because info.csv couldn't be created and/or opened in the dump directory:" .. out_dir)
@@ -618,7 +618,7 @@ function Audio:playBackgroundTrack(index)
 end
 
 function Audio:onMusicOver()
-  if self.not_loaded or #self.background_playlist == 0 then
+  if self.not_loaded or #self.background_playlist == 0 or self.background_music == nil then
     return
   end
   self:playNextBackgroundTrack()
