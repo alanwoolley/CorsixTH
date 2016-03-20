@@ -55,7 +55,7 @@ struct THStringProxy_t {};
 
 // We need 2 lightuserdata keys for naming the weak tables in the registry,
 // which we get by having 2 bytes of dummy global variables.
-uint8_t g_aStringDummyGlobals[2] = {0};
+static uint8_t g_aStringDummyGlobals[2] = {0};
 
 static inline void aux_push_weak_table(lua_State *L, int iIndex)
 {
@@ -188,7 +188,7 @@ static int l_str_index(lua_State *L)
     {
         size_t iLen;
         const char* sKey = lua_tolstring(L, 2, &iLen);
-        if(iLen == 8 && strcmp(sKey, "__random") == 0)
+        if(iLen == 8 && std::strcmp(sKey, "__random") == 0)
         {
             aux_push_random_key(L);
             lua_replace(L, 2);

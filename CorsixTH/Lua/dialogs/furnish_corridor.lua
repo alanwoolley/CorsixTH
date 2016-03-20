@@ -60,7 +60,7 @@ function UIFurnishCorridor:UIFurnishCorridor(ui, objects, edit_dialog)
   }
   if objects then
     for _, object in pairs(objects) do
-      self.objects[#self.objects + 1] = {object = object.object, start_qty = object.qty, qty = object.qty, min_qty = object.min_qty} -- Had to make a copy of objects list. Otherwise, we will modify the original variable (Opening dialog twice keeps memory of previously choosen quantities)
+      self.objects[#self.objects + 1] = {object = object.object, start_qty = object.qty, qty = object.qty, min_qty = object.min_qty} -- Had to make a copy of objects list. Otherwise, we will modify the original variable (Opening dialog twice keeps memory of previously chosen quantities)
     end
   else
     for _, object in ipairs(app.objects) do
@@ -95,11 +95,11 @@ function UIFurnishCorridor:UIFurnishCorridor(ui, objects, edit_dialog)
       if self:purchaseItem(index, qty) == 0 and not is_negative_quantity then
         -- give visual warning that player doesn't have enough $ to buy
         self.ui.adviser:say(_A.warnings.cannot_afford_2, false, true)
-        self.ui:playSound "wrong2.wav"
+        self.ui:playSound("wrong2.wav")
       elseif qty > 0 then
-        self.ui:playSound "AddItemJ.wav"
+        self.ui:playSound("AddItemJ.wav")
       else
-        self.ui:playSound "DelItemJ.wav"
+        self.ui:playSound("DelItemJ.wav")
       end
     end
   end

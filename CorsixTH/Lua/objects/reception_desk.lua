@@ -138,6 +138,8 @@ function ReceptionDesk:tick()
   return Object.tick(self)
 end
 
+--! Reception desk looks for a receptionist.
+--!return (boolean) Desk has a receptionist attached to it (may still be on her way to the desk).
 function ReceptionDesk:checkForNearbyStaff()
   if self.receptionist or self.reserved_for then
     -- Already got staff, or a staff member is on the way
@@ -202,7 +204,6 @@ function ReceptionDesk:onDestroy()
     end)
   end
   self.queue:rerouteAllPatients({name = "seek_reception"})
-  self.world:getLocalPlayerHospital().reception_desks[self] = nil
 
   self.being_destroyed = nil
   return Object.onDestroy(self)

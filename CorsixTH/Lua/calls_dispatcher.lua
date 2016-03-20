@@ -25,7 +25,7 @@ local CallsDispatcher = _G["CallsDispatcher"]
 
 local debug = false -- Turn on for debug message
 
-function CallsDispatcher:CallsDispatcher(world, entities)
+function CallsDispatcher:CallsDispatcher(world)
   self.world = world
   self.call_queue = {}
   self.change_callback = {}
@@ -121,7 +121,7 @@ function CallsDispatcher:callForRepair(object, urgent, manual, lock_room)
     local sound = room.room_info.handyman_call_sound
     if sound then
       ui:playAnnouncement(sound)
-      ui:playSound "machwarn.wav"
+      ui:playSound("machwarn.wav")
     end
     message = _A.warnings.machines_falling_apart
   end
@@ -165,9 +165,8 @@ function CallsDispatcher:callNurseForVaccination(patient)
   local call = {
     object = patient,
     key = "vaccinate",
-    description = "Vaccinating patient at: "
-                   .. tostring(patient.tile_x) .. ","
-                   .. tostring(patient.tile_y),
+    description = "Vaccinating patient at: " ..
+        tostring(patient.tile_x) .. "," .. tostring(patient.tile_y),
     verification = --[[persistable:call_dispatcher_vaccinate_verification]] function(staff)
       return CallsDispatcher.verifyStaffForVaccination(patient, staff)
     end,
@@ -395,23 +394,26 @@ function CallsDispatcher.dumpCall(call, message)
   else
     message = ''
   end
+
+  local call_obj = call.object
+
   local position = 'nowhere'
-  if call.object.tile_x then
-    position = call.object.tile_x ..','..call.object.tile_y
+  if call_obj.tile_x then
+    position = call_obj.tile_x .. ',' .. call_obj.tile_y
   end
-  if call.object.x then
-    position = call.object.x ..','..call.object.y
+  if call_obj.x then
+    position = call_obj.x .. ',' .. call_obj.y
   end
-  if(class.is(call.object,Humanoid)) then
+  if(class.is(call_obj,Humanoid)) then
     print(call.key .. '@' .. position .. message)
   else
-  print((call.object.room_info and call.object.room_info.id or call.object.object_type.id) .. '-' .. call.key ..
-    '@' .. position .. message)
+    print((call_obj.room_info and call_obj.room_info.id or call_obj.object_type.id) ..
+        '-' .. call.key .. '@' .. position .. message)
   end
 end
 
 -- Add checkpoint action
--- All call execution method should add this action in apporiate place to signify
+-- All call execution method should add this action in appropriate place to signify
 --   the job is finished.
 -- A interrupt handler could be supplied if special handling is needed.
 -- If not, the default would be reinsert the call into the queue
@@ -433,7 +435,7 @@ function CallsDispatcher.actionInterruptHandler(action, humanoid)
   end
 end
 
--- Called when a call is completed sucessfully
+--! Called when a call is completed successfully.
 function CallsDispatcher.onCheckpointCompleted(call)
   if not call.dropped and call.assigned then
     if debug then CallsDispatcher.dumpCall(call, "completed") end
@@ -554,10 +556,16 @@ function CallsDispatcher.staffActionInterruptHandler(action, humanoid, high_prio
   end
 end
 
+--! 'execute' callback for repairing an object (eg a machine).
+--!param object Object to repair.
+--!param handyman Staff to use.
 function CallsDispatcher.sendStaffToRepair(object, handyman)
   object:createHandymanActions(handyman)
 end
 
+--! 'execute' callback for watering a plant.
+--!param plant Plant to give water.
+--!param handyman Staff to use.
 function CallsDispatcher.sendStaffToWatering(plant, handyman)
   plant:createHandymanActions(handyman)
 end

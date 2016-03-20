@@ -47,7 +47,7 @@ public:
         @param iHeight Pixel height of the resulting image
     */
     FullColourRenderer(int iWidth, int iHeight);
-    virtual ~FullColourRenderer();
+    virtual ~FullColourRenderer() = default;
 
     //! Decode a 32bpp image, and push it to the storage backend.
     /*!
@@ -58,7 +58,7 @@ public:
     */
     bool decodeImage(const uint8_t* pImg, const THPalette *pPalette, uint32_t iSpriteFlags);
 
-protected:
+private:
     //! Store a decoded pixel. Use m_iX and m_iY if necessary.
     /*!
         @param pixel Pixel to store.
@@ -70,7 +70,6 @@ protected:
     int m_iX;
     int m_iY;
 
-private:
     //! Push a pixel to the storage.
     /*!
         @param iValue Pixel value to store.
@@ -99,10 +98,9 @@ class FullColourStoring : public FullColourRenderer
 public:
     FullColourStoring(uint32_t *pDest, int iWidth, int iHeight);
 
-protected:
-    virtual void storeARGB(uint32_t pixel);
+private:
+    void storeARGB(uint32_t pixel) override;
 
-protected:
     //! Pointer to the storage (not owned by this class).
     uint32_t *m_pDest;
 };
@@ -112,10 +110,9 @@ class WxStoring : public FullColourRenderer
 public:
     WxStoring(uint8_t* pRGBData, uint8_t* pAData, int iWidth, int iHeight);
 
-protected:
-    virtual void storeARGB(uint32_t pixel);
+private:
+    void storeARGB(uint32_t pixel) override;
 
-protected:
     //! Pointer to the RGB storage (not owned by this class).
     uint8_t *m_pRGBData;
 
@@ -213,7 +210,7 @@ public: // Internal (this rendering engine only) API
     //! Should bitmaps be scaled?
     /*!
         @param [out] pFactor If the function returns \c true, the factor to use
-            for scaling (can be \c NULL if not interested in the value).
+            for scaling (can be \c nullptr if not interested in the value).
         @return Whether bitmaps should be scaled.
      */
     bool shouldScaleBitmaps(double* pFactor);
@@ -224,7 +221,7 @@ public: // Internal (this rendering engine only) API
     void draw(SDL_Texture *pTexture, const SDL_Rect *prcSrcRect, const SDL_Rect *prcDstRect, int iFlags);
     void drawLine(THLine *pLine, int iX, int iY);
 
-protected:
+private:
     SDL_Window *m_pWindow;
     SDL_Renderer *m_pRenderer;
     SDL_Texture *m_pZoomTexture;
@@ -356,7 +353,7 @@ public: // Internal (this rendering engine only) API
         m_aColoursARGB[iEntry] = iVal;
     }
 
-protected:
+private:
     //! 32bpp palette colours associated with the 8bpp colour index.
     uint32_t m_aColoursARGB[256];
 
@@ -410,7 +407,7 @@ public:
     void draw(THRenderTarget* pCanvas, int iX, int iY, int iSrcX, int iSrcY,
               int iWidth, int iHeight);
 
-protected:
+private:
     //! Image stored in SDL format for quick rendering.
     SDL_Texture *m_pTexture;
 
@@ -492,8 +489,8 @@ public: // External API
     //! Get size of a sprite.
     /*!
         @param iSprite Sprite to get info from.
-        @param pWidth [out] If not NULL, the sprite width is stored in the destination.
-        @param pHeight [out] If not NULL, the sprite height is stored in the destination.
+        @param pWidth [out] If not nullptr, the sprite width is stored in the destination.
+        @param pHeight [out] If not nullptr, the sprite height is stored in the destination.
         @return Size could be provided for the sprite.
     */
     bool getSpriteSize(size_t iSprite, unsigned int* pWidth, unsigned int* pHeight) const;
@@ -543,7 +540,7 @@ public: // Internal (this rendering engine only) API
     */
     void wxDrawSprite(size_t iSprite, uint8_t* pRGBData, uint8_t* pAData);
 
-protected:
+private:
     friend class THCursor;
 #if CORSIX_TH_USE_PACK_PRAGMAS
 #pragma pack(push)
@@ -630,7 +627,7 @@ public:
     static bool setPosition(THRenderTarget* pTarget, int iX, int iY);
 
     void draw(THRenderTarget* pCanvas, int iX, int iY);
-protected:
+private:
     SDL_Surface* m_pBitmap;
     SDL_Cursor* m_pCursorHidden;
     int m_iHotspotX;
@@ -657,7 +654,7 @@ public:
     void persist(LuaPersistWriter *pWriter) const;
     void depersist(LuaPersistReader *pReader);
 
-protected:
+private:
     friend class THRenderTarget;
     void initialize();
 
@@ -671,7 +668,7 @@ protected:
         THLineOpType type;
         double m_fX, m_fY;
         THLineOperation(THLineOpType type, double m_fX, double m_fY) : type(type), m_fX(m_fX), m_fY(m_fY) {
-            m_pNext = NULL;
+            m_pNext = nullptr;
         }
     };
 

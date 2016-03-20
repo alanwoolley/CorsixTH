@@ -23,15 +23,11 @@ SOFTWARE.
 #include "config.h"
 #include "lua_sdl.h"
 #include "th_lua.h"
-#include "th_movie.h"
 #include "SDL2_framerate.h"
-#include <string.h>
 #include "../logging.h"
-#ifndef _MSC_VER
-#define stricmp strcasecmp
-#else
-#pragma warning (disable: 4996) // CRT deprecation
-#endif
+#include <cstring>
+#include <cstdio>
+#include <vector>
 
 // Frame Limiter
 int fps = 0;
@@ -44,25 +40,24 @@ static int l_init(lua_State *L) {
     for(i = 1; i <= argc; ++i)
     {
         const char* s = luaL_checkstring(L, i);
-        if(stricmp(s, "video") == 0)
+        if(std::strcmp(s, "video") == 0)
             flags |= SDL_INIT_VIDEO;
-        else if(stricmp(s, "audio") == 0)
+        else if(std::strcmp(s, "audio") == 0)
             flags |= SDL_INIT_AUDIO;
-        else if(stricmp(s, "timer") == 0)
+        else if(std::strcmp(s, "timer") == 0)
             flags |= SDL_INIT_TIMER;
-        else if(stricmp(s, "*") == 0)
+        else if(std::strcmp(s, "*") == 0)
             flags |= SDL_INIT_EVERYTHING;
         else
             luaL_argerror(L, i, "Expected SDL part name");
     }
     if(SDL_Init(flags) != 0)
     {
-        fprintf(stderr, "SDL_Init failed: %s\n", SDL_GetError());
+        std::fprintf(stderr, "SDL_Init failed: %s\n", SDL_GetError());
         lua_pushboolean(L, 0);
         return 1;
     }
 
-    luaT_addcleanup(L, SDL_Quit);
     lua_pushboolean(L, 1);
     return 1;
 }
@@ -134,6 +129,10 @@ static void l_push_modifiers_table(lua_State *L, Uint16 mod)
     {
         luaT_pushtablebool(L, "gui", true);
     }
+    if ((mod & KMOD_NUM) != 0)
+    {
+        luaT_pushtablebool(L, "numlockactive", true);
+    }
 }
 
 static int l_get_key_modifiers(lua_State *L)
@@ -175,7 +174,7 @@ static int l_mainloop(lua_State *L) {
     lua_State *dispatcher = lua_tothread(L, 1);
 
     fps_ctrl *fps_control = (fps_ctrl*)lua_touserdata(L, luaT_upvalueindex(1));
-    SDL_TimerID timer = SDL_AddTimer(30, timer_frame_callback, NULL);
+    SDL_TimerID timer = SDL_AddTimer(30, timer_frame_callback, nullptr);
     SDL_Event e;
 
 	SDL_initFramerate(&fps_manager);
@@ -369,12 +368,6 @@ static int l_mainloop(lua_State *L) {
 
 			}
 				break;
-			case SDL_USEREVENT_FF_REFRESH: {
-			    SDL_Log("Updating");
-			    ff_refresh* refresh  = (ff_refresh*) e.user.data1;
-			    SDL_UpdateTexture(refresh->texture, NULL, refresh->buffer, refresh->width);
-			    }
-			    break;
 			case SDL_USEREVENT_SHOWCHEATS:
 			    lua_pushliteral(dispatcher, "showcheats");
 			    nargs = 1;
@@ -383,8 +376,8 @@ static int l_mainloop(lua_State *L) {
                 lua_pushliteral(dispatcher, "showjukebox");
                 nargs = 1;
                 break;
-            case SDL_USEREVENT_CPCALL:
-                if(luaT_cpcall(L, (lua_CFunction)e.user.data1, e.user.data2))
+            case SDL_USEREVENT_MUSIC_LOADED:
+                if(luaT_cpcall(L, (lua_CFunction)l_load_music_async_callback, e.user.data1))
                 {
                     SDL_RemoveTimer(timer);
                     lua_pushliteral(L, "callback");
@@ -449,12 +442,13 @@ static int l_mainloop(lua_State *L) {
 					SDL_framerateDelay(&fps_manager);
 				}
 
-            } while(fps_control->limit_fps == false && SDL_PollEvent(NULL) == 0);
+            } while(fps_control->limit_fps == false && SDL_PollEvent(nullptr) == 0);
 		} else {
 			// Perform delay
 			if (fps != 0) {
 				SDL_framerateDelay(&fps_manager);
 			}
+
         }
 
         // No events pending - a good time to do a bit of garbage collection
@@ -507,19 +501,26 @@ static int l_get_ticks(lua_State *L)
     return 1;
 }
 
-static const struct luaL_Reg sdllib[] = {
+static const std::vector<luaL_Reg> sdllib = {
     {"init", l_init},
     {"getTicks", l_get_ticks},
     {"getKeyModifiers", l_get_key_modifiers},
-    {NULL, NULL}
+    {nullptr, nullptr}
 };
-static const struct luaL_Reg sdllib_with_upvalue[] = {
+static const std::vector<luaL_Reg> sdllib_with_upvalue = {
     {"mainloop", l_mainloop},
     {"getFPS", l_get_fps},
     {"trackFPS", l_track_fps},
     {"limitFPS", l_limit_fps},
-    {NULL, NULL}
+    {nullptr, nullptr}
 };
+
+inline void load_extra(lua_State *L, const char *name, lua_CFunction fn)
+{
+    luaT_pushcfunction(L, fn);
+    lua_call(L, 0, 1);
+    lua_setfield(L, -2, name);
+}
 
 int luaopen_sdl_audio(lua_State *L);
 int luaopen_sdl_wm(lua_State *L);
@@ -529,23 +530,15 @@ int luaopen_sdl(lua_State *L)
     fps_ctrl* ctrl = (fps_ctrl*)lua_newuserdata(L, sizeof(fps_ctrl));
     ctrl->init();
     luaT_register(L, "sdl", sdllib);
-    const luaL_Reg *pUpvaluedFunctions = sdllib_with_upvalue;
-    for(; pUpvaluedFunctions->name; ++pUpvaluedFunctions)
+    for (auto reg = sdllib_with_upvalue.begin(); reg->name; ++reg)
     {
         lua_pushvalue(L, -2);
-        luaT_pushcclosure(L, pUpvaluedFunctions->func, 1);
-        lua_setfield(L, -2, pUpvaluedFunctions->name);
+        luaT_pushcclosure(L, reg->func, 1);
+        lua_setfield(L, -2, reg->name);
     }
 
-#define LOAD_EXTRA(name, fn) \
-    luaT_pushcfunction(L, fn); \
-    lua_call(L, 0, 1); \
-    lua_setfield(L, -2, name)
-
-    LOAD_EXTRA("audio", luaopen_sdl_audio);
-    LOAD_EXTRA("wm", luaopen_sdl_wm);
-
-#undef LOAD_EXTRA
+    load_extra(L, "audio", luaopen_sdl_audio);
+    load_extra(L, "wm", luaopen_sdl_wm);
 
     return 1;
 }

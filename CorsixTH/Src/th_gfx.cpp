@@ -27,7 +27,7 @@ SOFTWARE.
 #include "th_sound.h"
 #include <new>
 #include <algorithm>
-#include <memory.h>
+#include <cstring>
 #include <climits>
 #include <cassert>
 
@@ -150,7 +150,7 @@ THAnimationManager::THAnimationManager()
     m_vElements.clear();
     m_vCustomSheets.clear();
 
-    m_pSpriteSheet = NULL;
+    m_pSpriteSheet = nullptr;
 
     m_iAnimationCount = 0;
     m_iFrameCount = 0;
@@ -267,7 +267,7 @@ bool THAnimationManager::loadFromTHFile(
         if (oElement.iSprite < iSpriteCount) {
             oElement.pSpriteSheet = m_pSpriteSheet;
         } else {
-            oElement.pSpriteSheet = NULL;
+            oElement.pSpriteSheet = nullptr;
         }
 
         m_vElements.push_back(oElement);
@@ -328,7 +328,7 @@ void THAnimationManager::setBoundingBox(frame_t &oFrame)
             break;
 
         element_t& oElement = m_vElements[iElement];
-        if(oElement.pSpriteSheet == NULL)
+        if(oElement.pSpriteSheet == nullptr)
             continue;
 
         unsigned int iWidth, iHeight;
@@ -394,7 +394,7 @@ size_t THAnimationManager::loadElements(Input &input, THSpriteSheet *pSpriteShee
         oElement.iLayer = iLayerClass;
         oElement.iLayerId = iLayerId;
         if (oElement.iSprite >= iSpriteCount)
-            oElement.pSpriteSheet = NULL;
+            oElement.pSpriteSheet = nullptr;
         else
             oElement.pSpriteSheet = pSpriteSheet;
 
@@ -632,7 +632,7 @@ bool THAnimationManager::loadCustomAnimations(const uint8_t* pData, size_t iData
 
             // Load data.
             uint8_t *pData = new (std::nothrow) uint8_t[iSize];
-            if (pData == NULL)
+            if (pData == nullptr)
                 return false;
             if (!input.Available(iSize))
                 return false;
@@ -732,7 +732,7 @@ void THAnimationManager::setAnimationAltPaletteMap(size_t iAnimation, const uint
                 break;
 
             element_t& oElement = m_vElements[iElement];
-            if (oElement.pSpriteSheet != NULL)
+            if (oElement.pSpriteSheet != nullptr)
                 oElement.pSpriteSheet->setSpriteAltPaletteMap(oElement.iSprite, pMap, iAlt32);
         }
         iFrame = m_vFrames[iFrame].iNextFrame;
@@ -814,7 +814,7 @@ bool THAnimationManager::hitTest(size_t iFrame, const THLayers_t& oLayers,
 
         const element_t &oElement = m_vElements[iElement];
         if((oElement.iLayerId != 0 && oLayers.iLayerContents[oElement.iLayer] != oElement.iLayerId)
-         || oElement.pSpriteSheet == NULL)
+         || oElement.pSpriteSheet == nullptr)
         {
             continue;
         }
@@ -859,7 +859,7 @@ void THAnimationManager::drawFrame(THRenderTarget* pCanvas, size_t iFrame,
             break;
 
         const element_t &oElement = m_vElements[iElement];
-        if (oElement.pSpriteSheet == NULL)
+        if (oElement.pSpriteSheet == nullptr)
             continue;
 
         if(oElement.iLayerId != 0 && oLayers.iLayerContents[oElement.iLayer] != oElement.iLayerId)
@@ -921,7 +921,7 @@ void THAnimationManager::getFrameExtent(size_t iFrame, const THLayers_t& oLayers
 
             const element_t &oElement = m_vElements[iElement];
             if((oElement.iLayerId != 0 && oLayers.iLayerContents[oElement.iLayer] != oElement.iLayerId)
-                || oElement.pSpriteSheet == NULL)
+                || oElement.pSpriteSheet == nullptr)
             {
                 continue;
             }
@@ -997,7 +997,7 @@ void THChunkRenderer::chunkFill(int npixels, uint8_t value)
     _fixNpixels(npixels);
     if(npixels > 0)
     {
-        memset(m_ptr, value, npixels);
+        std::memset(m_ptr, value, npixels);
         _incrementPosition(npixels);
     }
 }
@@ -1007,7 +1007,7 @@ void THChunkRenderer::chunkCopy(int npixels, const uint8_t* data)
     _fixNpixels(npixels);
     if(npixels > 0)
     {
-        memcpy(m_ptr, data, npixels);
+        std::memcpy(m_ptr, data, npixels);
         _incrementPosition(npixels);
     }
 }
@@ -1220,7 +1220,7 @@ void THAnimation::drawMorph(THRenderTarget* pCanvas, int iDestX, int iDestY)
     m_pManager->drawFrame(pCanvas, m_iFrame, m_oLayers, iDestX, iDestY,
                           m_iFlags);
     CalculateMorphRect(oClipRect, oMorphRect, iDestY + m_pMorphTarget->m_iY,
-                       iDestY + m_pMorphTarget->m_iSpeedX);
+                       iDestY + m_pMorphTarget->speed.x);
     pCanvas->setClipRect(&oMorphRect);
     m_pManager->drawFrame(pCanvas, m_pMorphTarget->m_iFrame,
                           m_pMorphTarget->m_oLayers, iDestX,
@@ -1233,7 +1233,7 @@ bool THAnimation::hitTest(int iDestX, int iDestY, int iTestX, int iTestY)
 {
     if(AreFlagsSet(m_iFlags, THDF_Alpha50 | THDF_Alpha75))
         return false;
-    if(m_pManager == NULL)
+    if(m_pManager == nullptr)
         return false;
     return m_pManager->hitTest(m_iFrame, m_oLayers, m_iX + iDestX,
         m_iY + iDestY, m_iFlags, iTestX, iTestY);
@@ -1243,7 +1243,7 @@ bool THAnimation::hitTestMorph(int iDestX, int iDestY, int iTestX, int iTestY)
 {
     if(AreFlagsSet(m_iFlags, THDF_Alpha50 | THDF_Alpha75))
         return false;
-    if(m_pManager == NULL)
+    if(m_pManager == nullptr)
         return false;
     return m_pManager->hitTest(m_iFrame, m_oLayers, m_iX + iDestX,
         m_iY + iDestY, m_iFlags, iTestX, iTestY) || m_pMorphTarget->hitTest(
@@ -1305,19 +1305,18 @@ THAnimationBase::THAnimationBase()
     m_iFlags = 0;
 }
 
-THAnimation::THAnimation()
+THAnimation::THAnimation():
+    m_pManager(nullptr),
+    m_pMorphTarget(nullptr),
+    m_iAnimation(0),
+    m_iFrame(0),
+    speed({0,0}),
+    m_iSoundToPlay(0),
+    m_iCropColumn(0)
 {
     m_fnDraw = THAnimation_Draw;
     m_fnHitTest = THAnimation_HitTest;
     m_fnIsMultipleFrameAnimation = THAnimation_isMultipleFrameAnimation;
-    m_pManager = NULL;
-    m_pMorphTarget = NULL;
-    m_iAnimation = 0;
-    m_iFrame = 0;
-    m_iCropColumn = 0;
-    m_iSpeedX = 0;
-    m_iSpeedY = 0;
-    m_iSoundToPlay = 0;
 }
 
 void THAnimation::persist(LuaPersistWriter *pWriter) const
@@ -1369,8 +1368,8 @@ void THAnimation::persist(LuaPersistWriter *pWriter) const
     // Write the unioned fields
     if(m_fnDraw != THAnimation_DrawChild)
     {
-        pWriter->writeVInt(m_iSpeedX);
-        pWriter->writeVInt(m_iSpeedY);
+        pWriter->writeVInt(speed.x);
+        pWriter->writeVInt(speed.y);
     }
     else
     {
@@ -1465,9 +1464,9 @@ void THAnimation::depersist(LuaPersistReader *pReader)
         // Read the unioned fields
         if(m_fnDraw != THAnimation_DrawChild)
         {
-            if(!pReader->readVInt(m_iSpeedX))
+            if(!pReader->readVInt(speed.x))
                 break;
-            if(!pReader->readVInt(m_iSpeedY))
+            if(!pReader->readVInt(speed.y))
                 break;
         }
         else
@@ -1479,7 +1478,7 @@ void THAnimation::depersist(LuaPersistReader *pReader)
         }
 
         // Read the layers
-        memset(m_oLayers.iLayerContents, 0, sizeof(m_oLayers.iLayerContents));
+        std::memset(m_oLayers.iLayerContents, 0, sizeof(m_oLayers.iLayerContents));
         int iNumLayers;
         if(!pReader->readVUInt(iNumLayers))
             break;
@@ -1487,7 +1486,7 @@ void THAnimation::depersist(LuaPersistReader *pReader)
         {
             if(!pReader->readByteStream(m_oLayers.iLayerContents, 13))
                 break;
-            if(!pReader->readByteStream(NULL, iNumLayers - 13))
+            if(!pReader->readByteStream(nullptr, iNumLayers - 13))
                 break;
         }
         else
@@ -1512,12 +1511,12 @@ void THAnimation::tick()
     m_iFrame = m_pManager->getNextFrame(m_iFrame);
     if(m_fnDraw != THAnimation_DrawChild)
     {
-        m_iX += m_iSpeedX;
-        m_iY += m_iSpeedY;
+        m_iX += speed.x;
+        m_iY += speed.y;
     }
     if(m_pMorphTarget)
     {
-        m_pMorphTarget->m_iY += m_pMorphTarget->m_iSpeedY;
+        m_pMorphTarget->m_iY += m_pMorphTarget->speed.y;
         if(m_pMorphTarget->m_iY < m_pMorphTarget->m_iX)
             m_pMorphTarget->m_iY = m_pMorphTarget->m_iX;
     }
@@ -1553,14 +1552,14 @@ void THAnimationBase::attachToTile(THMapNode *pMapNode, int layer)
 #undef GetFlags
 
     m_pPrev = pList;
-    if(pList->m_pNext != NULL)
+    if(pList->m_pNext != nullptr)
     {
         pList->m_pNext->m_pPrev = this;
         this->m_pNext = pList->m_pNext;
     }
     else
     {
-        m_pNext = NULL;
+        m_pNext = nullptr;
     }
     pList->m_pNext = this;
 }
@@ -1568,12 +1567,11 @@ void THAnimationBase::attachToTile(THMapNode *pMapNode, int layer)
 void THAnimation::setParent(THAnimation *pParent)
 {
     removeFromTile();
-    if(pParent == NULL)
+    if(pParent == nullptr)
     {
         m_fnDraw = THAnimation_Draw;
         m_fnHitTest = THAnimation_HitTest;
-        m_iSpeedX = 0;
-        m_iSpeedY = 0;
+        speed = { 0, 0 };
     }
     else
     {
@@ -1595,7 +1593,7 @@ void THAnimation::setAnimation(THAnimationManager* pManager, size_t iAnimation)
     m_iFrame = pManager->getFirstFrame(iAnimation);
     if(m_pMorphTarget)
     {
-        m_pMorphTarget = NULL;
+        m_pMorphTarget = nullptr;
         m_fnDraw = THAnimation_Draw;
         m_fnHitTest = THAnimation_HitTest;
     }
@@ -1637,7 +1635,7 @@ static int GetAnimationDurationAndExtent(THAnimationManager *pManager,
     {
         int iFrameMinY;
         int iFrameMaxY;
-        pManager->getFrameExtent(iCurFrame, oLayers, NULL, NULL, &iFrameMinY, &iFrameMaxY, iFlags);
+        pManager->getFrameExtent(iCurFrame, oLayers, nullptr, nullptr, &iFrameMinY, &iFrameMaxY, iFlags);
         if(iFrameMinY < iMinY)
             iMinY = iFrameMinY;
         if(iFrameMaxY > iMaxY)
@@ -1696,13 +1694,13 @@ void THAnimation::setMorphTarget(THAnimation *pMorphTarget, unsigned int iDurati
         m_pMorphTarget->m_iX = iMorphMinY;
 
     if(iOrigMaxY > iMorphMaxY)
-        m_pMorphTarget->m_iSpeedX = iOrigMaxY;
+        m_pMorphTarget->speed.x = iOrigMaxY;
     else
-        m_pMorphTarget->m_iSpeedX = iMorphMaxY;
+        m_pMorphTarget->speed.x = iMorphMaxY;
 
-    int iDist = m_pMorphTarget->m_iX - m_pMorphTarget->m_iSpeedX;
-    m_pMorphTarget->m_iSpeedY = (iDist - iMorphDuration + 1) / iMorphDuration;
-    m_pMorphTarget->m_iY = m_pMorphTarget->m_iSpeedX;
+    int iDist = m_pMorphTarget->m_iX - m_pMorphTarget->speed.x;
+    m_pMorphTarget->speed.y = (iDist - iMorphDuration + 1) / iMorphDuration;
+    m_pMorphTarget->m_iY = m_pMorphTarget->speed.x;
 }
 
 void THAnimation::setFrame(size_t iFrame)
@@ -1743,8 +1741,8 @@ THSpriteRenderList::THSpriteRenderList()
     m_fnIsMultipleFrameAnimation = THSpriteRenderList_isMultipleFrameAnimation;
     m_iBufferSize = 0;
     m_iNumSprites = 0;
-    m_pSpriteSheet = NULL;
-    m_pSprites = NULL;
+    m_pSpriteSheet = nullptr;
+    m_pSprites = nullptr;
     m_iSpeedX = 0;
     m_iSpeedY = 0;
     m_iLifetime = -1;
@@ -1887,7 +1885,7 @@ void THSpriteRenderList::depersist(LuaPersistReader *pReader)
     }
 
     // Read the layers
-    memset(m_oLayers.iLayerContents, 0, sizeof(m_oLayers.iLayerContents));
+    std::memset(m_oLayers.iLayerContents, 0, sizeof(m_oLayers.iLayerContents));
     int iNumLayers;
     if(!pReader->readVUInt(iNumLayers))
         return;
@@ -1895,7 +1893,7 @@ void THSpriteRenderList::depersist(LuaPersistReader *pReader)
     {
         if(!pReader->readByteStream(m_oLayers.iLayerContents, 13))
             return;
-        if(!pReader->readByteStream(NULL, iNumLayers - 13))
+        if(!pReader->readByteStream(nullptr, iNumLayers - 13))
             return;
     }
     else

@@ -35,10 +35,10 @@ BasePathing::BasePathing(THPathfinder *pf) : m_pPf(pf)
 node_t *BasePathing::pathingInit(const THMap *pMap, int iStartX, int iStartY)
 {
     int iWidth = pMap->getWidth();
-    m_pPf->m_pDestination = NULL;
+    m_pPf->m_pDestination = nullptr;
     m_pPf->_allocNodeCache(iWidth, pMap->getHeight());
     node_t *pNode = m_pPf->m_pNodes + iStartY * iWidth + iStartX;
-    pNode->prev = NULL;
+    pNode->prev = nullptr;
     pNode->distance = 0;
     pNode->guess = makeGuess(pNode);
     m_pPf->m_ppDirtyList[0] = pNode;
@@ -51,26 +51,26 @@ node_t *BasePathing::pathingInit(const THMap *pMap, int iStartX, int iStartY)
     flags are set as to prevent travelling off the map (as well as to
     prevent walking through walls).
  */
-bool BasePathing::pathingNeighbours(node_t *pNode, uint32_t iFlags, int iWidth)
+bool BasePathing::pathingNeighbours(node_t *pNode, th_map_node_flags flags, int iWidth)
 {
-    if(iFlags & THMN_CanTravelW)
-        if(tryNode(pNode, iFlags, pNode - 1, THTD_West)) return true;
+    if(flags.can_travel_w)
+        if(tryNode(pNode, flags, pNode - 1, THTD_West)) return true;
 
-    if(iFlags & THMN_CanTravelE)
-        if (tryNode(pNode, iFlags, pNode + 1, THTD_East)) return true;
+    if(flags.can_travel_e)
+        if (tryNode(pNode, flags, pNode + 1, THTD_East)) return true;
 
-    if(iFlags & THMN_CanTravelN)
-        if (tryNode(pNode, iFlags, pNode - iWidth, THTD_North)) return true;
+    if(flags.can_travel_n)
+        if (tryNode(pNode, flags, pNode - iWidth, THTD_North)) return true;
 
-    if(iFlags & THMN_CanTravelS)
-        if (tryNode(pNode, iFlags, pNode + iWidth, THTD_South)) return true;
+    if(flags.can_travel_s)
+        if (tryNode(pNode, flags, pNode + iWidth, THTD_South)) return true;
 
     return false;
 }
 
-void BasePathing::pathingTryNode(node_t *pNode, uint32_t iNFlags, uint32_t iPassable, node_t *pNeighbour)
+void BasePathing::pathingTryNode(node_t *pNode, th_map_node_flags neighbour_flags, bool passable, node_t *pNeighbour)
 {
-    if(iNFlags & THMN_Passable || iPassable == 0)
+    if(neighbour_flags.passable || !passable)
     {
         if(pNeighbour->prev == pNeighbour)
         {
@@ -97,23 +97,22 @@ int PathFinder::makeGuess(node_t *pNode)
     return abs(pNode->x - m_iEndX) + abs(pNode->y - m_iEndY);
 }
 
-bool PathFinder::tryNode(node_t *pNode, uint32_t iFlags,
+bool PathFinder::tryNode(node_t *pNode, th_map_node_flags flags,
                          node_t *pNeighbour, int direction)
 {
-    uint32_t iPassable = iFlags & THMN_Passable;
-    uint32_t iNFlags = m_pMap->getNodeUnchecked(pNeighbour->x, pNeighbour->y)->iFlags;
-    pathingTryNode(pNode, iNFlags, iPassable, pNeighbour);
+    th_map_node_flags neighbour_flags = m_pMap->getNodeUnchecked(pNeighbour->x, pNeighbour->y)->flags;
+    pathingTryNode(pNode, neighbour_flags, flags.passable, pNeighbour);
     return false;
 }
 
 bool PathFinder::findPath(const THMap *pMap, int iStartX, int iStartY, int iEndX, int iEndY)
 {
-    if(pMap == NULL)
+    if(pMap == nullptr)
         pMap = m_pPf->m_pDefaultMap;
-    if(pMap == NULL || pMap->getNode(iEndX, iEndY) == NULL
-        || (pMap->getNodeUnchecked(iEndX, iEndY)->iFlags & THMN_Passable) == 0)
+    if(pMap == nullptr || pMap->getNode(iEndX, iEndY) == nullptr
+        || !pMap->getNodeUnchecked(iEndX, iEndY)->flags.passable)
     {
-        m_pPf->m_pDestination = NULL;
+        m_pPf->m_pDestination = nullptr;
         return false;
     }
 
@@ -133,12 +132,12 @@ bool PathFinder::findPath(const THMap *pMap, int iStartX, int iStartY, int iEndX
             return true;
         }
 
-        uint32_t iFlags = pMap->getNodeUnchecked(pNode->x, pNode->y)->iFlags;
-        if (pathingNeighbours(pNode, iFlags, iWidth)) return true;
+        th_map_node_flags flags = pMap->getNodeUnchecked(pNode->x, pNode->y)->flags;
+        if (pathingNeighbours(pNode, flags, iWidth)) return true;
 
         if(m_pPf->m_iOpenCount == 0)
         {
-            m_pPf->m_pDestination = NULL;
+            m_pPf->m_pDestination = nullptr;
             break;
         }
         else
@@ -152,23 +151,22 @@ int HospitalFinder::makeGuess(node_t *pNode)
     return 0;
 }
 
-bool HospitalFinder::tryNode(node_t *pNode, uint32_t iFlags,
+bool HospitalFinder::tryNode(node_t *pNode, th_map_node_flags flags,
                              node_t *pNeighbour, int direction)
 {
-    uint32_t iPassable = iFlags & THMN_Passable;
-    uint32_t iNFlags = m_pMap->getNodeUnchecked(pNeighbour->x, pNeighbour->y)->iFlags;
-    pathingTryNode(pNode, iNFlags, iPassable, pNeighbour);
+    th_map_node_flags neighbour_flags = m_pMap->getNodeUnchecked(pNeighbour->x, pNeighbour->y)->flags;
+    pathingTryNode(pNode, neighbour_flags, flags.passable, pNeighbour);
     return false;
 }
 
 bool HospitalFinder::findPathToHospital(const THMap *pMap, int iStartX, int iStartY)
 {
-    if(pMap == NULL)
+    if(pMap == nullptr)
         pMap = m_pPf->m_pDefaultMap;
-    if(pMap == NULL || pMap->getNode(iStartX, iStartY) == NULL
-        || (pMap->getNodeUnchecked(iStartX, iStartY)->iFlags & THMN_Passable) == 0)
+    if(pMap == nullptr || pMap->getNode(iStartX, iStartY) == nullptr
+        || !pMap->getNodeUnchecked(iStartX, iStartY)->flags.passable)
     {
-        m_pPf->m_pDestination = NULL;
+        m_pPf->m_pDestination = nullptr;
         return false;
     }
 
@@ -179,19 +177,19 @@ bool HospitalFinder::findPathToHospital(const THMap *pMap, int iStartX, int iSta
 
     while(true)
     {
-        uint32_t iFlags = pMap->getNodeUnchecked(pNode->x, pNode->y)->iFlags;
+        th_map_node_flags flags = pMap->getNodeUnchecked(pNode->x, pNode->y)->flags;
 
-        if(iFlags & THMN_Hospital)
+        if(flags.hospital)
         {
             m_pPf->m_pDestination = pNode;
             return true;
         }
 
-        if (pathingNeighbours(pNode, iFlags, iWidth)) return true;
+        if (pathingNeighbours(pNode, flags, iWidth)) return true;
 
         if(m_pPf->m_iOpenCount == 0)
         {
-            m_pPf->m_pDestination = NULL;
+            m_pPf->m_pDestination = nullptr;
             break;
         }
         else
@@ -205,32 +203,31 @@ int IdleTileFinder::makeGuess(node_t *pNode)
     return 0;
 }
 
-bool IdleTileFinder::tryNode(node_t *pNode, uint32_t iFlags,
+bool IdleTileFinder::tryNode(node_t *pNode, th_map_node_flags flags,
                              node_t *pNeighbour, int direction)
 {
-    uint32_t iPassable = iFlags & THMN_Passable;
-    uint32_t iNFlags = m_pMap->getNodeUnchecked(pNeighbour->x, pNeighbour->y)->iFlags;
+    th_map_node_flags neighbour_flags = m_pMap->getNodeUnchecked(pNeighbour->x, pNeighbour->y)->flags;
     /* When finding an idle tile, do not navigate through doors */
     switch(direction)
     {
     case THTD_North:
-        if((iFlags & THMN_DoorNorth) == 0)
-            pathingTryNode(pNode, iNFlags, iPassable, pNeighbour);
+        if(!flags.door_north)
+            pathingTryNode(pNode, neighbour_flags, flags.passable, pNeighbour);
         break;
 
     case THTD_East:
-        if((iNFlags & THMN_DoorWest) == 0)
-            pathingTryNode(pNode, iNFlags, iPassable, pNeighbour);
+        if(!neighbour_flags.door_west)
+            pathingTryNode(pNode, neighbour_flags, flags.passable, pNeighbour);
         break;
 
     case THTD_South:
-        if((iNFlags & THMN_DoorNorth) == 0)
-            pathingTryNode(pNode, iNFlags, iPassable, pNeighbour);
+        if(!neighbour_flags.door_north)
+            pathingTryNode(pNode, neighbour_flags, flags.passable, pNeighbour);
         break;
 
     case THTD_West:
-        if((iFlags & THMN_DoorWest) == 0)
-            pathingTryNode(pNode, iNFlags, iPassable, pNeighbour);
+        if(!flags.door_west)
+            pathingTryNode(pNode, neighbour_flags, flags.passable, pNeighbour);
         break;
     }
 
@@ -240,7 +237,7 @@ bool IdleTileFinder::tryNode(node_t *pNode, uint32_t iFlags,
         int iDX = pNeighbour->x - m_iStartX;
         int iDY = pNeighbour->y - m_iStartY;
         double fDistance = sqrt((double)(iDX * iDX + iDY * iDY));
-        if(m_pBestNext == NULL || fDistance < m_fBestDistance)
+        if(m_pBestNext == nullptr || fDistance < m_fBestDistance)
         {
             m_pBestNext = pNeighbour; m_fBestDistance = fDistance;
         }
@@ -250,11 +247,11 @@ bool IdleTileFinder::tryNode(node_t *pNode, uint32_t iFlags,
 
 bool IdleTileFinder::findIdleTile(const THMap *pMap, int iStartX, int iStartY, int iN)
 {
-    if(pMap == NULL)
+    if(pMap == nullptr)
         pMap = m_pPf->m_pDefaultMap;
-    if(pMap == NULL)
+    if(pMap == nullptr)
     {
-        m_pPf->m_pDestination = NULL;
+        m_pPf->m_pDestination = nullptr;
         return false;
     }
 
@@ -264,14 +261,14 @@ bool IdleTileFinder::findIdleTile(const THMap *pMap, int iStartX, int iStartY, i
 
     node_t *pNode = pathingInit(pMap, iStartX, iStartY);
     int iWidth = pMap->getWidth();
-    node_t *pPossibleResult = NULL;
+    node_t *pPossibleResult = nullptr;
 
     while(true)
     {
         pNode->open_idx = -1;
-        uint32_t iFlags = pMap->getNodeUnchecked(pNode->x, pNode->y)->iFlags;
+        th_map_node_flags flags = pMap->getNodeUnchecked(pNode->x, pNode->y)->flags;
 
-        if((iFlags & THMN_DoNotIdle) == 0 && (iFlags & THMN_Passable) && (iFlags & THMN_Hospital))
+        if(!flags.do_not_idle && flags.passable && flags.hospital)
         {
             if(iN == 0)
             {
@@ -285,14 +282,14 @@ bool IdleTileFinder::findIdleTile(const THMap *pMap, int iStartX, int iStartY, i
             }
         }
 
-        m_pBestNext = NULL;
+        m_pBestNext = nullptr;
         m_fBestDistance = 0.0;
 
-        if (pathingNeighbours(pNode, iFlags, iWidth)) return true;
+        if (pathingNeighbours(pNode, flags, iWidth)) return true;
 
         if(m_pPf->m_iOpenCount == 0)
         {
-            m_pPf->m_pDestination = NULL;
+            m_pPf->m_pDestination = nullptr;
             break;
         }
         if(m_pBestNext)
@@ -317,22 +314,15 @@ int Objectsvisitor::makeGuess(node_t *pNode)
     return 0;
 }
 
-bool Objectsvisitor::tryNode(node_t *pNode, uint32_t iFlags, node_t *pNeighbour, int direction)
+bool Objectsvisitor::tryNode(node_t *pNode, th_map_node_flags flags, node_t *pNeighbour, int direction)
 {
     int iObjectNumber = 0;
     const THMapNode *pMapNode = m_pMap->getNodeUnchecked(pNeighbour->x, pNeighbour->y);
-    uint32_t iNFlags = m_pMap->getNodeUnchecked(pNeighbour->x, pNeighbour->y)->iFlags;
-    if ((iNFlags & 0xFF000000) == m_iTHOB)
-        iObjectNumber = 1;
-    if(pMapNode->pExtendedObjectList != NULL)
+    th_map_node_flags neighbour_flags = m_pMap->getNodeUnchecked(pNeighbour->x, pNeighbour->y)->flags;
+    for(auto thob : pMapNode->objects)
     {
-        int count = *pMapNode->pExtendedObjectList & 7;
-        for(int i = 0; i < count; i++)
-        {
-            int thob = (*pMapNode->pExtendedObjectList >> (3 + i* 8)) & 255;
-            if(thob == m_eTHOB)
-                iObjectNumber++;
-        }
+        if(thob == m_eTHOB)
+            iObjectNumber++;
     }
     if(m_bAnyObjectType)
         iObjectNumber = 1;
@@ -361,27 +351,26 @@ bool Objectsvisitor::tryNode(node_t *pNode, uint32_t iFlags, node_t *pNeighbour,
 
     if(pNode->distance < m_iMaxDistance)
     {
-        uint32_t iPassable = iFlags & THMN_Passable;
         switch(direction)
         {
         case THTD_North:
-            if((iFlags & THMN_DoorNorth) == 0)
-                pathingTryNode(pNode, iNFlags, iPassable, pNeighbour);
+            if(!flags.door_north)
+                pathingTryNode(pNode, neighbour_flags, flags.passable, pNeighbour);
             break;
 
         case THTD_East:
-            if((iNFlags & THMN_DoorWest) == 0)
-                pathingTryNode(pNode, iNFlags, iPassable, pNeighbour);
+            if(!neighbour_flags.door_west)
+                pathingTryNode(pNode, neighbour_flags, flags.passable, pNeighbour);
             break;
 
         case THTD_South:
-            if((iNFlags & THMN_DoorNorth) == 0)
-                pathingTryNode(pNode, iNFlags, iPassable, pNeighbour);
+            if(!neighbour_flags.door_north)
+                pathingTryNode(pNode, neighbour_flags, flags.passable, pNeighbour);
             break;
 
         case THTD_West:
-            if((iFlags & THMN_DoorWest) == 0)
-                pathingTryNode(pNode, iNFlags, iPassable, pNeighbour);
+            if(!flags.door_west)
+                pathingTryNode(pNode, neighbour_flags, flags.passable, pNeighbour);
             break;
         }
     }
@@ -392,15 +381,14 @@ bool Objectsvisitor::visitObjects(const THMap *pMap, int iStartX, int iStartY,
                                   THObjectType eTHOB, int iMaxDistance,
                                   lua_State *L, int iVisitFunction, bool anyObjectType)
 {
-    if(pMap == NULL)
+    if(pMap == nullptr)
         pMap = m_pPf->m_pDefaultMap;
-    if(pMap == NULL)
+    if(pMap == nullptr)
     {
-        m_pPf->m_pDestination = NULL;
+        m_pPf->m_pDestination = nullptr;
         return false;
     }
 
-    m_iTHOB = static_cast<uint32_t>(eTHOB) << 24;
     m_pL = L;
     m_iVisitFunction = iVisitFunction;
     m_iMaxDistance = iMaxDistance;
@@ -413,12 +401,12 @@ bool Objectsvisitor::visitObjects(const THMap *pMap, int iStartX, int iStartY,
 
     while(true)
     {
-        uint32_t iFlags = pMap->getNodeUnchecked(pNode->x, pNode->y)->iFlags;
-        if (pathingNeighbours(pNode, iFlags, iWidth)) return true;
+        th_map_node_flags flags = pMap->getNodeUnchecked(pNode->x, pNode->y)->flags;
+        if (pathingNeighbours(pNode, flags, iWidth)) return true;
 
         if(m_pPf->m_iOpenCount == 0)
         {
-            m_pPf->m_pDestination = NULL;
+            m_pPf->m_pDestination = nullptr;
             break;
         }
         else
@@ -430,11 +418,11 @@ bool Objectsvisitor::visitObjects(const THMap *pMap, int iStartX, int iStartY,
 THPathfinder::THPathfinder() : m_oPathFinder(this), m_oHospitalFinder(this),
                                m_oIdleTileFinder(this), m_oObjectsvisitor(this)
 {
-    m_pNodes = NULL;
-    m_ppDirtyList = NULL;
+    m_pNodes = nullptr;
+    m_ppDirtyList = nullptr;
     m_ppOpenHeap = (node_t**)malloc(sizeof(node_t*) * 8);
-    m_pDestination = NULL;
-    m_pDefaultMap = NULL;
+    m_pDestination = nullptr;
+    m_pDefaultMap = nullptr;
     m_iNodeCacheWidth = 0;
     m_iNodeCacheHeight = 0;
     m_iDirtyCount = 0;
@@ -493,7 +481,7 @@ void THPathfinder::_allocNodeCache(int iWidth, int iHeight)
 
 int THPathfinder::getPathLength() const
 {
-    if(m_pDestination != NULL)
+    if(m_pDestination != nullptr)
         return m_pDestination->distance;
     else
         return -1;
@@ -501,7 +489,7 @@ int THPathfinder::getPathLength() const
 
 bool THPathfinder::getPathEnd(int* pX, int* pY) const
 {
-    if(m_pDestination == NULL)
+    if(m_pDestination == nullptr)
     {
         if(pX)
             *pX = -1;
@@ -520,7 +508,7 @@ void THPathfinder::pushResult(lua_State *L) const
 {
     lua_checkstack(L, 3);
 
-    if(m_pDestination == NULL)
+    if(m_pDestination == nullptr)
     {
         lua_pushnil(L);
         lua_pushliteral(L, "no path");
@@ -584,7 +572,7 @@ node_t* THPathfinder::_openHeapPop()
         min = i;
         const int right = (i + 1) * 2;
         int minvalue = value;
-        node_t *pSwap = NULL;
+        node_t *pSwap = nullptr;
         node_t *pTest = m_ppOpenHeap[left];
         if(pTest->value() < minvalue)
             min = left, minvalue = pTest->value(), pSwap = pTest;
@@ -609,7 +597,7 @@ node_t* THPathfinder::_openHeapPop()
 
 void THPathfinder::persist(LuaPersistWriter *pWriter) const
 {
-    if(m_pDestination == NULL)
+    if(m_pDestination == nullptr)
     {
         pWriter->writeVUInt(0);
         return;
@@ -653,6 +641,6 @@ void THPathfinder::depersist(LuaPersistReader *pReader)
         pNode = pPrevNode;
     }
     pNode->distance = 0;
-    pNode->prev = NULL;
+    pNode->prev = nullptr;
     m_ppDirtyList[m_iDirtyCount++] = pNode;
 }

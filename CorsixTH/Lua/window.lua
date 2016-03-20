@@ -317,14 +317,26 @@ function Panel:drawLabel(canvas, x, y, limit)
   return next_y, last_x
 end
 
+--! Set the position of a panel.
+--!param x (int) New horizontal position of the panel.
+--!param y (int) New vertical position of the panel.
 function Panel:setPosition(x, y)
   self.x = x
   self.y = y
 end
 
+--! Set the size of a panel.
+--!param width (int) New width of the panel.
+--!param height (int) New height of the panel.
 function Panel:setSize(width, height)
   self.w = width
   self.h = height
+end
+
+--! Set the visibility of the panel.
+--!param visibility (bool) New visibility of the panel.
+function Panel:setVisible(visibility)
+  self.visible = visibility
 end
 
 --[[ Add a `Panel` to the window.
@@ -559,14 +571,17 @@ function Button:setDisabledSprite(index)
   return self
 end
 
+--! Enable or disable a button.
+--!param enable (boolean) Whether to enable (true) or disable (false) the button.
 function Button:enable(enable)
-  if enable then
+  if enable and not self.enabled then
     self.enabled = true
     self.panel_for_sprite.sprite_index = self.sprite_index_normal
     if self.panel_for_sprite.colour_backup then
       self.panel_for_sprite.colour = self.panel_for_sprite.colour_backup
     end
-  else
+  end
+  if not enable and self.enabled then
     self.enabled = false
     self.panel_for_sprite.sprite_index = self.sprite_index_disabled
     if self.panel_for_sprite.disabled_colour then
@@ -591,6 +606,7 @@ function Button:makeRepeat()
   return self
 end
 
+--! Flip the toggle state of the button (on -> off, or off -> on).
 function Button:toggle()
   self.sprite_index_normal, self.sprite_index_active =
     self.sprite_index_active, self.sprite_index_normal
@@ -602,6 +618,8 @@ function Button:toggle()
   return self.toggled
 end
 
+--! Set the toggle state of the button to the provided state.
+--!param state (boolean) Desired state of the toggle button.
 function Button:setToggleState(state)
   if self.toggled ~= state then
     self:toggle()
@@ -672,6 +690,9 @@ function Button:handleClick(mouse_button)
   end
 end
 
+--! Set the position of a button.
+--!param x (int) New horizontal position of the button.
+--!param y (int) New vertical position of the button.
 function Button:setPosition(x, y)
   self.panel_for_sprite:setPosition(x, y)
   self.r = self.r - self.x + x
@@ -684,6 +705,9 @@ function Button:setPosition(x, y)
   end
 end
 
+--! Set the size of a button.
+--!param width (int) New width of the button.
+--!param height (int) New height of the button.
 function Button:setSize(width, height)
   self.panel_for_sprite:setSize(width, height)
   self.r = self.x + width
@@ -692,6 +716,12 @@ function Button:setSize(width, height)
     self.tooltip.tooltip_x = math.round((self.x + self.r) / 2, 1)
     self.tooltip.tooltip_y = self.y
   end
+end
+
+--! Set the visibility of the button.
+--!param visibility (bool) New visibility of the button.
+function Button:setVisible(visibility)
+  self.panel_for_sprite:setVisible(visibility)
 end
 
 --! Convenience function to allow setLabel to be called on a button, not only its panel.
@@ -987,20 +1017,19 @@ function Textbox:keyInput(char, rawchar)
   if not self.char_limit or string.len(line) < self.char_limit then
     -- Upper- and lowercase letters
     if self.allowed_input.alpha then
-      if #rawchar == 1 and (("a" <= rawchar and rawchar <= "z")
-      or ("A" <= rawchar and rawchar <= "Z")) then
+      if #char == 1 and string.match(char, '%a') then
         handled = true
       end
     end
     -- Numbers
     if not handled and self.allowed_input.numbers then
-      if #rawchar == 1 and "0" <= rawchar and rawchar <= "9" then
+      if #char == 1 and string.match(char, '%d') then
         handled = true
       end
     end
-    -- Space and hyphen
+    -- Space, hyphen and plus sign
     if not handled and self.allowed_input.misc then
-      if rawchar == "space" or rawchar == "-" then
+      if char == "space" or char == "-" or char == "+" then
         handled = true
       end
     end
@@ -1017,7 +1046,8 @@ function Textbox:keyInput(char, rawchar)
     else
       local pos = self.cursor_pos[2] - 1
       if ui.app.key_modifiers.ctrl then
-        pos = string.find(string.sub(line, 1, self.cursor_pos[2]), "[^"..pat.."]["..pat.."]+[^"..pat.."]*$") or 0
+        pos = string.find(string.sub(line, 1, self.cursor_pos[2]),
+            "[^" .. pat .. "][" .. pat .. "]+[^" .. pat .. "]*$") or 0
       end
       new_line = line:sub(1, pos) .. line:sub(self.cursor_pos[2] + 1, -1)
       self.cursor_pos[2] = pos
@@ -1034,14 +1064,15 @@ function Textbox:keyInput(char, rawchar)
     else
       local pos = self.cursor_pos[2] + 2
       if ui.app.key_modifiers.ctrl then
-        pos = (string.find(line, "[^"..pat.."]["..pat.."]", self.cursor_pos[2] + 1) or string.len(line)) + 1
+        pos = (string.find(line, "[^" .. pat .. "][" .. pat .. "]",
+            self.cursor_pos[2] + 1) or string.len(line)) + 1
       end
       new_line = line:sub(1, self.cursor_pos[2]) .. line:sub(pos, -1)
     end
     handled = true
   end
   -- Enter (newline or confirm)
-  if not handled and (char == "return" or char == "keypad enter") then
+  if not handled and (char == "return" or char == "enter") then
     if type(self.text) == "table" then
       local remainder = line:sub(self.cursor_pos[2] + 1, -1)
       self.text[self.cursor_pos[1]] = line:sub(1, self.cursor_pos[2])
@@ -1091,7 +1122,8 @@ function Textbox:keyInput(char, rawchar)
       else
         if ui.app.key_modifiers.ctrl then
           -- to the right until next word or end of line
-          self.cursor_pos[2] = string.find(line, "[^"..pat.."]["..pat.."]", self.cursor_pos[2] + 1) or string.len(line)
+          self.cursor_pos[2] = string.find(line, "[^" .. pat .. "][" .. pat .. "]",
+              self.cursor_pos[2] + 1) or string.len(line)
         else
           -- one to the right
           self.cursor_pos[2] = self.cursor_pos[2] + 1
@@ -1108,7 +1140,8 @@ function Textbox:keyInput(char, rawchar)
       else
         if ui.app.key_modifiers.ctrl then
           -- to the left until beginning of word or beginning of line
-          self.cursor_pos[2] = string.find(string.sub(line, 1, self.cursor_pos[2]), "[^"..pat.."]["..pat.."]+[^"..pat.."]*$") or 0
+          self.cursor_pos[2] = string.find(string.sub(line, 1, self.cursor_pos[2]),
+              "[^" .. pat .. "][" .. pat .. "]+[^" .. pat .. "]*$") or 0
         else
           -- one to the left
           self.cursor_pos[2] = self.cursor_pos[2] - 1
@@ -1133,8 +1166,8 @@ function Textbox:keyInput(char, rawchar)
   end
   if not self.char_limit or string.len(self.text) < self.char_limit then
     -- Experimental "all" category
-    if not handled and self.allowed_input.all
-       and not (char == "shift" or char == "ctrl" or char == "alt") then -- F-Keys
+    if not handled and self.allowed_input.all and
+        not (char == "shift" or char == "ctrl" or char == "alt") then -- F-Keys
       handled = true
     end
   end
@@ -1161,7 +1194,7 @@ function Textbox:textInput(text)
 
   local line = type(self.text) == "table" and self.text[self.cursor_pos[1]] or self.text
   local new_line = line:sub(1, self.cursor_pos[2]) .. text .. line:sub(self.cursor_pos[2] + 1, -1)
-  self.cursor_pos[2] = self.cursor_pos[2] + 1
+  self.cursor_pos[2] = self.cursor_pos[2] + #text
 
   if type(self.text) == "table" then
     self.text[self.cursor_pos[1]] = new_line
@@ -1504,8 +1537,8 @@ end
 !param y The Y position of the cursor in window co-ordinatees.
 ]]
 function Window:beginDrag(x, y)
-  if not self.width or not self.height or not self.ui
-  or self.ui.app.runtime_config.lock_windows or not self.draggable then
+  if not self.width or not self.height or not self.ui or
+      self.ui.app.runtime_config.lock_windows or not self.draggable then
     -- Need width, height and UI to do a drag
     return false
   end

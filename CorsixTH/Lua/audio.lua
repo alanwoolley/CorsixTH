@@ -66,9 +66,7 @@ function Audio:init()
     return
   end
   if not SDL.audio.loaded then
-    if not _MAP_EDITOR then
-      print "Notice: Audio system not loaded as CorsixTH compiled without it"
-    end
+    print("Notice: Audio system not loaded as CorsixTH compiled without it")
     self.not_loaded = true
     return
   end
@@ -120,8 +118,8 @@ function Audio:init()
         if music_dir then
           info.filename_mp3 = music_dir .. file
         else
-          print("Warning: CorsixTH only supports xmi if audio_mp3"
-            .. " is not defined in the config file.")
+          print("Warning: CorsixTH only supports xmi if audio_mp3" ..
+              " is not defined in the config file.")
             music_array[filename:upper()] = nil
         end
          -- Remove the xmi version of this file, if found.
@@ -163,7 +161,7 @@ function Audio:init()
     end
   end
   if #self.background_playlist == 0 and self.app.good_install_folder then
-    print "Notice: Audio system loaded, but found no background tracks"
+    print("Notice: Audio system loaded, but found no background tracks")
     self.has_bg_music = false
   else
     self.has_bg_music = true
@@ -200,7 +198,7 @@ function Audio:initSpeech(speech_file)
   end
   local archive_data, err = load_sound_file(speech_file)
 
-  -- If sound file not found and language choosen is not English,
+  -- If sound file not found and language chosen is not English,
   -- maybe we can have more chance loading English sounds
   if not archive_data and speech_file ~= "Sound-0.dat" and self.app.good_install_folder then
     if self.speech_file_name == "Sound-0.dat" then
@@ -591,8 +589,8 @@ function Audio:playBackgroundTrack(index)
       SDL.audio.loadMusicAsync(data, function(music, e)
 
         if music == nil then
-          error("Could not load music file \'" .. (info.filename_mp3 or info.filename) .. "\'"
-            .. (e and (" (" .. e .. ")" or "")))
+          error("Could not load music file \'" .. (info.filename_mp3 or info.filename) .. "\'" ..
+              (e and (" (" .. e .. ")" or "")))
         else
           if _DECODA then
             debug.getmetatable(music).__tostring = function(ud)

@@ -63,7 +63,7 @@ function UIQueue:UIQueue(ui, queue)
 
   self:makeTooltip(_S.tooltip.queue_window.front_of_queue, 168, 25, 213, 105)
   self:makeTooltip(_S.tooltip.queue_window.end_of_queue, 543, 51, 586, 105)
-  self:makeTooltip(_S.tooltip.queue_window.patient        .. " " .. _S.misc.not_yet_implemented, 218, 15, 537, 107)
+  self:makeTooltip(_S.tooltip.queue_window.patient .. " " .. _S.misc.not_yet_implemented, 218, 15, 537, 107)
 end
 
 function UIQueue:decreaseMaxSize()
@@ -98,7 +98,7 @@ function UIQueue:draw(canvas, x, y)
   font:draw(canvas, num_patients, x + 140, y + 22)
 
   font:draw(canvas, _S.queue_window.num_expected, x + 22, y + 45)
-  font:draw(canvas, queue.expected_count, x + 140, y + 45)
+  font:draw(canvas, queue:expectedSize(), x + 140, y + 45)
 
   font:draw(canvas, _S.queue_window.num_entered, x + 22, y + 68)
   font:draw(canvas, queue.visitor_count, x + 140, y + 68)

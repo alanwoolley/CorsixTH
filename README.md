@@ -1,5 +1,5 @@
 ![](http://i.imgur.com/fYp148T.jpg)
-### Latest Release [![Release 0.40](https://img.shields.io/badge/release-0.40-brightgreen.svg)](https://github.com/CorsixTH/CorsixTH/releases) [![Build Status](https://travis-ci.org/CorsixTH/CorsixTH.svg?branch=master)](https://travis-ci.org/CorsixTH/CorsixTH)
+### Latest Release [![Release 0.50](https://img.shields.io/badge/release-0.50-brightgreen.svg)](https://github.com/CorsixTH/CorsixTH/releases) [![Build Status](https://travis-ci.org/CorsixTH/CorsixTH.svg?branch=master)](https://travis-ci.org/CorsixTH/CorsixTH)
 
 ##### [Forum](http://forums.corsixth.com) | [IRC Chat](http://webchat.freenode.net/?channels=corsix-th) | [Report Issue](https://github.com/CorsixTH/CorsixTH/issues/new)
 
@@ -37,7 +37,7 @@ Not a programmer? Don't know another language? Well you can still help! come vis
 
 ## More
 
-Our [wiki](https://github.com/CorsixTH/CorsixTH/wiki) is a good place to start, if you cant find what you are looking for feel free to contact us using one of the methods below.
+Our [wiki](https://github.com/CorsixTH/CorsixTH/wiki) is a good place to start, if you can't find what you are looking for feel free to contact us using one of the methods below.
 
 ## Contact
 

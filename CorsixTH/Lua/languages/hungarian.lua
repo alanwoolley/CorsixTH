@@ -1820,7 +1820,7 @@ original_credits = {
   [361] = ".",
 }
 confirmation.maximum_screen_size = "Az általad beállított képernyőfelbontás magasabb mint 3000 X 2000. Van lehetőség ilyen felbontások beállítására, viszont ezekhez erősebb hardver szükségeltetik az akadozásmentes futtatáshoz. Biztosan folytatod?"
-confirmation.music_warning = "Mielőtt kiválaszthatnád az mp3-akat amelyek játék közben fognak szólni szükséged lesz az smpeg.dll nevű (vagy azzal egyenértékű) file-ra, különben nem lesz zene. Jelenleg 64 bites operációs rendszerekhez ez a file nem elérhető. Folytatod?"
+confirmation.music_warning = "Mielőtt kiválaszthatnád az mp3-akat amelyek játék közben fognak szólni szükséged lesz az smpeg.dll nevű (vagy azzal egyenértékű) file-ra, különben nem lesz zene. Folytatod?"
 menu_options_wage_increase.deny = " MEGTAGAD"
 menu_options_wage_increase.grant = " ENGEDÉLYEZ"
 tooltip.options_window.audio_button = "Minden hang ki/be kapcsolása"
@@ -1849,7 +1849,7 @@ tooltip.customise_window.aliens = "Mivel nincsenek megfelelő animációink az i
 tooltip.customise_window.average_contents = "Ha szeretnéd, hogy a játék megjegyezze milyen extra tárgyakkal szoktad a szobákat általában berendezni, akkor kapcsold be ezt"
 tooltip.customise_window.back = "Menü bezárása, és vissza a Beállításokhoz"
 tooltip.customise_window.movies = "Ezzel le tudod tiltani az összes átvezető videót"
-tooltip.customise_window.fractured_bones = 	"Mivel csak félkész animációink van a törött csontú női páciensek megjelenítésére, ezért ők nem jelennek meg a kórházadban. Ha mégis szeretnéd, hogy érkezzenek ilyen betegek is, akkor ezt kapcsold ki"
+tooltip.customise_window.fractured_bones = "Mivel csak félkész animációink van a törött csontú női páciensek megjelenítésére, ezért ők nem jelennek meg a kórházadban. Ha mégis szeretnéd, hogy érkezzenek ilyen betegek is, akkor ezt kapcsold ki"
 tooltip.customise_window.volume = "Ha hangerő halkítása gomb használata megnyitja az esetleírásokat is, akkor ezt bekapcsolva átállíthatod az esetleírások gyorsbillentyű kombinációját Shift + C -re"
 tooltip.customise_window.intro = "A bevezető videó (intro) ki/be kapcsolása - az átvezető videóknak engedélyezve kell lenniük, ha szeretnéd ezt bekapcsolni"
 tooltip.customise_window.paused = "Az eredeti Theme Hospitalban a játékos csak a felső menüt használhatta ha a játék szüneteltetve volt. Ez az alapbeállítás a CorsixTH-ban is, de ha ezt bekapcsolod, akkor szüneteltetés alatt is elérsz minden menüt"

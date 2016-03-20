@@ -27,29 +27,35 @@ class "GameUI" (UI)
 local GameUI = _G["GameUI"]
 
 local TH = require "TH"
-local WM = require "sdl".wm
 local SDL = require "sdl"
+local WM = SDL.wm
 local lfs = require "lfs"
 local pathsep = package.config:sub(1, 1)
 
-function GameUI:GameUI(app, local_hospital)
+--! Game UI constructor.
+--!param app (Application) Application object.
+--!param local_hospital Hospital to display
+--!param map_editor (bool) Whether the map is editable.
+function GameUI:GameUI(app, local_hospital, map_editor)
   self:UI(app)
 
   self.hospital = local_hospital
   self.tutorial = { chapter = 0, phase = 0 }
-
-  if _MAP_EDITOR then
-    self:addWindow(UIMapEditor(self))
+  if map_editor then
+    self.map_editor = UIMapEditor(self)
+    self:addWindow(self.map_editor)
   else
     self.adviser = UIAdviser(self)
     self.bottom_panel = UIBottomPanel(self)
-    self.menu_bar = UIMenuBar(self)
     self.menu_button = UIMenuButton(self)
+    self:addWindow(self.menu_button)
     self.bottom_panel:addWindow(self.adviser)
     self:addWindow(self.bottom_panel)
-    self:addWindow(self.menu_button)
-    -- self:addWindow(self.menu_bar)
   end
+
+  -- UI widgets
+  self.menu_bar = UIMenuBar(self, self.map_editor)
+  self:addWindow(self.menu_bar)
 
   local scr_w = app.config.width
   local scr_h = app.config.height
@@ -57,15 +63,15 @@ function GameUI:GameUI(app, local_hospital)
   if self.visible_diamond.w <= 0 or self.visible_diamond.h <= 0 then
     -- For a standard 128x128 map, screen size would have to be in the
     -- region of 3276x2457 in order to be too large.
-    if not _MAP_EDITOR then
-      error "Screen size too large for the map"
+    if not self.map_editor then
+      error("Screen size too large for the map")
     end
   end
   self.screen_offset_x, self.screen_offset_y = app.map:WorldToScreen(
     app.map.th:getCameraTile(local_hospital:getPlayerIndex()))
   self.zoom_factor = 1
   self:scrollMap(-scr_w / 2, 16 - scr_h / 2)
-  self.limit_to_visible_diamond = not _MAP_EDITOR
+  self.limit_to_visible_diamond = not self.map_editor
   self.transparent_walls = false
   self.do_world_hit_test = true
 
@@ -104,7 +110,7 @@ function GameUI:makeVisibleDiamond(scr_w, scr_h)
 
   -- The visible diamond is the region which the top-left corner of the screen
   -- is limited to, and ensures that the map always covers all of the screen.
-  -- Its verticies are at (x + w, y), (x - w, y), (x, y + h), (x, y - h).
+  -- Its vertices are at (x + w, y), (x - w, y), (x, y + h), (x, y - h).
   return {
     x = - scr_w / 2,
     y = 16 * map_h - scr_h / 2,
@@ -115,33 +121,35 @@ end
 
 function GameUI:setZoom(factor)
   if factor <= 0 then
-    return
+    return false
   end
-  local old_factor = self.zoom_factor
   if not factor or math.abs(factor - 1) < 0.001 then
     factor = 1
   end
+
   local scr_w = self.app.config.width
   local scr_h = self.app.config.height
+  local new_diamond = self:makeVisibleDiamond(scr_w / factor, scr_h / factor)
+  if new_diamond.w < 0 or new_diamond.h < 0 then
+    return false
+  end
+
+  self.visible_diamond = new_diamond
   local refx, refy = self.cursor_x or scr_w / 2, self.cursor_y or scr_h / 2
   local cx, cy = self:ScreenToWorld(refx, refy)
   self.zoom_factor = factor
-  self.visible_diamond = self:makeVisibleDiamond(scr_w / factor, scr_h / factor)
-  if self.visible_diamond.w < 0 or self.visible_diamond.h < 0 then
-    self:setZoom(old_factor)
-    return false
-  else
-    cx, cy = self.app.map:WorldToScreen(cx, cy)
-    self:scrollMap(cx - self.screen_offset_x - refx / factor,
-                   cy - self.screen_offset_y - refy / factor)
-    return true
-  end
+
+  cx, cy = self.app.map:WorldToScreen(cx, cy)
+  cx = cx - self.screen_offset_x - refx / factor
+  cy = cy - self.screen_offset_y - refy / factor
+  self:scrollMap(cx, cy)
+  return true
 end
 
 function GameUI:draw(canvas)
   local app = self.app
   local config = app.config
-  if _MAP_EDITOR or not self.in_visible_diamond then
+  if self.map_editor or not self.in_visible_diamond then
     canvas:fillBlack()
   end
   local zoom = self.zoom_factor
@@ -205,6 +213,10 @@ local scroll_keys = {
   right = {x =  10, y =   0},
   down  = {x =   0, y =  10},
   left  = {x = -10, y =   0},
+  ["keypad 8"] = {x =   0, y = -10},
+  ["keypad 6"] = {x =  10, y =   0},
+  ["keypad 2"] = {x =   0, y =  10},
+  ["keypad 4"] = {x = -10, y =   0},
 }
 
 function GameUI:updateKeyScroll()
@@ -230,7 +242,7 @@ function GameUI:keySpeedUp()
 end
 
 function GameUI:keyTransparent()
-  self:makeTransparentWalls()
+  self:setWallsTransparent(true)
 end
 
 function GameUI:onKeyDown(rawchar, modifiers, is_repeat)
@@ -263,9 +275,7 @@ function GameUI:onKeyUp(rawchar)
     self.app.world:previousSpeed()
   end
 
-  if self.transparent_walls then
-    self:removeTransparentWalls()
-  end
+  self:setWallsTransparent(false)
 end
 
 function GameUI:makeDebugFax()
@@ -312,8 +322,8 @@ function GameUI:onCursorWorldPositionChange()
     if self.do_world_hit_test ~= true then
       -- limit to non-door objects in room
       local room = self.do_world_hit_test
-      entity = entity and class.is(entity, Object) and entity:getRoom() == room
-       and entity ~= room.door and entity
+      entity = entity and class.is(entity, Object) and
+          entity:getRoom() == room and entity ~= room.door
     end
   end
   if entity ~= self.cursor_entity then
@@ -453,13 +463,16 @@ function GameUI:onMouseMove(x, y, dx, dy)
     -- larger than it actually is.
   --  scroll_region_size = 1
   --else
-    -- In windowed mode, a reasonable size is needed, though not too large.
+    -- In windowed mode, a reasonable size is needed, though not too large. 
   --  scroll_region_size = 8
   --end
 
-  if not self.app.config.prevent_edge_scrolling and (x < scroll_region_size
-  or y < scroll_region_size or x >= self.app.config.width - scroll_region_size
-  or y >= self.app.config.height - scroll_region_size) then
+  scroll_region_size = 8
+  if not self.app.config.prevent_edge_scrolling and
+      (x < scroll_region_size or y < scroll_region_size or
+       x >= self.app.config.width - scroll_region_size or
+       y >= self.app.config.height - scroll_region_size) then
+	   
     local dx = 0
     local dy = 0
     local scroll_power = 7
@@ -515,7 +528,7 @@ function GameUI:onMouseUp(code, x, y)
   end
 
   local button = self.button_codes[code]
-  if button == "right" and not _MAP_EDITOR and highlight_x then
+  if button == "right" and not self.map_editor and highlight_x then
     local window = self:getWindow(UIPatient)
     local patient = (window and window.patient.is_debug and window.patient) or self.hospital:getDebugPatient()
     if patient then
@@ -767,17 +780,10 @@ end
 --! Sets wall transparency to the specified parameter
 --!param mode (boolean) whether to enable or disable wall transparency
 function GameUI:setWallsTransparent(mode)
-  self.transparent_walls = mode
-  self:applyTransparency()
-end
-
---! Toggles transparency of walls, i.e. enables if currently disabled, and vice versa
-function GameUI:makeTransparentWalls()
-  self:setWallsTransparent(true)
-end
-
-function GameUI:removeTransparentWalls()
-  self:setWallsTransparent(not self.transparent_walls)
+  if mode ~= self.transparent_walls then
+    self.transparent_walls = mode
+    self:applyTransparency()
+  end
 end
 
 function UI:toggleAdviser()
@@ -912,15 +918,15 @@ tutorial_phases = {
         -- The demo uses a single string for the post-tutorial info while
         -- the real game uses three.
         local texts = TheApp.using_demo_files and {
-          _S.introduction_texts["level15"],
-          _S.introduction_texts["demo"],
+          {_S.introduction_texts["level15"]},
+          {_S.introduction_texts["demo"]},
         } or {
-          _S.introduction_texts["level15"],
-          _S.introduction_texts["level16"],
-          _S.introduction_texts["level17"],
-          _S.introduction_texts["level1"],
+          {_S.introduction_texts["level15"]},
+          {_S.introduction_texts["level16"]},
+          {_S.introduction_texts["level17"]},
+          {_S.introduction_texts["level1"]},
         }
-        TheApp.ui:addWindow(UIInformation(TheApp.ui, {texts}))
+        TheApp.ui:addWindow(UIInformation(TheApp.ui, texts))
         TheApp.ui:addWindow(UIWatch(TheApp.ui, "initial_opening"))
       end,
     },
@@ -1065,7 +1071,7 @@ function GameUI:showBriefing()
   local level = self.app.world.map.level_number
   local text = {_S.information.custom_game}
   if type(level) == "number" then
-    text = _S.introduction_texts[TheApp.using_demo_files and "demo" or "level" .. level]
+    text = {_S.introduction_texts[TheApp.using_demo_files and "demo" or "level" .. level]}
   elseif self.app.world.map.level_intro then
     text = {self.app.world.map.level_intro}
   end

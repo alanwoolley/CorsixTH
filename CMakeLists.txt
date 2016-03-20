@@ -2,14 +2,11 @@
 # OPTIONS AVAILABLE:
 # At most, one of the following:
 #   - WITH_SDL     : Activate SDL Renderer (default)
-#   - WITH_OPENGL  : Activate OpenGL Renderer
-#   - WITH_DIRECTX : Activate DirectX Renderer (Windows only)
 # Any of the following:
 #   - WITH_AUDIO   : Activate Sound (enabled by default)
 #   - WITH_FREETYPE2
 #   - WITH_MOVIES  : Activate movies (requires Sound)
 #   - BUILD_ANIMVIEWER
-#   - BUILD_MAPEDITOR
 #   - WITH_LUAJIT  : Whether to use LuaJIT 2 instead of Lua51 (default is LuaJIT 2)
 #   - WITH_LIBAV   : Whether to use LibAV (as opposed to FFMEPG) when building movies
 #   - WITH_VLD     : Build with Visual Leak Detector (requires Visual Studio)
@@ -25,20 +22,11 @@ IF(COMPILER_SUPPORTS_CXX11)
 ELSEIF(COMPILER_SUPPORTS_CXX0X)
   SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++0x")
 ENDIF(COMPILER_SUPPORTS_CXX11)
-IF(MSVC)
-  SET(CMAKE_EXE_LINKER_FLAGS_RELEASE "/INCREMENTAL" CACHE STRING "Linker flags for release" FORCE)
-  SET(CMAKE_EXE_LINKER_FLAGS_MINSIZEREL "/INCREMENTAL" CACHE STRING "Linker flags for minsizerel" FORCE)
-ENDIF(MSVC)
 IF (MINGW)
   set(CMAKE_EXE_LINKER_FLAGS "-static-libgcc -static-libstdc++")
 ENDIF(MINGW)
 INCLUDE(CheckIncludeFiles)
 SET(CORSIX_TH_DONE_TOP_LEVEL_CMAKE ON)
-
-IF(APPLE)
-  SET(CMAKE_OSX_DEPLOYMENT_TARGET 10.7)
-  SET(CMAKE_OSX_ARCHITECTURES x86_64)
-ENDIF()
 
 # Define our options
 OPTION(WITH_SDL "Activate SDL Renderer" ON) # our default option
@@ -48,7 +36,6 @@ OPTION(WITH_FREETYPE2 "Enhanced Font Support" ON)
 OPTION(WITH_LUAJIT "Use LuaJIT instead of Lua" OFF)
 OPTION(WITH_LIBAV "Use LibAV instead of FFmpeg" OFF)
 OPTION(BUILD_ANIMVIEWER "Build the animation viewer as part of the build process" OFF)
-OPTION(BUILD_MAPEDITOR "Build the map editor as part of the build process" OFF)
 IF(MSVC)
   OPTION(WITH_VLD "Build with Visual Leak Detector for Visual Studio" OFF)
 ENDIF(MSVC)
@@ -105,8 +92,6 @@ ENDIF(MSVC)
 
 # Environment handling
 
-CHECK_INCLUDE_FILES(malloc.h CORSIX_TH_HAS_MALLOC_H)
-CHECK_INCLUDE_FILES(alloca.h CORSIX_TH_HAS_ALLOCA_H)
 CHECK_INCLUDE_FILES(inttypes.h CORSIX_TH_HAS_INTTYPES_H)
 
 # Include individual projects
@@ -119,15 +104,6 @@ IF(BUILD_ANIMVIEWER)
   message("Building AnimView")
   add_subdirectory(AnimView)
 ENDIF(BUILD_ANIMVIEWER)
-
-IF(BUILD_MAPEDITOR)
-  IF(WITH_OPENGL)
-    message("Building MapEdit")
-    add_subdirectory(MapEdit)
-  ELSE(WITH_OPENGL)
-    message(FATAL_ERROR "The map editor can only be built when using OpenGL as renderer")
-  ENDIF(WITH_OPENGL)
-ENDIF(BUILD_MAPEDITOR)
 
 # Documentation generation, construct 'doc' target (or a message it is disabled).
 
@@ -185,14 +161,6 @@ IF (DOXYGEN_FOUND)
   add_dependencies(doc doc_leveledit)
 
 
-  add_custom_target(doc_mapedit
-    ${DOXYGEN_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/DoxyGen/mapedit.doxygen
-    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/doc
-    COMMENT "Generating API documentation for MapEdit" VERBATIM
-  )
-  add_dependencies(doc doc_mapedit)
-
-
   add_custom_target(doc_corsixth_engine
     ${DOXYGEN_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/DoxyGen/corsixth_engine.doxygen
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/doc
@@ -236,7 +204,6 @@ IF (DOXYGEN_FOUND)
   file(APPEND ${CMAKE_CURRENT_BINARY_DIR}/doc/index.html "<ul>\n")
   file(APPEND ${CMAKE_CURRENT_BINARY_DIR}/doc/index.html "  <li><a href=\"animview/html/index.html\">Animation viewer documentation</a>\n")
   file(APPEND ${CMAKE_CURRENT_BINARY_DIR}/doc/index.html "  <li><a href=\"leveledit/html/index.html\">Level editor documentation</a>\n")
-  file(APPEND ${CMAKE_CURRENT_BINARY_DIR}/doc/index.html "  <li><a href=\"mapedit/html/index.html\">Map editor documentation</a>\n")
 ENDIF (DOXYGEN_FOUND)
 
 IF (DOXYGEN_FOUND OR LUA_PROGRAM_FOUND)

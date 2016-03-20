@@ -24,13 +24,8 @@ SOFTWARE.
 #define CORSIX_TH_PERSIST_LUA_H_
 #include "config.h"
 #include "th_lua.h"
+#include <vector>
 #include <cstdlib>
-#ifdef CORSIX_TH_HAS_MALLOC_H
-#include <malloc.h> // for alloca
-#endif
-#ifdef CORSIX_TH_HAS_ALLOCA_H
-#include <alloca.h>
-#endif
 
 template <class T> struct LuaPersistVInt {};
 template <> struct LuaPersistVInt<int> {typedef unsigned int T;};
@@ -43,7 +38,7 @@ template <> struct LuaPersistVInt<int> {typedef unsigned int T;};
 class LuaPersistWriter
 {
 public:
-    virtual ~LuaPersistWriter();
+    virtual ~LuaPersistWriter() = default;
 
     virtual lua_State* getStack() = 0;
     virtual void writeStackObject(int iIndex) = 0;
@@ -72,14 +67,14 @@ public:
         }
         else
         {
-            uint8_t *pBytes = (uint8_t*)alloca(iNumBytes);
-            pBytes[iNumBytes - 1] = 0x7F & (uint8_t)(tValue);
+            std::vector<uint8_t> bytes(iNumBytes);
+            bytes[iNumBytes - 1] = 0x7F & (uint8_t)(tValue);
             for(int i = 1; i < iNumBytes; ++i)
             {
                 tValue /= (T)0x80;
-                pBytes[iNumBytes - 1 - i] = 0x80 | (0x7F & (uint8_t)tValue);
+                bytes[iNumBytes - 1 - i] = 0x80 | (0x7F & (uint8_t)tValue);
             }
-            writeByteStream(pBytes, iNumBytes);
+            writeByteStream(bytes.data(), iNumBytes);
         }
     }
 
@@ -116,7 +111,7 @@ public:
 class LuaPersistReader
 {
 public:
-    virtual ~LuaPersistReader();
+    virtual ~LuaPersistReader() = default;
 
     virtual lua_State* getStack() = 0;
     virtual bool readStackObject() = 0;

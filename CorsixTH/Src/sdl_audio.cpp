@@ -28,7 +28,6 @@ SOFTWARE.
 #include <SDL_mixer.h>
 #ifdef _MSC_VER
 #pragma comment(lib, "SDL2_mixer")
-#pragma warning(disable: 4996) // CRT deprecation
 #endif
 #include <cstring>
 
@@ -38,7 +37,7 @@ struct music_t
 
     music_t()
     {
-        pMusic = NULL;
+        pMusic = nullptr;
     }
 
     ~music_t()
@@ -46,7 +45,7 @@ struct music_t
         if(pMusic)
         {
             Mix_FreeMusic(pMusic);
-            pMusic = NULL;
+            pMusic = nullptr;
         }
     }
 };
@@ -72,7 +71,6 @@ static int l_init(lua_State *L)
     else
     {
         lua_pushboolean(L, 1);
-        luaT_addcleanup(L, Mix_CloseAudio);
         Mix_HookMusicFinished(audio_music_over_callback);
         return 1;
     }
@@ -86,7 +84,7 @@ struct load_music_async_t
     char* err;
 };
 
-static int l_load_music_async_callback(lua_State *L)
+int l_load_music_async_callback(lua_State *L)
 {
     load_music_async_t *async = (load_music_async_t*)lua_touserdata(L, 1);
 
@@ -110,7 +108,7 @@ static int l_load_music_async_callback(lua_State *L)
 
     // Push CB arg
     int nargs = 1;
-    if(async->music == NULL)
+    if(async->music == nullptr)
     {
         lua_pushnil(cbL);
         if(async->err)
@@ -130,7 +128,7 @@ static int l_load_music_async_callback(lua_State *L)
             lua_xmove(L, cbL, 1);
         music_t* pLMusic = (music_t*)lua_touserdata(cbL, -1);
         pLMusic->pMusic = async->music;
-        async->music = NULL;
+        async->music = nullptr;
     }
 
     // Finish cleanup
@@ -159,17 +157,16 @@ static int load_music_async_thread(void* arg)
 {
     load_music_async_t *async = (load_music_async_t*)arg;
     async->music = Mix_LoadMUS_RW(async->rwop, 1);
-    async->rwop = NULL;
-    if(async->music == NULL)
+    async->rwop = nullptr;
+    if(async->music == nullptr)
     {
-        size_t iLen = strlen(Mix_GetError()) + 1;
+        size_t iLen = std::strlen(Mix_GetError()) + 1;
         async->err = (char*)malloc(iLen);
-        memcpy(async->err, Mix_GetError(), iLen);
+        std::memcpy(async->err, Mix_GetError(), iLen);
     }
     SDL_Event e;
-    e.type = SDL_USEREVENT_CPCALL;
-    e.user.data1 = (void*)l_load_music_async_callback;
-    e.user.data2 = arg;
+    e.type = SDL_USEREVENT_MUSIC_LOADED;
+    e.user.data1 = arg;
     SDL_PushEvent(&e);
     return 0;
 }
@@ -187,9 +184,9 @@ static int l_load_music_async(lua_State *L)
     lua_pushvalue(L, -2);
     lua_settable(L, LUA_REGISTRYINDEX);
     async->L = L;
-    async->music = NULL;
+    async->music = nullptr;
     async->rwop = rwop;
-    async->err = NULL;
+    async->err = nullptr;
     lua_createtable(L, 2, 0);
     lua_pushthread(L);
     lua_rawseti(L, -2, 1);
@@ -225,7 +222,7 @@ static int l_load_music(lua_State *L)
     const uint8_t *pData = luaT_checkfile(L, 1, &iLength);
     SDL_RWops* rwop = SDL_RWFromConstMem(pData, (int)iLength);
     Mix_Music* pMusic = Mix_LoadMUS_RW(rwop, 1);
-    if(pMusic == NULL)
+    if(pMusic == nullptr)
     {
         lua_pushnil(L);
         lua_pushstring(L, Mix_GetError());
@@ -290,7 +287,7 @@ static int l_transcode_xmi(lua_State *L)
     const uint8_t *pData = luaT_checkfile(L, 1, &iLength);
 
     uint8_t *pMidData = TranscodeXmiToMid(pData, iLength, &iMidLength);
-    if(pMidData == NULL)
+    if(pMidData == nullptr)
     {
         lua_pushnil(L);
         lua_pushliteral(L, "Unable to transcode XMI to MIDI");
@@ -305,7 +302,7 @@ static int l_transcode_xmi(lua_State *L)
 static const struct luaL_Reg sdl_audiolib[] = {
     {"init", l_init},
     {"transcodeXmiToMid", l_transcode_xmi},
-    {NULL, NULL}
+    {nullptr, nullptr}
 };
 
 static const struct luaL_Reg sdl_musiclib[] = {
@@ -316,7 +313,7 @@ static const struct luaL_Reg sdl_musiclib[] = {
     {"pauseMusic", l_pause_music},
     {"resumeMusic", l_resume_music},
     {"setMusicVolume", l_music_volume},
-    {NULL, NULL}
+    {nullptr, nullptr}
 };
 
 int luaopen_sdl_audio(lua_State *L)
@@ -349,6 +346,11 @@ int luaopen_sdl_audio(lua_State *L)
     lua_setfield(L, -2, "loaded");
 
     return 1;
+}
+
+int l_load_music_async_callback(lua_State *L)
+{
+    return 0;
 }
 
 #endif // CORSIX_TH_USE_SDL_MIXER

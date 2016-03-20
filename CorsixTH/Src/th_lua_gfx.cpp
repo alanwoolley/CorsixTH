@@ -23,7 +23,7 @@ SOFTWARE.
 #include "th_lua_internal.h"
 #include "th_gfx.h"
 #include <SDL.h>
-#include <cassert>
+#include <cstring>
 
 static int l_palette_new(lua_State *L)
 {
@@ -305,18 +305,23 @@ static int l_font_get_size(lua_State *L)
     size_t iMsgLen;
     const char* sMsg = luaT_checkstring(L, 2, &iMsgLen);
 
-    int iWidth, iHeight;
-    pFont->getTextSize(sMsg, iMsgLen, &iWidth, &iHeight);
+    int iMaxWidth = INT_MAX;
+    if(!lua_isnoneornil(L, 3))
+        iMaxWidth = static_cast<int>(luaL_checkinteger(L, 3));
 
-    lua_pushinteger(L, iWidth);
-    lua_pushinteger(L, iHeight);
-    return 2;
+    THFontDrawArea oDrawArea = pFont->getTextSize(sMsg, iMsgLen, iMaxWidth);
+
+    lua_pushinteger(L, oDrawArea.iEndX);
+    lua_pushinteger(L, oDrawArea.iEndY);
+    lua_pushinteger(L, oDrawArea.iNumRows);
+
+    return 3;
 }
 
 static int l_font_draw(lua_State *L)
 {
     THFont* pFont = luaT_testuserdata<THFont>(L);
-    THRenderTarget* pCanvas = NULL;
+    THRenderTarget* pCanvas = nullptr;
     if(!lua_isnoneornil(L, 2))
     {
         pCanvas = luaT_testuserdata<THRenderTarget>(L, 2);
@@ -329,36 +334,36 @@ static int l_font_draw(lua_State *L)
     if(!lua_isnoneornil(L, 8))
     {
         const char* sAlign = luaL_checkstring(L, 8);
-        if(strcmp(sAlign, "right") == 0)
+        if(std::strcmp(sAlign, "right") == 0)
             eAlign = Align_Right;
-        else if(strcmp(sAlign, "left") == 0)
+        else if(std::strcmp(sAlign, "left") == 0)
             eAlign = Align_Left;
-        else if(strcmp(sAlign, "center") == 0
-             || strcmp(sAlign, "centre") == 0
-             || strcmp(sAlign, "middle") == 0)
+        else if(std::strcmp(sAlign, "center") == 0
+             || std::strcmp(sAlign, "centre") == 0
+             || std::strcmp(sAlign, "middle") == 0)
         {
             eAlign = Align_Center;
         }
         else
             return luaL_error(L, "Invalid alignment: \"%s\"", sAlign);
     }
-    int iWidth, iHeight;
-    pFont->getTextSize(sMsg, iMsgLen, &iWidth, &iHeight);
+
+    THFontDrawArea oDrawArea = pFont->getTextSize(sMsg, iMsgLen);
     if(!lua_isnoneornil(L, 7))
     {
         int iW = static_cast<int>(luaL_checkinteger(L, 6));
         int iH = static_cast<int>(luaL_checkinteger(L, 7));
-        if(iW > iWidth && eAlign != Align_Left)
-            iX += (iW - iWidth) / ((eAlign == Align_Center) ? 2 : 1);
-        if(iH > iHeight)
-            iY += (iH - iHeight) / 2;
+        if(iW > oDrawArea.iEndX && eAlign != Align_Left)
+            iX += (iW - oDrawArea.iEndX) / ((eAlign == Align_Center) ? 2 : 1);
+        if(iH > oDrawArea.iEndY)
+            iY += (iH - oDrawArea.iEndY) / 2;
     }
-    if(pCanvas != NULL)
+    if(pCanvas != nullptr)
     {
         pFont->drawText(pCanvas, sMsg, iMsgLen, iX, iY);
     }
-    lua_pushinteger(L, iY + iHeight);
-    lua_pushinteger(L, iX + iWidth);
+    lua_pushinteger(L, iY + oDrawArea.iEndY);
+    lua_pushinteger(L, iX + oDrawArea.iEndX);
 
     return 2;
 }
@@ -366,7 +371,7 @@ static int l_font_draw(lua_State *L)
 static int l_font_draw_wrapped(lua_State *L)
 {
     THFont* pFont = luaT_testuserdata<THFont>(L);
-    THRenderTarget* pCanvas = NULL;
+    THRenderTarget* pCanvas = nullptr;
     if(!lua_isnoneornil(L, 2))
     {
         pCanvas = luaT_testuserdata<THRenderTarget>(L, 2);
@@ -380,27 +385,38 @@ static int l_font_draw_wrapped(lua_State *L)
     if(!lua_isnoneornil(L, 7))
     {
         const char* sAlign = luaL_checkstring(L, 7);
-        if(strcmp(sAlign, "right") == 0)
+        if(std::strcmp(sAlign, "right") == 0)
             eAlign = Align_Right;
-        else if(strcmp(sAlign, "left") == 0)
+        else if(std::strcmp(sAlign, "left") == 0)
             eAlign = Align_Left;
-        else if(strcmp(sAlign, "center") == 0
-             || strcmp(sAlign, "centre") == 0
-             || strcmp(sAlign, "middle") == 0)
+        else if(std::strcmp(sAlign, "center") == 0
+             || std::strcmp(sAlign, "centre") == 0
+             || std::strcmp(sAlign, "middle") == 0)
         {
             eAlign = Align_Center;
         }
         else
             return luaL_error(L, "Invalid alignment: \"%s\"", sAlign);
     }
+    int iMaxRows = INT_MAX;
+    if(!lua_isnoneornil(L, 8))
+    {
+      iMaxRows = static_cast<int>(luaL_checkinteger(L, 8));
+    }
 
-    int iLastX;
-    int iLastY = pFont->drawTextWrapped(pCanvas, sMsg, iMsgLen, iX, iY,
-                                              iW, NULL, &iLastX, eAlign);
-    lua_pushinteger(L, iLastY);
-    lua_pushinteger(L, iLastX);
+    int iSkipRows = 0;
+    if(!lua_isnoneornil(L, 9))
+    {
+        iSkipRows = static_cast<int>(luaL_checkinteger(L, 9));
+    }
 
-    return 2;
+    THFontDrawArea oDrawArea = pFont->drawTextWrapped(pCanvas, sMsg, iMsgLen, iX, iY,
+                                              iW, iMaxRows, iSkipRows, eAlign);
+    lua_pushinteger(L, oDrawArea.iEndY);
+    lua_pushinteger(L, oDrawArea.iEndX);
+    lua_pushinteger(L, oDrawArea.iNumRows);
+
+    return 3;
 }
 
 static int l_font_draw_tooltip(lua_State *L)
@@ -414,22 +430,21 @@ static int l_font_draw_tooltip(lua_State *L)
     int iScreenWidth = pCanvas->getWidth();
 
     int iW = 200; // (for now) hardcoded width of tooltips
-    int iRealW;
     uint32_t iBlack = pCanvas->mapColour(0x00, 0x00, 0x00);
     uint32_t iWhite = pCanvas->mapColour(0xFF, 0xFF, 0xFF);
-    int iLastY = pFont->drawTextWrapped(NULL, sMsg, iMsgLen, iX + 2, iY + 1, iW - 4, &iRealW);
-    int iLastX = iX + iRealW + 3;
-    int iFirstY = iY - (iLastY - iY) - 1;
+    THFontDrawArea oArea = pFont->drawTextWrapped(nullptr, sMsg, iMsgLen, iX + 2, iY + 1, iW - 4, INT_MAX, 0);
+    int iLastX = iX + oArea.iWidth + 3;
+    int iFirstY = iY - (oArea.iEndY - iY) - 1;
 
     int iXOffset = iLastX > iScreenWidth ? iScreenWidth - iLastX : 0;
     int iYOffset = iFirstY < 0 ? -iFirstY : 0;
 
-    pCanvas->fillRect(iBlack, iX + iXOffset, iFirstY + iYOffset, iRealW + 3, iLastY - iY + 2);
-    pCanvas->fillRect(iWhite, iX + iXOffset + 1, iFirstY + 1 + iYOffset, iRealW + 1, iLastY - iY);
+    pCanvas->fillRect(iBlack, iX + iXOffset, iFirstY + iYOffset, oArea.iWidth + 3, oArea.iEndY - iY + 2);
+    pCanvas->fillRect(iWhite, iX + iXOffset + 1, iFirstY + 1 + iYOffset, oArea.iWidth + 1, oArea.iEndY - iY);
 
     pFont->drawTextWrapped(pCanvas, sMsg, iMsgLen, iX + 2 + iXOffset, iFirstY + 1 + iYOffset, iW - 4);
 
-    lua_pushinteger(L, iLastY);
+    lua_pushinteger(L, oArea.iEndY);
 
     return 1;
 }
@@ -488,7 +503,7 @@ static int l_layers_depersist(lua_State *L)
     lua_insert(L, 1);
     LuaPersistReader* pReader = (LuaPersistReader*)lua_touserdata(L, 1);
 
-    memset(pLayers->iLayerContents, 0, sizeof(pLayers->iLayerContents));
+    std::memset(pLayers->iLayerContents, 0, sizeof(pLayers->iLayerContents));
     int iNumLayers;
     if(!pReader->readVUInt(iNumLayers))
         return 0;
@@ -496,7 +511,7 @@ static int l_layers_depersist(lua_State *L)
     {
         if(!pReader->readByteStream(pLayers->iLayerContents, 13))
             return 0;
-        if(!pReader->readByteStream(NULL, iNumLayers - 13))
+        if(!pReader->readByteStream(nullptr, iNumLayers - 13))
             return 0;
     }
     else
@@ -562,8 +577,8 @@ static THRenderTargetCreationParams l_surface_creation_params(lua_State *L, int 
         if(sOption[0] == 0)
             continue;
 
-        if (stricmp(sOption, "fullscreen") == 0)        oParams.bFullscreen       = true;
-        if (stricmp(sOption, "present immediate") == 0) oParams.bPresentImmediate = true;
+        if (std::strcmp(sOption, "fullscreen") == 0)        oParams.bFullscreen       = true;
+        if (std::strcmp(sOption, "present immediate") == 0) oParams.bPresentImmediate = true;
     }
 
     return oParams;
@@ -738,7 +753,7 @@ static int l_surface_scale(lua_State *L)
     {
         size_t iLength;
         const char* sOption = lua_tolstring(L, 3, &iLength);
-        if(sOption && iLength >= 6 && memcmp(sOption, "bitmap", 6) == 0)
+        if(sOption && iLength >= 6 && std::memcmp(sOption, "bitmap", 6) == 0)
         {
             eToScale = THSI_Bitmaps;
         }

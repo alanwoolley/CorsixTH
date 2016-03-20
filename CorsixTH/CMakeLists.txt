@@ -7,7 +7,7 @@ ENDIF(CORSIX_TH_DONE_TOP_LEVEL_CMAKE)
 # Project Declaration
 PROJECT(CorsixTH)
 
-# Basic platform dependant stuff
+# Basic platform dependent stuff
 IF(UNIX)
   IF(APPLE)
     # fruit goes here
@@ -94,7 +94,7 @@ IF(SDL_FOUND)
     message(FATAL_ERROR "Error: SDL was found but SDLmain was not")
     message("Make sure the path is correctly defined or set the environment variable SDLDIR to the correct location")
   ENDIF(SDLMAIN_LIBRARY STREQUAL "")
-  # No need to specify sdlmain seperately, the FindSDL.cmake file will take care of that. If not we get an error about it
+  # No need to specify sdlmain separately, the FindSDL.cmake file will take care of that. If not we get an error about it
   TARGET_LINK_LIBRARIES(CorsixTH ${SDL_LIBRARY})
   message("  SDL found")
 ELSE(SDL_FOUND)
@@ -175,19 +175,6 @@ IF(CORSIX_TH_USE_FREETYPE2)
     message(FATAL_ERROR "Error: FreeType2 library not found, even though it was selected to be used")
   ENDIF(FREETYPE_FOUND)
 ENDIF(CORSIX_TH_USE_FREETYPE2)
-
-# Find DirectX
-IF(CORSIX_TH_USE_DX9_RENDERER)
-  FIND_PACKAGE(DirectX REQUIRED)
-  IF(DirectX_FOUND)
-    TARGET_LINK_LIBRARIES(CorsixTH ${DirectX_LIBRARY})
-    TARGET_LINK_LIBRARIES(CorsixTH ${DirectX_D3DX9_LIBRARY})
-    INCLUDE_DIRECTORIES(${DirectX_INCLUDE_DIR})
-    message("  DirectX found")
-  ELSE(DirectX_FOUND)
-    message(FATAL_ERROR "Error: DirectX library not found, it is required to build (consider changing choice of renderer)")
-  ENDIF(DirectX_FOUND)
-ENDIF(CORSIX_TH_USE_DX9_RENDERER)
 
 # Find msinttypes for MSVC
 IF(MSVC AND NOT CORSIX_TH_HAS_INTTYPES_H)

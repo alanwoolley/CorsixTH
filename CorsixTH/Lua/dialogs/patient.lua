@@ -216,13 +216,18 @@ function UIPatient:onMouseMove(x, y, dx, dy)
   return Window.onMouseMove(self, x, y, dx, dy)
 end
 
+--[[! Scrolls the map to the position of the patient which this dialog belongs to ]]
+function UIPatient:scrollToPatient()
+  local ui = self.ui
+  local patient = self.patient
+  local px, py = ui.app.map:WorldToScreen(patient.tile_x, patient.tile_y)
+  local dx, dy = patient.th:getPosition()
+  ui:scrollMapTo(px + dx, py + dy)
+end
+
 function UIPatient:onTick()
   if self.do_scroll then
-    local ui = self.ui
-    local patient = self.patient
-    local px, py = ui.app.map:WorldToScreen(patient.tile_x, patient.tile_y)
-    local dx, dy = patient.th:getPosition()
-    ui:scrollMapTo(px + dx, py + dy)
+    self:scrollToPatient()
   end
   return Window.onTick(self)
 end
@@ -262,11 +267,11 @@ function UIPatient:viewQueue()
   for i, action in ipairs(self.patient.action_queue) do
     if action.name == "queue" then
       self.ui:addWindow(UIQueue(self.ui, action.queue))
-      self.ui:playSound "selectx.wav"
+      self.ui:playSound("selectx.wav")
       return
     end
   end
-  self.ui:playSound "wrong2.wav"
+  self.ui:playSound("wrong2.wav")
 end
 
 function UIPatient:goHome()
@@ -274,7 +279,7 @@ function UIPatient:goHome()
     return
   end
   self:close()
-  self.patient:playSound "sack.wav"
+  self.patient:playSound("sack.wav")
   self.patient:goHome()
   self.patient:updateDynamicInfo(_S.dynamic_info.patient.actions.sent_home)
 end
@@ -287,8 +292,9 @@ end
 function UIPatient:guessDisease()
   local patient = self.patient
   -- NB: the first line of conditions should already be ruled out by button being disabled, but just in case
-  if patient.is_debug or patient.diagnosis_progress == 0 or patient.diagnosed or patient.going_home
-  or patient:getRoom() or not patient.hospital.disease_casebook[patient.disease.id].discovered then
+  if patient.is_debug or patient.diagnosis_progress == 0 or patient.diagnosed or
+      patient.going_home or patient:getRoom() or
+      not patient.hospital.disease_casebook[patient.disease.id].discovered then
     self.ui:playSound("wrong2.wav")
     return
   end

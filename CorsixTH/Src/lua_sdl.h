@@ -32,8 +32,8 @@ SOFTWARE.
 #define SDL_USEREVENT_TICK (SDL_USEREVENT + 0)
 // SDL_USEREVENT_MUSIC_OVER - informs script of SDL_Mixer music finishing
 #define SDL_USEREVENT_MUSIC_OVER (SDL_USEREVENT + 1)
-// SDL_USEREVENT_CPCALL - calls lua_cpcall with SDL_Event user.data1 and data2
-#define SDL_USEREVENT_CPCALL (SDL_USEREVENT + 2)
+// SDL_USEREVENT_MUSIC_LOADED - informs script that async music is loaded
+#define SDL_USEREVENT_MUSIC_LOADED (SDL_USEREVENT + 2)
 // SDL USEREVENT_MOVIE_OVER - informs script of THMovie movie finishing
 #define SDL_USEREVENT_MOVIE_OVER (SDL_USEREVENT + 3)
 // SDL_USEREVENT_SOUND_OVER - informs script of a played sound finishing.
@@ -63,5 +63,8 @@ typedef struct {
 			edgeScroll, vibrate;
 	char* originalFilesPath, *cthPath, *language;
 } Configuration;
+
+int l_load_music_async_callback(lua_State *L);
+
 
 #endif // CORSIX_TH_LUA_SDL_H_

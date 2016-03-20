@@ -145,12 +145,12 @@ public:
     /*!
         @param width Pixel width of the resulting image
         @param height Pixel height of the resulting image
-        @param buffer If NULL, then a new buffer is created to render the image
+        @param buffer If nullptr, then a new buffer is created to render the image
           onto. Otherwise, should be an array at least width*height in size.
           Ownership of this pointer is assumed by the class - call takeData()
           to take ownership back again.
     */
-    THChunkRenderer(int width, int height, uint8_t *buffer = NULL);
+    THChunkRenderer(int width, int height, uint8_t *buffer = nullptr);
 
     ~THChunkRenderer();
 
@@ -189,7 +189,7 @@ public:
     //! Perform a "fill to end of file" chunk (normally called by decodeChunks)
     void chunkFinish(uint8_t value);
 
-protected:
+private:
     inline bool _isDone() {return m_ptr == m_end;}
     inline void _fixNpixels(int& npixels) const;
     inline void _incrementPosition(int npixels);
@@ -261,11 +261,11 @@ public:
     //! Load original animations.
     /*!
         setSpriteSheet() must be called before calling this.
-        @param pStartData Animation first frame indicies (e.g. VSTART-1.ANI)
+        @param pStartData Animation first frame indices (e.g. VSTART-1.ANI)
         @param iStartDataLength Length of \a pStartData.
         @param pFrameData Frame details (e.g. VFRA-1.ANI)
         @param iFrameDataLength Length of \a pFrameData
-        @param pListData Element indicies list (e.g. VLIST-1.ANI)
+        @param pListData Element indices list (e.g. VLIST-1.ANI)
         @param iListDataLength Length of \a pListData
         @param pElementData Element details (e.g. VELE-1.ANI)
         @param iElementDataLength Length of \a pElementData
@@ -322,7 +322,7 @@ public:
         @param pCanvas The render target to draw onto.
         @param iFrame The frame index to draw (should be in range [0, getFrameCount() - 1])
         @param oLayers Information to decide what to draw on each layer.
-            An animation is comprised of upto thirteen layers, numbered 0
+            An animation is comprised of up to thirteen layers, numbered 0
             through 12. Some animations will have different options for what to
             render on each layer. For example, patient animations generally
             have the different options on layer 1 as different clothes, so if
@@ -360,7 +360,7 @@ public:
      */
     const AnimationStartFrames &getNamedAnimations(const std::string &sName, int iTilesize) const;
 
-protected:
+private:
 #if CORSIX_TH_USE_PACK_PRAGMAS
 #pragma pack(push)
 #pragma pack(1)
@@ -515,15 +515,12 @@ public:
 
    // bool isMultipleFrameAnimation() { return false;}
 protected:
-    void _clear();
-
     //! X position on tile (not tile x-index)
     int m_iX;
     //! Y position on tile (not tile y-index)
     int m_iY;
 
     THLayers_t m_oLayers;
-
 };
 
 class THAnimation : public THAnimationBase
@@ -552,24 +549,25 @@ public:
     void setMorphTarget(THAnimation *pMorphTarget, unsigned int iDurationFactor = 1);
     void setFrame(size_t iFrame);
 
-    void setSpeed(int iX, int iY) {m_iSpeedX = iX, m_iSpeedY = iY;}
+    void setSpeed(int iX, int iY) {speed.x = iX, speed.y = iY;}
     void setCropColumn(int iColumn) {m_iCropColumn = iColumn;}
 
     void persist(LuaPersistWriter *pWriter) const;
     void depersist(LuaPersistReader *pReader);
 
     THAnimationManager* getAnimationManager(){ return m_pManager;}
-protected:
+private:
     THAnimationManager *m_pManager;
     THAnimation* m_pMorphTarget;
     size_t m_iAnimation; ///< Animation number.
     size_t m_iFrame;     ///< Frame number.
-    union { struct {
-        //! Amount to change m_iX per tick
-        int m_iSpeedX;
-        //! Amount to change m_iY per tick
-        int m_iSpeedY;
-    };
+    union {
+        struct {
+            //! Amount to change m_iX per tick
+            int x;
+            //! Amount to change m_iY per tick
+            int y;
+        } speed;
         //! Some animations are tied to the marker of another animation and
         //! hence have a parent rather than a speed.
         THAnimation* m_pParent;
@@ -598,7 +596,7 @@ public:
     void persist(LuaPersistWriter *pWriter) const;
     void depersist(LuaPersistReader *pReader);
 
-protected:
+private:
     struct _sprite_t
     {
         size_t iSprite;

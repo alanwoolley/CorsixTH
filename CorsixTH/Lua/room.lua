@@ -297,7 +297,7 @@ function Room:onHumanoidEnter(humanoid)
   -- If this humanoid for some strange reason happens to enter a non-active room,
   -- just leave.
   if not self.is_active then
-    print ('Warning: humanoid entering non-active room')
+    print('Warning: humanoid entering non-active room')
     self.humanoids[humanoid] = true
     if class.is(humanoid, Patient) then
       self:makeHumanoidLeave(humanoid)
@@ -457,15 +457,6 @@ function Room:staffMeetsRoomRequirements(humanoid)
   return false
 end
 
--- Tests whether this room is awaiting more staff to be able to do business
-function Room:isWaitingToGetStaff(staff)
-  if not self.is_active or (self.door.queue:patientSize() == 0
-  and not (self.door.reserved_for and class.is(self.door.reserved_for, Patient) or false)) then
-    return false
-  end
-  return self:staffFitsInRoom(staff, true)
-end
-
 --! When a valid member of staff enters the room this function is called.
 -- Can be extended in derived classes.
 --!param humanoid The staff in question
@@ -501,8 +492,7 @@ function Room:commandEnteringPatient(humanoid)
 end
 
 function Room:tryAdvanceQueue()
-  if self.door.queue:size() > 0 and not self.door.user
-  and not self.door.reserved_for then
+  if self.door.queue:size() > 0 and not self.door.user and not self.door.reserved_for then
     local front = self.door.queue:front()
     -- These two conditions differ by the waiting symbol
 
@@ -688,7 +678,7 @@ local function tryMovePatient(old_room, new_room, patient)
 
   local px, py = patient.tile_x, patient.tile_y
   -- Don't reroute the patient if he just decided to go to the toilet
-  if patient.going_to_toilet then
+  if patient.going_to_toilet ~= "no" then
     return false
   end
 
@@ -776,7 +766,8 @@ function Room:crashRoom()
     local person = self.door.reserved_for
     if not person:isLeaving() then
       if class.is(person, Patient) then
-        person:queueAction({name = "idle", count = 1}) --Delay so that room is destroyed before the seek_room search.
+        --Delay so that room is destroyed before the seek_room search.
+        person:queueAction({name = "idle", count = 1})
         person:queueAction({name = "seek_room", room_type = self.room_info.id})
       end
     end
@@ -819,8 +810,8 @@ function Room:crashRoom()
       end
       object.unreachable = true
     end
-    if object.object_type.id ~= "door" and not object.strength
-    and object.object_type.class ~= "SwingDoor" then
+    if object.object_type.id ~= "door" and not object.strength and
+        object.object_type.class ~= "SwingDoor" then
       object.user = nil
       object.user_list = nil
       object.reserved_for = nil

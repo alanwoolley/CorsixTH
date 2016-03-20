@@ -37,6 +37,8 @@ int luaopen_random(lua_State *L);
 #include "persist_lua.h"
 #include "iso_fs.h"
 #include "lfs.h"
+#include <cstring>
+#include <cstdio>
 
 // Config file checking
 #ifndef CORSIX_TH_USE_PACK_PRAGMAS
@@ -46,12 +48,13 @@ int luaopen_random(lua_State *L);
 
 extern JavaVM* jvm;
 
-int CorsixTH_lua_main_no_eval(lua_State *L) {
-	// assert(_VERSION == LUA_VERSION)
-	size_t iLength;
-	lua_getglobal(L, "_VERSION");
-	const char* sVersion = lua_tolstring(L, -1, &iLength);
-    if(iLength != strlen(LUA_VERSION) || strcmp(sVersion, LUA_VERSION) != 0)
+int CorsixTH_lua_main_no_eval(lua_State *L)
+{
+    // assert(_VERSION == LUA_VERSION)
+    size_t iLength;
+    lua_getglobal(L, "_VERSION");
+    const char* sVersion = lua_tolstring(L, -1, &iLength);
+    if(iLength != std::strlen(LUA_VERSION) || std::strcmp(sVersion, LUA_VERSION) != 0)
     {
         lua_pushliteral(L, "Linked against a version of Lua different to the "
             "one used when compiling.\nPlease recompile CorsixTH against the "
@@ -61,12 +64,8 @@ int CorsixTH_lua_main_no_eval(lua_State *L) {
     }
     lua_pop(L, 1);
 
-    // registry._CLEANUP = {}
-    lua_newtable(L);
-    lua_setfield(L, LUA_REGISTRYINDEX, "_CLEANUP");
-
     // math.random* = Mersenne twister variant
-    luaT_cpcall(L, luaopen_random, NULL);
+    luaT_cpcall(L, luaopen_random, nullptr);
 
     // package.preload["jit.opt"] = load(jit_opt_lua)
     // package.preload["jit.opt_inline"] = load(jit_opt_inline_lua)
@@ -130,7 +129,7 @@ int CorsixTH_lua_main_no_eval(lua_State *L) {
         {
             size_t iLen;
             const char* sCmd = lua_tolstring(L, i, &iLen);
-            if(iLen > 14 && memcmp(sCmd, "--interpreter=", 14) == 0)
+            if(iLen > 14 && std::memcmp(sCmd, "--interpreter=", 14) == 0)
             {
                 lua_getglobal(L, "assert");
                 lua_getglobal(L, "loadfile");
@@ -175,9 +174,6 @@ int CorsixTH_lua_main_no_eval(lua_State *L) {
                  // There's probably a better way of doing this.
 #if defined(IS_CORSIXTH_APP)
     "code = loadfile(\"CorsixTH.app/Contents/Resources/\"..name)\n"
-    "if code then return code end\n"
-#elif defined(IS_MAPEDIT_APP)
-    "code = loadfile(\"MapEdit.app/Contents/Resources/\"..name)\n"
     "if code then return code end\n"
 #endif
 #endif
@@ -225,7 +221,7 @@ int CorsixTH_lua_stacktrace(lua_State *L)
     lua_call(L, 1, 1);
 
     // err = <description> .. err
-    lua_pushliteral(L, "An error has occured in CorsixTH:\n");
+    lua_pushliteral(L, "An error has occurred in CorsixTH:\n");
     lua_insert(L, 1);
     lua_concat(L, 2);
 
@@ -241,15 +237,15 @@ int CorsixTH_lua_stacktrace(lua_State *L)
 
 int CorsixTH_lua_panic(lua_State *L)
 {
-    fprintf(stderr, "A Lua error has occured in CorsixTH outside of protected "
+    std::fprintf(stderr, "A Lua error has occurred in CorsixTH outside of protected "
         "mode!!\n");
-    fflush(stderr);
+    std::fflush(stderr);
 
     if(lua_type(L, -1) == LUA_TSTRING)
-        fprintf(stderr, "%s\n", lua_tostring(L, -1));
+        std::fprintf(stderr, "%s\n", lua_tostring(L, -1));
     else
-        fprintf(stderr, "%p\n", lua_topointer(L, -1));
-    fflush(stderr);
+        std::fprintf(stderr, "%p\n", lua_topointer(L, -1));
+    std::fflush(stderr);
 
     // A stack trace would be nice, but they cannot be done in a panic.
 

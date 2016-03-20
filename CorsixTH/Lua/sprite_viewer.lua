@@ -37,7 +37,7 @@ local sdown = false
 local y_off
 local old_event_handlers
 
-for _, dir in ipairs{"Data", "QData", "DataM", "QDataM"} do
+for _, dir in ipairs({"Data", "QData", "DataM", "QDataM"}) do
   for item in pairs(app.fs:listFiles(dir) or {}) do
     if item:match"%.TAB$" then
       sprite_table_paths[#sprite_table_paths + 1] = {dir, item:sub(1, -5)}
@@ -113,7 +113,7 @@ local function Render(canvas)
   local tallest = 0
   for i = 0, #sprite_table - 1 do
     local w, h = sprite_table:size(i)
-    local lbl = "#" .. i .. " (" .. w .. "x" .. h ..")"
+    local lbl = "#" .. i .. " (" .. w .. "x" .. h .. ")"
     local lw = font:sizeOf(lbl)
     if lw > w then w = lw end
     h = h + fonth + sep

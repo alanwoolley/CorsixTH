@@ -66,7 +66,7 @@ function UIPlaceObjects:UIPlaceObjects(ui, object_list, pay_for)
     self:addPanel(113, 0, y) -- Desc text box
   end
   self:addPanel(114,   0, 90) -- Dialog mid-piece
-  self:addPanel(115,   0, 100):makeButton(9, 8, 41, 42, 116, self.cancel):setSound"no4.wav":setTooltip(_S.tooltip.place_objects_window.cancel)
+  self:addPanel(115,   0, 100):makeButton(9, 8, 41, 42, 116, self.cancel):setSound("no4.wav"):setTooltip(_S.tooltip.place_objects_window.cancel)
   self:addKeyHandler("escape", self.cancel)
   self.purchase_button =
   self:addPanel(117,  50, 100):makeButton(1, 8, 41, 42, 118, self.purchaseItems):setTooltip(_S.tooltip.place_objects_window.buy_sell)
@@ -76,7 +76,7 @@ function UIPlaceObjects:UIPlaceObjects(ui, object_list, pay_for)
     :setDisabledSprite(128):enable(false):makeToggle() -- Disabled pick up items button
   self.confirm_button =
   self:addPanel(121, 134, 100):makeButton(1, 8, 43, 42, 122, self.confirm):setTooltip(_S.tooltip.place_objects_window.confirm)
-    :setDisabledSprite(129):enable(false):setSound"YesX.wav" -- Disabled confirm button
+    :setDisabledSprite(129):enable(false):setSound("YesX.wav") -- Disabled confirm button
 
   self.list_header = self:addPanel(123, 0, 146) -- Object list header
   self.list_header.visible = false
@@ -222,16 +222,17 @@ function UIPlaceObjects:addObjects(object_list, pay_for)
     self.objects[#self.objects + 1] = object
     if pay_for then
       local build_cost = self.ui.hospital:getObjectBuildCost(object.object.id)
-      self.ui.hospital:spendMoney(object.qty * build_cost, _S.transactions.buy_object .. ": " .. object.object.name, object.qty * build_cost)
+      local msg = _S.transactions.buy_object .. ": " .. object.object.name
+      self.ui.hospital:spendMoney(object.qty * build_cost, msg, object.qty * build_cost)
     end
   end
 
   -- sort list by size of object (number of tiles in the first existing orientation (usually north))
   table.sort(self.objects, function(o1, o2)
-    local orient1 = o1.object.orientations.north or o1.object.orientations.east
-                 or o1.object.orientations.south or o1.object.orientations.west
-    local orient2 = o2.object.orientations.north or o2.object.orientations.east
-                 or o2.object.orientations.south or o2.object.orientations.west
+    local orient1 = o1.object.orientations.north or o1.object.orientations.east or
+                    o1.object.orientations.south or o1.object.orientations.west
+    local orient2 = o2.object.orientations.north or o2.object.orientations.east or
+                    o2.object.orientations.south or o2.object.orientations.west
     return #orient1.footprint > #orient2.footprint
   end)
 
@@ -242,9 +243,10 @@ end
 
 -- precondition: self.active_index has to correspond to the object to be removed
 function UIPlaceObjects:removeObject(object, dont_close_if_empty, refund)
-  local build_cost = self.ui.hospital:getObjectBuildCost(object.object.id)
   if refund then
-    self.ui.hospital:receiveMoney(build_cost, _S.transactions.sell_object .. ": " .. object.object.name, build_cost)
+    local build_cost = self.ui.hospital:getObjectBuildCost(object.object.id)
+    local msg = _S.transactions.sell_object .. ": " .. object.object.name
+    self.ui.hospital:receiveMoney(build_cost, msg, build_cost)
   end
 
   object.qty = object.qty - 1
@@ -444,7 +446,7 @@ end
 
 function UIPlaceObjects:tryNextOrientation()
   if #self.objects > 0 then
-    self.ui:playSound "swoosh.wav"
+    self.ui:playSound("swoosh.wav")
     startvibration(2);
     self.objects[self.active_index].orientation_before = self.object_orientation;
     self:nextOrientation()
@@ -492,6 +494,7 @@ function UIPlaceObjects:placeObject(dont_close_if_empty)
     real_obj = object.existing_objects[1]
     table.remove(object.existing_objects, 1)
   end
+  local room = self.room or self.world:getRoom(self.object_cell_x, self.object_cell_y)
   if real_obj then
     -- If there is such an object then we don't want to make a new one, but move this one instead.
     if real_obj.orientation_before and real_obj.orientation_before ~= self.object_orientation then
@@ -504,16 +507,19 @@ function UIPlaceObjects:placeObject(dont_close_if_empty)
     end
     -- Some objects (e.g. the plant) uses this flag to avoid doing stupid things when picked up.
     real_obj.picked_up = false
+    -- Machines may have smoke, recalculate it to ensure the animation is in the correct state
+    if real_obj.strength then
+      real_obj:calculateSmoke(room)
+    end
   else
     real_obj = self.world:newObject(object.object.id, self.object_cell_x,
     self.object_cell_y, self.object_orientation)
   end
-  local room = self.room or self.world:getRoom(self.object_cell_x, self.object_cell_y)
   if room then
     room.objects[real_obj] = true
   end
 
-  self.ui:playSound "place_r.wav"
+  self.ui:playSound("place_r.wav")
 
   self:removeObject(object, dont_close_if_empty)
   object.orientation_before = nil
@@ -766,8 +772,8 @@ function UIPlaceObjects:calculateBestPlacementPosition(x, y)
     -- TODO: East, South
   end
   bestx, besty = math_floor(bestx), math_floor(besty)
-  if bestx < 1 or besty < 1
-  or bestx > self.map.width or besty > self.map.height then
+  if bestx < 1 or besty < 1 or
+      bestx > self.map.width or besty > self.map.height then
     bestx, besty = nil
   end
   return bestx, besty, besto
