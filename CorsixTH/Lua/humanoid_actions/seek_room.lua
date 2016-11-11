@@ -18,6 +18,36 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE. --]]
 
+class "SeekRoomAction" (HumanoidAction)
+
+---@type SeekRoomAction
+local SeekRoomAction = _G["SeekRoomAction"]
+
+--! Find another room (and go to it).
+--!param room_type Type of the new room.
+function SeekRoomAction:SeekRoomAction(room_type)
+  assert(type(room_type) == "string", "Invalid value for parameter 'room_type'")
+
+  self:HumanoidAction("seek_room")
+  self.room_type = room_type
+  self.treatment_room = nil -- Whether the next room is a treatment room.
+  self.diagnosis_room = nil
+end
+
+--! Denote that the room being looked for is a treatment room.
+--!return (action) self, for daisy-chaining.
+function SeekRoomAction:enableTreatmentRoom()
+  self.treatment_room = true
+  return self
+end
+
+function SeekRoomAction:setDiagnosisRoom(room)
+  assert(type(room) == "number", "Invalid value for parameter 'room'")
+
+  self.diagnosis_room = room
+  return self
+end
+
 local function action_seek_room_find_room(action, humanoid)
   local room_type = action.room_type
   if action.diagnosis_room then
@@ -142,7 +172,7 @@ local function action_seek_room_no_diagnosis_room_found(action, humanoid)
   -- Otherwise, depending on hospital policy three things can happen:
   if humanoid.diagnosis_progress < humanoid.hospital.policies["send_home"] then
     -- Send home automatically
-    humanoid:goHome()
+    humanoid:goHome("kicked")
     humanoid:updateDynamicInfo(_S.dynamic_info.patient.actions.no_diagnoses_available)
   elseif humanoid.diagnosis_progress < humanoid.hospital.policies["guess_cure"] or
       not humanoid.hospital.disease_casebook[humanoid.disease.id].discovered then
@@ -174,12 +204,18 @@ local function action_seek_room_no_diagnosis_room_found(action, humanoid)
     -- Guess "type of disease" automatically.
     -- A patient with an undiscovered disease should never get here.
     assert(humanoid.hospital.disease_casebook[humanoid.disease.id].discovered)
-    humanoid:setDiagnosed(true)
-    humanoid:queueAction({
-      name = "seek_room",
-      room_type = humanoid.disease.treatment_rooms[1],
-      treatment_room = true,
-    }, 1)
+    humanoid:setDiagnosed()
+    humanoid:unregisterRoomBuildCallback(action.build_callback)
+    humanoid:unregisterRoomRemoveCallback(action.remove_callback)
+    if humanoid:agreesToPay(humanoid.disease.id) then
+      humanoid:queueAction({
+        name = "seek_room",
+        room_type = humanoid.disease.treatment_rooms[1],
+        treatment_room = true,
+      }, 1)
+    else
+      humanoid:goHome("over_priced", humanoid.disease.id)
+    end
     humanoid:finishAction()
   end
 end
@@ -205,7 +241,7 @@ local function action_seek_room_start(action, humanoid)
   end
   -- Seeking for toilets is a special case with its own action.
   if action.room_type == "toilets" then
-    humanoid:queueAction({name = "seek_toilets"}, 1)
+    humanoid:queueAction(SeekToiletsAction(), 1)
     humanoid:finishAction()
     return
   end
@@ -300,7 +336,7 @@ local function action_seek_room_start(action, humanoid)
       end
       if action_still_valid then
         action.done_walk = true
-        humanoid:queueAction({name = "meander", count = 1, must_happen = true}, 0)
+        humanoid:queueAction(MeanderAction():setCount(1):setMustHappen(true), 0)
       end
     else
       -- Make sure the patient stands in a correct way as he/she is waiting.

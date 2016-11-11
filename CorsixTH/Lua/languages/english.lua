@@ -72,6 +72,9 @@ date_format = {
 object.litter = "Litter"
 tooltip.objects.litter = "Litter: Left on the floor by a patient because he did not find a bin to throw it in."
 
+object.rathole = "Rathole"
+tooltip.objects.rathole = "Home of a rat family that found your hospital dirty enough to live here."
+
 tooltip.fax.close = "Close this window without deleting the message"
 tooltip.message.button = "Left click to open message"
 tooltip.message.button_dismiss = "Left click to open message, right click to dismiss it"
@@ -198,6 +201,10 @@ adviser = {
     researcher_needs_desk_3 = "Each Researcher needs to have his own desk to work from.",
     nurse_needs_desk_1 = "Each Nurse needs to have her own desk to work from.",
     nurse_needs_desk_2 = "Your Nurse is pleased that you have allowed her to have a break. If you were intending to have more than one working in the ward, then you need to provide them each with a desk to work from.",
+    low_prices = "You're charging too little for %s. This will bring people to your hospital, but you won't make a lot of profit from each one.",
+    high_prices = "Your charges for %s are high. This will make big profits in the short-term, but ultimately you'll start to drive people away.",
+    fair_prices = "Your charges for %s seem fair and balanced.",
+    patient_not_paying = "A patient left without paying for %s because it's too expensive!",
   },
   cheats = {
     th_cheat = "Congratulations, you have unlocked cheats!",
@@ -591,6 +598,8 @@ cheats_window = {
     end_year = "End of Year",
     lose_level = "Lose Level",
     win_level = "Win Level",
+    increase_prices = "Increase prices",
+    decrease_prices = "Decrease prices",
   },
   close = "Close",
 }
@@ -610,6 +619,8 @@ tooltip.cheats_window = {
     end_year = "Jumps to the end of the year.",
     lose_level = "Lose the current level.",
     win_level = "Win the current level.",
+    increase_prices = "Increase all prices by 50% (max. 200%)",
+    decrease_prices = "Decrease all prices by 50% (min. 50%)",
   }
 }
 

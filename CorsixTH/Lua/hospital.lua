@@ -48,7 +48,6 @@ function Hospital:Hospital(world, avail_rooms, name)
   self.acc_overdraft = 0
   self.acc_heating = 0
   self.discover_autopsy_risk = 10
-  self.initial_grace = true
 
   -- The sum of all material values (tiles, rooms, objects).
   -- Initial value: hospital tile count * tile value + 20000
@@ -83,6 +82,17 @@ function Hospital:Hospital(world, avail_rooms, name)
   self.reputation = 500
   self.reputation_min = 0
   self.reputation_max = 1000
+
+  -- Price distortion level under which the patients might consider the
+  -- treatment to be under-priced (TODO: This could depend on difficulty and/or
+  -- level; e.g. Easy: -0.3 / Difficult: -0.5)
+  self.under_priced_threshold = -0.4
+
+  -- Price distortion level over which the patients might consider the
+  -- treatment to be over-priced (TODO: This could depend on difficulty and/or
+  -- level; e.g. Easy: 0.4 / Difficult: 0.2)
+  self.over_priced_threshold = 0.3
+
   self.radiator_heat = 0.5
   self.num_visitors = 0
   self.num_deaths = 0
@@ -131,6 +141,7 @@ function Hospital:Hospital(world, avail_rooms, name)
   self.num_visitors_ty = 0
 
   self.ownedPlots = {1} -- Plots owned by the hospital
+  self.ratholes = {} -- List of table {x, y, wall, parcel, optional object} for ratholes in the hospital corridors.
   self.is_in_world = true -- Whether the hospital is in this world (AI hospitals are not)
   self.opened = false
   self.transactions = {}
@@ -633,6 +644,20 @@ function Hospital:afterLoad(old, new)
     self.reception_desks = nil
   end
 
+  if old < 109 then
+    -- price distortion
+    self.under_priced_threshold = -0.4
+    self.over_priced_threshold = 0.3
+  end
+
+  if old < 111 then
+    self.initial_grace = nil
+  end
+
+  if old < 114 then
+    self.ratholes = {}
+  end
+
   -- Update other objects in the hospital (added in version 106).
   if self.epidemic then self.epidemic.afterLoad(old, new) end
   for _, future_epidemic in ipairs(self.future_epidemics_pool) do
@@ -647,7 +672,7 @@ function Hospital:countPatients()
   -- i.e. calling it from town map to use here
   -- so Town map now takes this information from here.  (If I am wrong, put it back)
   self.patientcount = 0
-  for _, patient in pairs(self.patients) do
+  for _, patient in ipairs(self.patients) do
   -- only count patients that are in the hospital
     local tx, ty = patient.tile_x, patient.tile_y
     if tx and ty and self:isInHospital(tx, ty) then
@@ -738,7 +763,7 @@ function Hospital:checkFacilities()
     -- And unlike TH we don't want to be told that anyone is too hot or cold when the boiler is broken do we!
     if not self.heating_broke then
       if not self.warmth_msg and self.world.day == 15 then
-        local warmth = self:getAveragePatientAttribute("warmth")
+        local warmth = self:getAveragePatientAttribute("warmth", 0.3) -- Default value does not result in a message.
         if (self.world.year > 1 or self.world.month > 4) and warmth < 0.22 then
           self:warningTooCold()
         elseif self.world.month > 4 and warmth >= 0.36 then
@@ -747,30 +772,24 @@ function Hospital:checkFacilities()
       end
       -- Are the staff warm enough?
       if not self.warmth_msg and self.world.day == 20 then
-        local warmth = 0
-        local no = 0
-        for _, staff in ipairs(self.staff) do
-          warmth = warmth + staff.attributes["warmth"]
-          no = no + 1
-        end
-        if (self.world.year > 1 or self.world.month > 4) and warmth / no < 0.22 then
+        local avgWarmth = self:getAverageStaffAttribute("warmth", 0.25) -- Default value does not result in a message.
+        if (self.world.year > 1 or self.world.month > 4) and avgWarmth < 0.22 then
           self.world.ui.adviser:say(_A.warnings.staff_very_cold)
-        elseif self.world.month > 4 and warmth / no >= 0.36 then
+        elseif self.world.month > 4 and avgWarmth >= 0.36 then
           self.world.ui.adviser:say(_A.warnings.staff_too_hot)
         end
       end
     end
     -- Are the patients in need of a drink
     if not self.thirst_msg and self.world.day == 24 then
-      local thirst = self:getAveragePatientAttribute("thirst")
+      local thirst = self:getAveragePatientAttribute("thirst", 0) -- Default value does not result in a message.
       if self.world.year == 1 and self.world.month > 4 then
         if thirst > 0.8 then
           self.world.ui.adviser:say(_A.warnings.patients_very_thirsty)
         elseif thirst > 0.6 then
           self:warningThirst()
         end
-      end
-      if self.world.year > 1 then
+      elseif self.world.year > 1 then
         if thirst > 0.9 then
           self.world.ui.adviser:say(_A.warnings.patients_very_thirsty)
         elseif thirst > 0.6 then
@@ -861,13 +880,13 @@ function Hospital:getHeliportSpawnPosition()
   end
 end
 
---[[ Test if a given map tile is part of the hospital.
+--[[ Test if a given map tile is part of this hospital.
 !param x (integer) The 1-based X co-ordinate of the tile to test.
 !param y (integer) The 1-based Y co-ordinate of the tile to test.
 ]]
 function Hospital:isInHospital(x, y)
-  -- TODO: Fix to work when there are multiple hospitals.
-  return self.world.map.th:getCellFlags(x, y).hospital
+  local flags = self.world.map.th:getCellFlags(x, y)
+  return flags.hospital and flags.owner == self:getPlayerIndex()
 end
 function Hospital:coldWarning()
   local announcements = {
@@ -915,6 +934,49 @@ function Hospital:boilerFixed()
   end
 end
 
+--! Daily update of the ratholes.
+--!param self (Hospital) hospital being updated.
+local function dailyUpdateRatholes(self)
+  local map = self.world.map
+  local th = map.th
+
+  local wanted_holes = math.round(th:getLitterFraction(self:getPlayerIndex()) * 200)
+  if #self.ratholes < wanted_holes then -- Not enough holes, find a new spot
+    -- Try to find a wall in a corridor, and add it if possible.
+    -- Each iteration does a few probes at a random position, most tries will
+    -- fail on not being on a free (non-built) tile in a corridor with a wall
+    -- in the right hospital.
+    -- Doing more iterations speeds up finding a suitable location, less
+    -- iterations is reduces needed processor time.
+    -- "6 + 2 * difference" is an arbitrary value that seems to work nicely, 12
+    -- is an arbitrary upper limit on the number of tries.
+    for _ = 1, math.min(12, 6 + 2 * (wanted_holes - #self.ratholes)) do
+      local x = math.random(1, map.width)
+      local y = math.random(1, map.height)
+      local flags = th:getCellFlags(x, y)
+      if self:isInHospital(x, y) and flags.roomId == 0 and flags.buildable then
+        local walls = self:getWallsAround(x, y)
+        if #walls > 0 then
+          -- Found a wall, check it for not being used.
+          local wall = walls[math.random(1, #walls)]
+          local found = false
+          for _, hole in ipairs(self.ratholes) do
+            if hole.x == x and hole.y == y and hole.wall == wall.wall then
+              found = true
+              break
+            end
+          end
+
+          if not found then
+            self:addRathole(x, y, wall.wall, wall.parcel)
+            break
+          end
+        end
+      end
+    end
+  end
+end
+
 -- Called at the end of each day.
 function Hospital:onEndDay()
   local pay_this = self.loan*self.interest_rate/365 -- No leap years
@@ -937,25 +999,6 @@ function Hospital:onEndDay()
   for i, staff in ipairs(self.staff) do
     if staff.humanoid_class == "Receptionist" then
       hosp.receptionist_count = hosp.receptionist_count + 1
-    end
-  end
-  -- if there's currently an earthquake going on, possibly give the machines some damage
-  if (self.world.active_earthquake) then
-    for _, room in pairs(self.world.rooms) do
-      -- Only damage this hospital's objects.
-      if room.hospital == self then -- TODO: For multiplayer?
-        for object, value in pairs(room.objects) do
-          if object.strength then
-            -- The or clause is for backwards compatibility. Then the machine takes one damage each day.
-            if (object.quake_points and object.quake_points > 0) or object.quake_points == nil then
-              object:machineUsed(room)
-            end
-            if object.quake_points then
-              object.quake_points = object.quake_points - 1
-            end
-          end
-        end
-      end
     end
   end
 
@@ -1015,6 +1058,8 @@ function Hospital:onEndDay()
   local radiators = self.world.object_counts.radiator
   local heating_costs = (((self.radiator_heat * 10) * radiators) * 7.50) / month_length[self.world.month]
   self.acc_heating = self.acc_heating + heating_costs
+
+  if self:isPlayerHospital() then dailyUpdateRatholes(self) end
 end
 
 -- Called at the end of each month.
@@ -1242,7 +1287,7 @@ function Hospital:resolveEmergency()
   local emer = self.emergency
   local rescued_patients = emer.cured_emergency_patients
   for i, patient in ipairs(self.emergency_patients) do
-    if patient and patient.hospital and not patient:getRoom() then
+    if patient and not patient.cured and not patient:getRoom() then
       patient:die()
     end
   end
@@ -1277,6 +1322,19 @@ function Hospital:resolveEmergency()
   end
 
   self.world:nextEmergency()
+end
+
+--! Determine if all of the patients in the emergency have been cured or killed.
+--! If they have end the emergency timer.
+function Hospital:checkEmergencyOver()
+  local killed = self.emergency.killed_emergency_patients
+  local cured = self.emergency.cured_emergency_patients
+  if killed + cured >= self.emergency.victims then
+    local window = self.world.ui:getWindow(UIWatch)
+    if window then
+      window:onCountdownEnd()
+    end
+  end
 end
 
 -- Creates VIP and sends a FAX to query the user.
@@ -1529,35 +1587,36 @@ end
 ]]
 function Hospital:receiveMoneyForTreatment(patient)
   if not self.world.free_build_mode then
-    local disease_id
+    local disease_id = patient:getTreatmentDiseaseId()
+    if disease_id == nil then return end
+    local casebook = self.disease_casebook[disease_id]
     local reason
-    if not self.world.free_build_mode then
-      if patient.diagnosed then
-        disease_id = patient.disease.id
-        reason = _S.transactions.cure_colon .. " " .. patient.disease.name
-      else
-        local room_info = patient:getRoom()
-        if not room_info then
-          print("Warning: Trying to receieve money for treated patient who is "..
-              "not in a room")
-          return
-        end
-        room_info = room_info.room_info
-        disease_id = "diag_" .. room_info.id
-        reason = _S.transactions.treat_colon .. " " .. room_info.name
-      end
-     local casebook = self.disease_casebook[disease_id]
-     local amount = self:getTreatmentPrice(disease_id)
-      casebook.money_earned = casebook.money_earned + amount
-      patient.world:newFloatingDollarSign(patient, amount)
-      -- 25% of the payments now go through insurance
-      if patient.insurance_company then
-        self:addInsuranceMoney(patient.insurance_company, amount)
-      else
-        self:receiveMoney(amount, reason)
-      end
+    if casebook.pseudo then
+      reason = _S.transactions.treat_colon .. " " .. casebook.disease.name
+    else
+      reason = _S.transactions.cure_colon .. " " .. casebook.disease.name
     end
+    local amount = self:getTreatmentPrice(disease_id)
+
+    -- 25% of the payments now go through insurance
+    if patient.insurance_company then
+      self:addInsuranceMoney(patient.insurance_company, amount)
+    else
+      -- patient is paying normally (but still, he could feel like it's
+      -- under- or over-priced and it could impact happiness and reputation)
+      self:computePriceLevelImpact(patient, casebook)
+      self:receiveMoney(amount, reason)
+    end
+    casebook.money_earned = casebook.money_earned + amount
+    patient.world:newFloatingDollarSign(patient, amount)
   end
+end
+
+--! Sell a soda to a patient.
+--!param patient (patient) The patient buying the soda.
+function Hospital:sellSodaToPatient(patient)
+  self:receiveMoneyForProduct(patient, 20, _S.transactions.drinks)
+  self.sodas_sold = self.sodas_sold + 1
 end
 
 --! Function to determine the price for a treatment, modified by reputation and percentage
@@ -1581,6 +1640,16 @@ end
 function Hospital:receiveMoneyForProduct(patient, amount, reason)
   patient.world:newFloatingDollarSign(patient, amount)
   self:receiveMoney(amount, reason)
+end
+
+--! Pay drug if drug has been purchased to treat a patient.
+--!param disease_id Disease that was treated.
+function Hospital:paySupplierForDrug(disease_id)
+  local drug_amount = self.disease_casebook[disease_id].drug_cost or 0
+  if drug_amount ~= 0 then
+    local str = _S.drug_companies[math.random(1, 5)]
+    self:spendMoney(drug_amount, _S.transactions.drug_cost .. ": " .. str)
+  end
 end
 
 --[[ Add a transaction to the hospital's transaction log.
@@ -1712,6 +1781,11 @@ function Hospital:hasRoomOfType(type)
   return result
 end
 
+--! Remove the first entry with a given value from a table.
+--! Only works reliably for lists.
+--!param t Table to search for the value, and update.
+--!param value Value to search and remove.
+--!return Whether the value was removed.
 local function RemoveByValue(t, value)
   for i, v in ipairs(t) do
     if v == value then
@@ -1722,10 +1796,14 @@ local function RemoveByValue(t, value)
   return false
 end
 
+--! Remove a staff member from the hospital staff.
+--!param staff (Staff) Staff member to remove.
 function Hospital:removeStaff(staff)
   RemoveByValue(self.staff, staff)
 end
 
+--! Remove a patient from the hospital.
+--!param patient (Patient) Patient to remove.
 function Hospital:removePatient(patient)
   RemoveByValue(self.patients, patient)
 end
@@ -1737,6 +1815,8 @@ local reputation_changes = {
   ["kicked"] = -3, -- firing a staff member OR sending a patient home
   ["emergency_success"] = 15,
   ["emergency_failed"] = -20,
+  ["over_priced"] = -2,
+  ["under_priced"] = 1,
 }
 
 --! Normally reputation is changed based on a reason, and the affected
@@ -1755,7 +1835,9 @@ function Hospital:changeReputation(reason, disease, valueChange)
   else
     amount = reputation_changes[reason]
   end
-  self.reputation = self.reputation + amount
+  if self:isReputationChangeAllowed(amount) then
+    self.reputation = self.reputation + amount
+  end
   if disease then
     local casebook = self.disease_casebook[disease.id]
     casebook.reputation = casebook.reputation + amount
@@ -1780,6 +1862,81 @@ function Hospital:checkReputation()
   self.reputation_above_threshold = false
 end
 
+--! Decide whether a reputation change is effective or not. As we approach 1000,
+--! a gain is less likely. As we approach 0, a loss is less likely.
+--! Under 500, a gain is always effective.  Over 500, a loss is always effective.
+--!param amount (int): The amount of reputation change.
+function Hospital:isReputationChangeAllowed(amount)
+  if (amount > 0 and self.reputation <= 500) or (amount < 0 and self.reputation >= 500) or (amount == 0) then
+    return true
+  else
+    return math.random() <= self:getReputationChangeLikelihood()
+  end
+end
+
+--! Compute the likelihood for a reputation change to be effective.
+--! Likelihood gets smaller as hospital reputation gets closer to extreme values.
+--!return (float) Likelihood of a reputation change.
+function Hospital:getReputationChangeLikelihood()
+  -- The result follows a quadratic function, for a curved and smooth evolution.
+  -- If reputation == 500, the result is 100%.
+  -- Between [380-720], the result is still over 80%.
+  -- At 100 or 900, it's under 40%.
+  -- At 0 or 1000, it's 0%.
+  --
+  -- The a, b and c coefficients have been computed to include points
+  -- (x=0, y=1), (x=500, y=0) and (x=1000, y=1) where x is the current
+  -- reputation and y the likelihood of the reputation change to be
+  -- refused, based a discriminant (aka "delta") == 0
+  local a = 0.000004008
+  local b = 0.004008
+  local c = 1
+
+  local x = self.reputation
+
+  -- The result is "reversed" for more readability
+  return 1 - (a * x * x - b * x + c)
+end
+
+--! Update the 'cured' counts of the hospital.
+--!param patient Patient that was cured.
+function Hospital:updateCuredCounts(patient)
+  if not patient.is_debug then
+    self:changeReputation("cured", patient.disease)
+  end
+
+  if self.num_cured < 1 then
+    self.world.ui.adviser:say(_A.information.first_cure)
+  end
+  self.num_cured = self.num_cured + 1
+  self.num_cured_ty = self.num_cured_ty + 1
+
+  local casebook = self.disease_casebook[patient.disease.id]
+  casebook.recoveries = casebook.recoveries + 1
+
+  if patient.is_emergency then
+    self.emergency.cured_emergency_patients = self.emergency.cured_emergency_patients + 1
+  end
+end
+
+--! Update the 'not cured' counts of the hospital.
+--!param patient Patient that was not cured.
+--!param reason (string) the reason why the patient is not cured.
+--! -"kicked": Patient goes home early (manually sent, no treatment room, etc).
+--! -"over_priced": Patient considers the price too high.
+function Hospital:updateNotCuredCounts(patient, reason)
+  if patient.is_debug then return end
+
+  self:changeReputation(reason, patient.disease)
+  self.not_cured = self.not_cured + 1
+  self.not_cured_ty = self.not_cured_ty + 1
+
+  if reason == "kicked" then
+    local casebook = self.disease_casebook[patient.disease.id]
+    casebook.turned_away = casebook.turned_away + 1
+  end
+end
+
 function Hospital:updatePercentages()
   local killed = self.num_deaths / (self.num_cured + self.num_deaths) * 100
   self.percentage_killed = math.round(killed)
@@ -1787,17 +1944,45 @@ function Hospital:updatePercentages()
   self.percentage_cured = math.round(cured)
 end
 
-function Hospital:getAveragePatientAttribute(attribute)
-  -- Some patients (i.e. Alien) may not have the attribute in question, so check for that
+--! Compute average of an attribute for all patients in the hospital.
+--!param attribute (str) Name of the attribute.
+--!param default_value Value to return if there are no patients.
+--!return Average value of the attribute for all hospital patients, or the default value.
+function Hospital:getAveragePatientAttribute(attribute, default_value)
   local sum = 0
   local count = 0
   for _, patient in ipairs(self.patients) do
-    sum = sum + (patient.attributes[attribute] or 0)
+    -- Some patients (i.e. Alien) may not have the attribute in question, so check for that
     if patient.attributes[attribute] then
+      sum = sum + patient.attributes[attribute]
       count = count + 1
     end
   end
-  return sum / count
+
+  if count == 0 then
+    return default_value
+  else
+    return sum / count
+  end
+end
+
+--! Compute average of an attribute for all staff in the hospital.
+--!param attribute (str) Name of the attribute.
+--!param default_value Value to return if there is no staff.
+--!return Average value of the attribute for all staff, or the default value.
+function Hospital:getAverageStaffAttribute(attribute, default_value)
+  local sum = 0
+  local count = 0
+  for _, staff in ipairs(self.staff) do
+    sum = sum + staff.attributes[attribute]
+    count = count + 1
+  end
+
+  if count == 0 then
+    return default_value
+  else
+    return sum / count
+  end
 end
 
 --! Checks if the requirements for the given disease are met in the hospital and returns the ones missing.
@@ -1833,6 +2018,124 @@ function Hospital:checkDiseaseRequirements(disease)
   return any and {rooms = rooms, staff = staff}
 end
 
+--! Get the set of walls around a tile position.
+--!param x (int) X position of the queried tile.
+--!param y (int) Y position of the queried tile.
+--!return (table {wall, parcel}) The walls around the given position.
+function Hospital:getWallsAround(x, y)
+  local map = self.world.map
+  local th = map.th
+
+  local nw, ww
+  local walls = {} -- List of {wall="north"/"west"/"south"/"east", parcel}
+  local flags = th:getCellFlags(x, y)
+
+  _, nw, ww = th:getCell(x, y) -- floor, north wall, west wall
+  if ww ~= 0 then
+    walls[#walls + 1] = {wall = "west", parcel = flags.parcelId}
+  end
+  if nw ~= 0 then
+    walls[#walls + 1] = {wall = "north",  parcel = flags.parcelId}
+  end
+
+  if x ~= map.width then
+    _, _, ww = th:getCell(x + 1, y)
+    if ww ~= 0 then
+      walls[#walls + 1] = {wall = "east", parcel = flags.parcelId}
+    end
+  end
+
+  if y ~= map.height then
+    _, nw, _ = th:getCell(x, y + 1)
+    if nw ~= 0 then
+      walls[#walls + 1] = {wall = "south", parcel = flags.parcelId}
+    end
+  end
+
+  return walls
+end
+
+--! Test for the given position to be inside the given rectangle.
+--!param x (int) X position to test.
+--!param y (int) Y position to test.
+--!param rect (table x, y, width, height) Rectangle to check against.
+--!return (bool) Whether the position is inside the rectangle.
+local function isInside(x, y, rect)
+  return x >= rect.x and x < rect.x + rect.width and y >= rect.y and y < rect.y + rect.height
+end
+
+--! Find all ratholes that match the `to_match` criteria.
+--!param holes (list ratholes) Currently existing holes.
+--!param to_match (table) For each direction a rectangle with matching tile positions.
+--!return (list) Matching ratholes.
+local function findMatchingRatholes(holes, to_match)
+  local matched = {}
+  for _, hole in ipairs(holes) do
+    if isInside(hole.x, hole.y, to_match[hole.wall]) then table.insert(matched, hole) end
+  end
+  return matched
+end
+
+--! Remove the ratholes that use the walls of the provided room.
+--!param room (Room) Room being de-activated.
+function Hospital:removeRatholesAroundRoom(room)
+  local above_rect = {x = room.x, width = room.width, y = room.y - 1,          height = 1}
+  local below_rect = {x = room.x, width = room.width, y = room.y +room.height, height = 1}
+  local left_rect  = {x = room.x - 1,          width = 1, y = room.y, height = room.height}
+  local right_rect = {x = room.x + room.width, width = 1, y = room.y, height = room.height}
+
+  local to_delete = {east = left_rect, west = right_rect, south = above_rect, north = below_rect}
+
+  local remove_holes = findMatchingRatholes(self.ratholes, to_delete)
+  for _, hole in ipairs(remove_holes) do self:removeRathole(hole) end
+end
+
+-- Add a rathole to the room.
+--!param x (int) X position of the tile containing the rathole.
+--!param y (int) Y position of the tile containing the rathole.
+--!param wall (string) Wall containing the hole (north, west, south, east)
+--!param parcel (int) Parcel number of the xy position.
+function Hospital:addRathole(x, y, wall, parcel)
+  for _, rathole in ipairs(self.ratholes) do
+    if rathole.x == x and rathole.y == y and rathole.wall == wall then return end
+  end
+
+  local hole = {x = x, y = y, wall = wall, parcel = parcel}
+  if wall == "north" or wall == "west" then
+    -- Only add a rat-hole graphics object for the visible holes.
+    hole["object"] = self.world:newObject("rathole", hole.x, hole.y, hole.wall)
+  end
+  table.insert(self.ratholes, hole)
+end
+
+--! Remove the provided rathole.
+--!param hole (table{x, y, wall, optional object}) Hole to remove.
+function Hospital:removeRathole(hole)
+  for i, rathole in ipairs(self.ratholes) do
+    if rathole.x == hole.x and rathole.y == hole.y and rathole.wall == hole.wall then
+      table.remove(self.ratholes, i)
+      if rathole.object then
+        self.world:destroyEntity(rathole.object)
+      end
+
+      break
+    end
+  end
+end
+
+--! Remove any rathole from the given position.
+--!param x X position of the tile that should not have ratholes.
+--!param y Y position of the tile that should not have ratholes.
+function Hospital:removeRatholeXY(x, y)
+  for i = #self.ratholes, 1, -1 do
+    local rathole = self.ratholes[i]
+    if rathole.x == x and rathole.y == y then
+      table.remove(self.ratholes, i)
+      if rathole.object then self.world:destroyEntity(rathole.object) end
+    end
+  end
+end
+
 class "AIHospital" (Hospital)
 
 ---@type AIHospital
@@ -1859,13 +2162,13 @@ end
 function Hospital:addHandymanTask(object, taskType, priority, x, y, call)
   local parcelId = self.world.map.th:getCellFlags(x, y).parcelId
   local subTable = self:findHandymanTaskSubtable(taskType)
-  table.insert(subTable, {["object"] = object, ["priority"] = priority, ["tile_x"] = x, ["tile_y"] = y, ["parcelId"] = parcelId, ["call"] = call});
+  table.insert(subTable, {["object"] = object, ["priority"] = priority, ["tile_x"] = x, ["tile_y"] = y, ["parcelId"] = parcelId, ["call"] = call})
 end
 
 function Hospital:modifyHandymanTaskPriority(taskIndex, newPriority, taskType)
   if taskIndex ~= -1 then
     local subTable = self:findHandymanTaskSubtable(taskType)
-    subTable[taskIndex].priority = newPriority;
+    subTable[taskIndex].priority = newPriority
   end
 end
 
@@ -1946,7 +2249,7 @@ function Hospital:searchForHandymanTask(handyman, taskType)
           -- This should normally never be the case. If the handyman doesn't belong to a hsopital
           -- then they should not have any tasks assigned to them however it was previously possible
           -- We need to tidy up to make sure the task can be reassigned.
-          print("Warning: Orphaned handyman is still assigned a task. Removing.");
+          print("Warning: Orphaned handyman is still assigned a task. Removing.")
           v.assignedHandyman = nil
         else
           local assignedDistance = self.world:getPathDistance(v.tile_x, v.tile_y, v.assignedHandyman.tile_x, v.assignedHandyman.tile_y)
@@ -1983,11 +2286,16 @@ function Hospital:searchForHandymanTask(handyman, taskType)
   return index
 end
 
-
-function Hospital:getIndexOfTask(x, y, taskType)
+--! Find a handyman task by task type, position, and possibly the used object.
+--!param x (int) The X coordinate of the position.
+--!param y (int) The Y coordinate of the position.
+--!param taskType Type of the task.
+--!param obj (Object) If specified, the object used for doing the task.
+--! Since multiple litter objects may exist at the same tile, the object must be given when cleaning.
+function Hospital:getIndexOfTask(x, y, taskType, obj)
   local subTable = self:findHandymanTaskSubtable(taskType)
   for i, v in ipairs(subTable) do
-    if v.tile_x == x and v.tile_y == y then
+    if v.tile_x == x and v.tile_y == y and (obj == nil or v.object == obj) then
       return i
     end
   end
@@ -1999,7 +2307,7 @@ function Hospital:initOwnedPlots()
   self.ownedPlots = {}
   for i, v in ipairs(self.world.entities) do
     if v.tile_x and v.tile_y then
-      local parcel = self.world.map.th:getCellFlags(v.tile_x, v.tile_y).parcelId;
+      local parcel = self.world.map.th:getCellFlags(v.tile_x, v.tile_y).parcelId
       local isAlreadyContained = false
       for i2, v2 in ipairs(self.ownedPlots) do
         if parcel == v2 then
@@ -2059,4 +2367,31 @@ function Hospital:canConcentrateResearch(disease)
     return progress.start_strength < self.world.map.level_config.gbv.MaxObjectStrength
   end
   return false
+end
+
+--! Change patient happiness and hospital reputation based on price distortion.
+--! The patient happiness is adjusted proportionally. The hospital reputation
+--! can only be affected when the distortion level reaches some threshold.
+--!param patient (patient) The patient paying the bill. His/her happiness level
+--! is adjusted.
+--!param casebook (object) Disease casebook entry. It's used to display the
+--! localised disease name when Adviser tells the warning message.
+function Hospital:computePriceLevelImpact(patient, casebook)
+  local price_distortion = patient:getPriceDistortion(casebook)
+  patient:changeAttribute("happiness", -(price_distortion / 2))
+
+  if price_distortion < self.under_priced_threshold then
+    if math.random(1, 100) == 1 then
+      self.world.ui.adviser:say(_A.warnings.low_prices:format(casebook.disease.name))
+      self:changeReputation("under_priced")
+    end
+  elseif price_distortion > self.over_priced_threshold then
+    if math.random(1, 100) == 1 then
+      self.world.ui.adviser:say(_A.warnings.high_prices:format(casebook.disease.name))
+      self:changeReputation("over_priced")
+    end
+  elseif math.abs(price_distortion) <= 0.15 and math.random(1, 200) == 1 then
+    -- When prices are well adjusted (i.e. abs(price distortion) <= 0.15)
+    self.world.ui.adviser:say(_A.warnings.fair_prices:format(casebook.disease.name))
+  end
 end

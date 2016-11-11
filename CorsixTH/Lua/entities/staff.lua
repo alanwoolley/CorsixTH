@@ -282,26 +282,29 @@ end
 -- Determine if the staff member should contribute to research
 function Staff:isResearching()
   local room = self:getRoom()
-  return room and room.room_info.id == "research" -- in research lab
-    and self.humanoid_class == "Doctor" and self.profile.is_researcher >= 1.0 -- is qualified
-    and self.hospital  -- is not leaving the hospital
+
+  -- Staff is in research lab, is qualified, and is not leaving the hospital.
+  return room and room.room_info.id == "research" and
+      self.humanoid_class == "Doctor" and self.profile.is_researcher >= 1.0 and self.hospital
 end
 
 -- Determine if the staff member should increase their skills
 function Staff:isLearning()
   local room = self:getRoom()
-  return room and room.room_info.id == "training"  -- in training room
-    and room.staff_member                          -- the training room has a consultant
-    and self.action_queue[1].name == "use_object"  -- is using lecture chair
-    and self.action_queue[1].object.object_type.id == "lecture_chair"
+
+  -- Staff is in training room, the training room has a consultant, and  is using lecture chair.
+  return room and room.room_info.id == "training" and room.staff_member and
+      self.action_queue[1].name == "use_object" and
+      self.action_queue[1].object.object_type.id == "lecture_chair"
 end
 
 function Staff:isLearningOnTheJob()
   local room = self:getRoom()
-  return room and room.room_info.id ~= "training" and room.room_info.id ~= "staff_room"
-    and room.room_info.id ~= "toilets" -- is in room but not training room, staff room, or toilets
-    and self.humanoid_class == "Doctor" -- and is a doctor
-    and self.action_queue[1].name == "use_object" -- and is using something
+
+  -- Staff is in room but not training room, staff room, or toilets; is a doctor; and is using something
+  return room and room.room_info.id ~= "training" and
+      room.room_info.id ~= "staff_room" and room.room_info.id ~= "toilets" and
+      self.humanoid_class == "Doctor" and self.action_queue[1].name == "use_object"
 end
 
 
@@ -336,7 +339,7 @@ function Staff:updateSkill(consultant, trait, amount)
       self.world.ui.adviser:say(_A.information.promotion_to_consultant)
       if self:getRoom().room_info.id == "training" then
         self:setNextAction(self:getRoom():createLeaveAction())
-        self:queueAction{name = "meander"}
+        self:queueAction(MeanderAction())
         self.last_room = nil
       end
       self:updateStaffTitle()
@@ -371,7 +374,7 @@ function Staff:fire()
   self:setDynamicInfoText(_S.dynamic_info.staff.actions.fired)
   self.fired = true
   self.hospital:changeReputation("kicked")
-  self:setHospital(nil)
+  self:despawn()
   self.hover_cursor = nil
   self.attributes["fatigue"] = nil
   self:leaveAnnounce()
@@ -385,7 +388,7 @@ function Staff:fire()
 end
 
 function Staff:die()
-  self:setHospital(nil)
+  self:despawn()
   if self.task then
     -- If the staff member had a task outstanding, unassigning them from that task.
     -- Tasks with no handyman assigned will be eligible for reassignment by the hospital.
@@ -399,6 +402,12 @@ function Staff:die()
   end
   -- It may be that the staff member was fired just before dying (then self.hospital = nil)
   self.world.ui.hospital:humanoidDeath(self)
+end
+
+-- Despawns the staff member and removes them from the hospital
+function Staff:despawn()
+  self.hospital:removeStaff(self)
+  Humanoid.despawn(self)
 end
 
 -- Function which is called when the user clicks on the staff member.
@@ -419,7 +428,7 @@ function Staff:onClick(ui, button)
     end
   elseif button == "right" then
     self.pickup = true
-    self:setNextAction({name = "pickup", ui = ui, must_happen = true}, true)
+    self:setNextAction(PickupAction(ui), true)
   end
   Humanoid.onClick(self, ui, button)
 end
@@ -640,9 +649,9 @@ function Staff:goToStaffRoom()
   if room then
     room.staff_leaving = true
     self:setNextAction(room:createLeaveAction())
-    self:queueAction{name = "seek_staffroom", must_happen = true}
+    self:queueAction(SeekStaffRoomAction())
   else
-    self:setNextAction{name = "seek_staffroom", must_happen = true}
+    self:setNextAction(SeekStaffRoomAction())
   end
 end
 
@@ -660,7 +669,7 @@ function Staff:onPlaceInCorridor()
     self.task = nil
   end
   self:updateSpeed()
-  self:setNextAction{name = "meander"}
+  self:setNextAction(MeanderAction())
   if self.humanoid_class == "Receptionist" then
     world:findObjectNear(self, "reception_desk", nil, function(x, y)
       local obj = world:getObject(x, y, "reception_desk")
@@ -669,10 +678,9 @@ function Staff:onPlaceInCorridor()
   end
 end
 
+-- Sets the Hospital for a member of staff
+--!param hospital (Hospital) - hospital to assign to member of staff
 function Staff:setHospital(hospital)
-  if self.hospital then
-    self.hospital:removeStaff(self)
-  end
   Humanoid.setHospital(self, hospital)
   self:updateDynamicInfo()
 end
@@ -904,7 +912,7 @@ function Staff:interruptHandymanTask()
     self.on_call = nil
   end
   self.task = nil
-  self:setNextAction{name = "answer_call"}
+  self:setNextAction(AnswerCallAction())
 end
 
 function Staff:searchForHandymanTask()
@@ -952,7 +960,7 @@ function Staff:searchForHandymanTask()
     if self:getRoom() then
       self:queueAction(self:getRoom():createLeaveAction())
     end
-    self:queueAction({name = "meander"})
+    self:queueAction(MeanderAction())
   end
   return assignedTask
 end
@@ -964,12 +972,12 @@ function Staff:assignHandymanTask(taskIndex, taskType)
   if taskType == "cleaning" then
     if self:getRoom() then
       self:setNextAction(self:getRoom():createLeaveAction())
-      self:queueAction{name = "walk", x = task.tile_x, y = task.tile_y}
+      self:queueAction(WalkAction(task.tile_x, task.tile_y))
     else
-      self:setNextAction{name = "walk", x = task.tile_x, y = task.tile_y}
+      self:setNextAction(WalkAction(task.tile_x, task.tile_y))
     end
-    self:queueAction{name = "sweep_floor", litter = task.object}
-    self:queueAction{name = "answer_call"}
+    self:queueAction(SweepFloorAction(task.object))
+    self:queueAction(AnswerCallAction())
   else
     if task.call.dropped then
       task.call.dropped = nil
@@ -988,6 +996,21 @@ function Staff:getDrawingLayer()
   else
     return 4
   end
+end
+
+--! Estimate staff service quality based on skills, fatigue and happiness.
+--!return (float) between [0-1] indicating quality of the service.
+function Staff:getServiceQuality()
+  -- weights
+  local skill_weight = 0.7
+  local fatigue_weight = 0.2
+  local happiness_weight = 0.1
+
+  local weighted_skill = skill_weight * self.profile.skill
+  local weighted_fatigue = fatigue_weight * self.attributes["fatigue"]
+  local weighted_happiness = happiness_weight * self.attributes["happiness"]
+
+  return weighted_skill + weighted_fatigue + weighted_happiness
 end
 
 -- Dummy callback for savegame compatibility

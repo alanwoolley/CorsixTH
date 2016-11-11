@@ -71,6 +71,8 @@ function UICheats:UICheats(ui)
     {name = "end_year",       func = self.cheatYear},
     {name = "lose_level",     func = self.cheatLose},
     {name = "win_level",      func = self.cheatWin},
+    {name = "increase_prices", func = self.cheatIncreasePrices},
+    {name = "decrease_prices", func = self.cheatDecreasePrices},
   }
 
 
@@ -78,7 +80,6 @@ function UICheats:UICheats(ui)
 
   self.default_button_sound = "selectx.wav"
 
-  local app = ui.app
   self.modal_class = "cheats"
   self.esc_closes = true
   self.resizable = false
@@ -95,8 +96,8 @@ function UICheats:UICheats(ui)
   self.cheated_panel = self:addBevelPanel(20, y, 260, 18, col_cheated_no, col_border, col_border)
 
   local function button_clicked(num)
-    return --[[persistable:cheats_button]] function(self)
-      self:buttonClicked(num)
+    return --[[persistable:cheats_button]] function(window)
+      window:buttonClicked(num)
     end
   end
 
@@ -214,6 +215,30 @@ end
 
 function UICheats:cheatWin()
   self.ui.app.world:winGame(1) -- TODO adjust for multiplayer
+end
+
+function UICheats:cheatIncreasePrices()
+  local hosp = self.ui.app.world.hospitals[1]
+  for _, casebook in pairs(hosp.disease_casebook) do
+    local new_price = casebook.price + 0.5
+    if new_price > 2 then
+      casebook.price = 2
+    else
+      casebook.price = new_price
+    end
+  end
+end
+
+function UICheats:cheatDecreasePrices()
+  local hosp = self.ui.app.world.hospitals[1]
+  for _, casebook in pairs(hosp.disease_casebook) do
+    local new_price = casebook.price - 0.5
+    if new_price < 0.5 then
+      casebook.price = 0.5
+    else
+      casebook.price = new_price
+    end
+  end
 end
 
 function UICheats:buttonBack()

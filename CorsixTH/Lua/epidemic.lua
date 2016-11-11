@@ -535,12 +535,8 @@ function Epidemic:evacuateHospital()
       patient:clearDynamicInfo()
       patient:setDynamicInfo('text', {_S.dynamic_info.patient.actions.epidemic_sent_home})
       patient:setMood("exit","activate")
-      patient:setNextAction{
-        name = "spawn",
-        mode = "despawn",
-        point = self.world.spawn_points[math.random(1, #self.world.spawn_points)],
-        must_happen = true,
-      }
+      local spawn_point = self.world.spawn_points[math.random(1, #self.world.spawn_points)]
+      patient:setNextAction(SpawnAction("despawn", spawn_point):setMustHappen(true))
     end
   end
 end
@@ -560,9 +556,9 @@ function Epidemic:spawnInspector()
   inspector:setType("Inspector")
 
   local spawn_point = self.world.spawn_points[math.random(1, #self.world.spawn_points)]
-  inspector:setNextAction{name = "spawn", mode = "spawn", point = spawn_point}
+  inspector:setNextAction(SpawnAction("spawn", spawn_point))
   inspector:setHospital(self.hospital)
-  inspector:queueAction{name = "seek_reception"}
+  inspector:queueAction(SeekReceptionAction())
 end
 
 --[[ Is the patient "still" either idle queuing or sitting on a bench
@@ -599,7 +595,7 @@ function Epidemic:createVaccinationActions(patient,nurse)
   if not x or not y then
     nurse:setCallCompleted()
     patient.reserved_for = nil
-    nurse:setNextAction({name = "meander"})
+    nurse:setNextAction(MeanderAction())
     patient:removeVaccinationCandidateStatus()
   else
     -- Give selected patient the cursor with the arrow once they are next
@@ -607,12 +603,8 @@ function Epidemic:createVaccinationActions(patient,nurse)
     patient:giveVaccinationCandidateStatus()
     local level_config = self.world.map.level_config
     local fee = level_config.gbv.VacCost or 50
-    nurse:setNextAction({name = "walk", x = x, y = y,
-                        must_happen = true,
-                        walking_to_vaccinate = true})
-    nurse:queueAction({name ="vaccinate",
-                      vaccination_fee = fee,
-                      patient = patient, must_happen = true})
+    nurse:setNextAction(WalkAction(x, y):setMustHappen(true):enableWalkingToVaccinate())
+    nurse:queueAction(VaccinateAction(patient, fee))
   end
 end
 
@@ -622,35 +614,6 @@ end
  @param patient (Patient) the patient to be vaccinated
  @return best_x,best_y (Integer,nil) the best tiles to vaccinate from.]]
 function Epidemic:getBestVaccinationTile(nurse, patient)
-  -- General usage tile finder, used in the other cases
-  -- when the patient isn't sitting on a bench
-  local function get_best_usage_no_bench(nurse,patient)
-    -- Tile patient is standing on
-    local px, py = patient.tile_x, patient.tile_y
-    -- Location of the nurse
-    local nx, ny = nurse.tile_x, nurse.tile_y
-
-    local best_x, best_y = nil
-    local shortest_distance = nil
-    local free_tiles = self.world.entity_map:getAdjacentFreeTiles(px,py)
-
-    for _, coord in ipairs(free_tiles) do
-      local x = coord['x']
-      local y = coord['y']
-
-      local distance = self.world:getPathDistance(nx,ny,x,y)
-      -- If the tile is reachable for the nurse
-      if distance then
-        -- If the tile is closer then it's a better choice
-        if not shortest_distance or distance < shortest_distance then
-          shortest_distance = distance
-          best_x, best_y = x, y
-        end
-      end
-    end
-    return best_x, best_y
-  end
-
   local action = patient.action_queue[1]
   local px, py = patient.tile_x, patient.tile_y
   -- If the patient is using a bench the best tile to use is
@@ -660,17 +623,42 @@ function Epidemic:getBestVaccinationTile(nurse, patient)
     if object_in_use.object_type.id == "bench" then
       local direction = object_in_use.direction
       if direction == "north" then
-        return px, py-1
+        return px, py - 1
       elseif direction == "south" then
-        return px, py+1
+        return px, py + 1
       elseif direction == "east" then
-        return px+1, py
+        return px + 1, py
       elseif direction == "west" then
-        return px-1, py
+        return px - 1, py
       end
     end
   end
-  return get_best_usage_no_bench(nurse, patient)
+
+  -- General usage tile finder, used in the other cases
+  -- when the patient isn't sitting on a bench
+
+  -- Location of the nurse
+  local nx, ny = nurse.tile_x, nurse.tile_y
+
+  local best_x, best_y = nil
+  local shortest_distance = nil
+  local free_tiles = self.world.entity_map:getAdjacentFreeTiles(px, py)
+
+  for _, coord in ipairs(free_tiles) do
+    local x = coord['x']
+    local y = coord['y']
+
+    local distance = self.world:getPathDistance(nx, ny, x, y)
+    -- If the tile is reachable for the nurse
+    if distance then
+      -- If the tile is closer then it's a better choice
+      if not shortest_distance or distance < shortest_distance then
+        shortest_distance = distance
+        best_x, best_y = x, y
+      end
+    end
+  end
+  return best_x, best_y
 end
 
 --[[When the nurse is interrupted unreserve the patient and unassign the call.

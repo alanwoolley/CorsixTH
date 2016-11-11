@@ -139,7 +139,7 @@ local config_defaults = {
   use_new_graphics = false,
   check_for_updates = true
 }
-local fi = io.open(config_filename, "r")
+fi = io.open(config_filename, "r")
 local config_values = {}
 local needs_rewrite = false
 for key, value in pairs(config_defaults) do
@@ -193,16 +193,21 @@ if needs_rewrite then
 
 -------------------------------------------------------------------------------------------------------------------------
 -- Language to use for ingame text. Between the square braces should be one of:
+--  Brazilian Portuguese  / pt_br / br
 --  Chinese (simplified)  / zh(s) / chi(s)
 --  Chinese (traditional) / zh(s) / chi(s)
+--  Czech                 / cs / cze
 --  Danish                / da / dk
 --  Dutch                 / Nederlands / nl / dut / nld
 --  English               / en / eng
 --  Finnish               / Suomi / fi / fin
 --  French                / fr / fre / fra
 --  German                / de / ger / deu
+--  Hungarian             / hu / hun
 --  Italian               / it / ita
+--  Korean                / kor / ko
 --  Norwegian             / nb / nob
+--  Polish                / pl / pol
 --  Portuguese            / pt / por
 --  Russian               / ru / rus
 --  Spanish               / es / spa
@@ -374,6 +379,14 @@ unicode_font = nil -- [[X:\ThemeHospital\font.ttc]]
 -- is more suitable.
 --
 savegames = nil -- [[X:\ThemeHospital\Saves]]
+
+-------------------------------------------------------------------------------------------------------------------------
+-- Levels. By default, the "Levels" directory alongside this config file will
+-- be used for storing new maps / levels in. Should this not be suitable, then
+-- uncomment the following line, and point it to a directory which exists and
+-- is more suitable.
+--
+levels = nil -- [[X:\ThemeHospital\Levels]]
 
  ------------------------------------------------------------------------------------------------------------------------
 -- Use new graphics. Whether to use the original graphics from Theme Hospital

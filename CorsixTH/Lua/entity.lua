@@ -34,7 +34,7 @@ function Entity:Entity(animation)
   self.playing_sounds_in_random_sequence = false
   self.waiting_for_sound_effects_to_be_turned_on = false
   self.random_sound_sequence_parameters = nil
-  self.dynamic_info = nil;
+  self.dynamic_info = nil
 end
 
 --[[
@@ -346,6 +346,11 @@ function Entity:playAfterLoadSound()
                                             self.random_sound_sequence_parameters["maxSilence"],
                                             self.random_sound_sequence_parameters["numSilences"])
   end
+end
+
+--! Stub to be extended in subclasses, if needed.
+function Entity:eraseObject()
+  -- Give entity the chance to clear itself from the map before resetAnimation gets called.
 end
 
 function Entity:resetAnimation()

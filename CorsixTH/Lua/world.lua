@@ -51,6 +51,11 @@ local local_criteria_variable = {
   {name = "population",       icon = 11, formats = 1},
 }
 
+-- time between each damage caused by an earthquake
+local earthquake_damage_time = 16 -- hours
+local earthquake_warning_period = 600 -- hours between warning and real thing
+local earthquake_warning_length = 25 -- length of early warning quake
+
 function World:World(app)
   self.map = app.map
   self.wall_types = app.walls
@@ -73,6 +78,18 @@ function World:World(app)
   self.objects_notify_occupants = {}
   self.rooms = {} -- List that can have gaps when a room is deleted, so use pairs to iterate.
   self.entity_map = EntityMap(self.map)
+
+  -- All information relating to the next or current earthquake, nil if
+  -- there is no scheduled earthquake.
+  -- Contains the following fields:
+  -- active (boolean) Whether we are currently running the warning or damage timers (after start_day of start_month is passed).
+  -- start_month (integer) The month the earthquake warning is triggered.
+  -- start_day (integer) The day of the month the earthquake warning is triggered.
+  -- size (integer) The amount of damage the earthquake causes (1-9).
+  -- remaining_damage (integer) The amount of damage this earthquake has yet to inflict.
+  -- damage_timer (integer) The number of hours until the earthquake next inflicts damage if active.
+  -- warning_timer (integer) The number of hours left until the real damaging earthquake begins.
+  self.next_earthquake = { active = false }
 
   -- Time
   self.hours_per_day = 50
@@ -217,15 +234,11 @@ function World:adjustZoom(delta)
     modifier = 0.05
   end
 
-  print("Virtual width: " .. virtual_width)
-
   virtual_width = virtual_width - delta * factor * modifier
   if virtual_width < 200 then
     return false
   end
 
-
-  print ("Setting zoom: " .. scr_w/virtual_width)
   return self.ui:setZoom(scr_w / virtual_width)
 end
 
@@ -451,10 +464,42 @@ function World:calculateSpawnTiles()
   end
 end
 
+--! Function to determine whether a given disease is available for new patients.
+--!param self (World) World object.
+--!param disease (disease) Disease to test.
+--!param hospital (Hospital) Hospital that needs a new patient.
+--!return (boolean) Whether the disease is usable for new spawned patients.
+local function isDiseaseUsableForNewPatient(self, disease, hospital)
+  if disease.only_emergency then return false end
+  if not disease.visuals_id then return true end
+
+  local current_month = (self.year - 1) * 12 + self.month
+
+  -- level files can delay visuals to a given month
+  -- and / or until a given number of patients have arrived
+  local level_config = self.map.level_config
+  local hold_visual_months = level_config.gbv.HoldVisualMonths
+  local hold_visual_peep_count = level_config.gbv.HoldVisualPeepCount
+
+  -- if the month is greater than either of these values then visuals will not appear in the game
+  if (hold_visual_months and hold_visual_months > current_month) or
+      (hold_visual_peep_count and hold_visual_peep_count > hospital.num_visitors) then
+    return false
+  end
+
+  -- The value against #visuals_available determines from which month a disease can appear.
+  -- 0 means it can show up anytime.
+  return level_config.visuals_available[disease.visuals_id].Value < current_month
+end
+
 --! Spawn a patient from a spawn point for the given hospital.
 --!param hospital (Hospital) Hospital that the new patient should visit.
 --!return (Patient entity) The spawned patient, or 'nil' if no patient spawned.
 function World:spawnPatient(hospital)
+  if not hospital then
+    hospital = self:getLocalPlayerHospital()
+  end
+
   -- The level might not contain any diseases
   if #self.available_diseases < 1 then
     self.ui:addWindow(UIInformation(self.ui, {"There are no diseases on this level! Please add some to your level."}))
@@ -464,48 +509,32 @@ function World:spawnPatient(hospital)
     self.ui:addWindow(UIInformation(self.ui, {"Could not spawn patient because no spawn points are available. Please place walkable tiles on the edge of your level."}))
     return
   end
-  if not hospital then
-    hospital = self:getLocalPlayerHospital()
-  end
-  --! What is the current month?
-  local current_month = (self.year - 1) * 12 + self.month
-  --! level files can delay visuals to a given month
-  --! and / or until a given number of patients have arrived
-  local hold_visual_months = self.map.level_config.gbv.HoldVisualMonths
-  local hold_visual_peep_count = self.map.level_config.gbv.HoldVisualPeepCount
-  --! Function to determine whether a given disease is visible and available.
-  --!param disease (disease) Disease to test.
-  --!return (boolean) Whether the disease is visible and available.
-  local function isVisualDiseaseAvailable(disease)
-    if not disease.visuals_id then
-      return true
+
+  if not hospital:hasStaffedDesk() then return nil end
+
+  -- Construct disease, take a random guess first, as a quick clear-sky attempt.
+  local disease = self.available_diseases[math.random(1, #self.available_diseases)]
+  if not isDiseaseUsableForNewPatient(self, disease, hospital) then
+    -- Lucky shot failed, do a proper calculation.
+    local usable_diseases = {}
+    for _, d in ipairs(self.available_diseases) do
+      if isDiseaseUsableForNewPatient(self, d, hospital) then
+        usable_diseases[#usable_diseases + 1] = d
+      end
     end
-    --! if the month is greater than either of these values then visuals will not appear in the game
-    if hold_visual_months and hold_visual_months > current_month or
-    hold_visual_peep_count and hold_visual_peep_count > hospital.num_visitors then
-      return false
-    end
-    --! the value against #visuals_available determines from which month a disease can appear. 0 means it can show up anytime.
-    local level_config = self.map.level_config
-    if level_config.visuals_available[disease.visuals_id].Value >= current_month then
-      return false
-    end
-    return true
+
+    if #usable_diseases == 0 then return nil end
+
+    disease = usable_diseases[math.random(1, #usable_diseases)]
   end
 
-  if hospital:hasStaffedDesk() then
-    local spawn_point = self.spawn_points[math.random(1, #self.spawn_points)]
-    local patient = self:newEntity("Patient", 2)
-    local disease = self.available_diseases[math.random(1, #self.available_diseases)]
-    while disease.only_emergency or not isVisualDiseaseAvailable(disease) do
-      disease = self.available_diseases[math.random(1, #self.available_diseases)]
-    end
-    patient:setDisease(disease)
-    patient:setNextAction{name = "spawn", mode = "spawn", point = spawn_point}
-    patient:setHospital(hospital)
-
-    return patient
-  end
+  -- Construct patient.
+  local spawn_point = self.spawn_points[math.random(1, #self.spawn_points)]
+  local patient = self:newEntity("Patient", 2)
+  patient:setDisease(disease)
+  patient:setNextAction(SpawnAction("spawn", spawn_point))
+  patient:setHospital(hospital)
+  return patient
 end
 
 --A VIP is invited (or he invited himself) to the player hospital.
@@ -523,153 +552,114 @@ function World:spawnVIP(name)
   vip.enter_explosions = hospital.num_explosions
 
   local spawn_point = self.spawn_points[math.random(1, #self.spawn_points)]
-  vip:setNextAction{name = "spawn", mode = "spawn", point = spawn_point}
+  vip:setNextAction(SpawnAction("spawn", spawn_point))
   vip:setHospital(hospital)
   vip:updateDynamicInfo()
   hospital.announce_vip = hospital.announce_vip + 1
-  vip:queueAction{name = "seek_reception"}
-end
-
-function World:createEarthquake()
-  -- Sanity check
-  if not self.earthquake_size then
-    return false
-  end
-
-  -- the bigger the earthquake, the longer it lasts. We add one
-  -- further day, as we use those to give a small earthquake first,
-  -- before the bigger one begins
-  local stop_day = math.round(self.earthquake_size / 3) + 1
-
-  -- make sure the user has at least two days of an earthquake
-  if stop_day < 2 then
-    stop_day = 2
-  end
-
-  -- store the offsets so we can not shake the user to some too distant location
-  self.currentX = self.ui.screen_offset_x
-  self.currentY = self.ui.screen_offset_y
-
-  -- we add an extra 1 at the end because we register the start of earthquakes at the end of the day
-  self.earthquake_stop_day = self.day + stop_day + 1
-
-  -- if the day the earthquake is supposed to stop on a day greater than the length of the current month (eg 34)
-  if self.earthquake_stop_day > self:getCurrentMonthLength() then
-    -- subtract the current length of the month so the earthquake will stop at the start of the next month
-    self.earthquake_stop_day = self.earthquake_stop_day - self:getCurrentMonthLength()
-  end
-
-  -- Prepare machines for getting damage - at most as much as the severity of the earthquake +-1
-  for _, room in pairs(self.rooms) do
-    for object, value in pairs(room.objects) do
-      if object.strength then
-        object.quake_points = self.earthquake_size + math.random(-1, 1)
-      end
-    end
-  end
-
-  -- set a flag to indicate that we are now having an earthquake
-  self.active_earthquake = true
-
-  -- Play the earthquake vibration
-  startvibration(3)
-  return true
+  vip:queueAction(SeekReceptionAction())
 end
 
 --! Perform actions to simulate an active earthquake.
 function World:tickEarthquake()
+  if self:isCurrentSpeed("Pause") then return end
+
   -- check if this is the day that the earthquake is supposed to stop
-  if self.day == self.earthquake_stop_day then
-    self.active_earthquake = false
-    -- Stop vibration
-    stopvibration()
-    self.ui.tick_scroll_amount = false
+  if self.next_earthquake.remaining_damage == 0 then
+    self.next_earthquake.active = false
+    self.ui:endShakeScreen()
     -- if the earthquake measured more than 7 on the richter scale, tell the user about it
-    if self.earthquake_size > 7 then
-      self.ui.adviser:say(_A.earthquake.ended:format(math.floor(self.earthquake_size)))
-    end
-    -- Make sure that machines got all the damage they should get.
-    for _, room in pairs(self.rooms) do
-      for object, value in pairs(room.objects) do
-        if object.strength and object.quake_points then
-          while object.quake_points > 0 do
-            object:machineUsed(room)
-            object.quake_points = object.quake_points - 1
-          end
-        end
-      end
+    if self.next_earthquake.size > 7 then
+      self.ui.adviser:say(_A.earthquake.ended:format(math.floor(self.next_earthquake.size)))
     end
 
     -- set up the next earthquake date
     self:nextEarthquake()
   else
-    -- Multiplier for how much the screen moves around during the quake.
-    local multi = 4
-    if (self.day > self.earthquake_stop_day) or (self.day < math.round(self.earthquake_size / 3)) then
-      -- if we are in the first two days of the earthquake, make it smaller
-      self.randomX = math.random(-(self.earthquake_size/2)*multi, (self.earthquake_size/2)*multi)
-      self.randomY = math.random(-(self.earthquake_size/2)*multi, (self.earthquake_size/2)*multi)
-    else
-      -- otherwise, hit the user with the full earthquake
-      self.randomX = math.random(-self.earthquake_size*multi, self.earthquake_size*multi)
-      self.randomY = math.random(-self.earthquake_size*multi, self.earthquake_size*multi)
+    local announcements = {
+      "quake001.wav", "quake002.wav", "quake003.wav", "quake004.wav",
+    }
+
+    -- start of warning quake
+    if self.next_earthquake.warning_timer == earthquake_warning_period then
+      self.ui:beginShakeScreen(0.2)
+      self.ui:playAnnouncement(announcements[math.random(1, #announcements)])
     end
 
-    -- if the game is not paused
-    if not self:isCurrentSpeed("Pause") then
-      -- Play the earthquake sound. It has different names depending on language used though.
-      if TheApp.audio:soundExists("quake2.wav") then
-        self.ui:playSound("quake2.wav")
-      else
-        self.ui:playSound("quake.wav")
+    -- end of warning quake
+    if self.next_earthquake.warning_timer >= earthquake_warning_period - earthquake_warning_length and
+        self.next_earthquake.warning_timer - self.hours_per_tick < earthquake_warning_period - earthquake_warning_length then
+      self.ui:endShakeScreen()
+    end
+
+    if self.next_earthquake.warning_timer > 0 then
+      self.next_earthquake.warning_timer = self.next_earthquake.warning_timer - self.hours_per_tick
+      -- nothing more to do during inactive warning period
+      if self.next_earthquake.warning_timer < earthquake_warning_period - earthquake_warning_length then
+        return
       end
 
-      -- shake the screen randomly to give the appearance of an earthquake
-      -- the greater the earthquake, the more the screen will shake
+      -- start of real earthquake
+      if self.next_earthquake.warning_timer <= 0 then
+        self.ui:playAnnouncement(announcements[math.random(1, #announcements)])
+      end
+    end
 
-      -- restrict the amount the earthquake can shift the user left and right
-      if self.ui.screen_offset_x > (self.currentX + 600) then
-        if self.randomX > 0 then
-          self.randomX = -self.randomX
-        end
-      elseif self.ui.screen_offset_x < (self.currentX - 600) then
-        if self.randomX < 0 then
-          self.randomX = -self.randomX
+    -- All earthquakes start and end small (small earthquakes never become
+    -- larger), so when there has been less than 2 damage applied or only
+    -- 2 damage remaining to be applied, move the screen with less
+    -- intensity than otherwise.
+    if self.next_earthquake.remaining_damage <= 2 or
+        self.next_earthquake.size - self.next_earthquake.remaining_damage <= 2 then
+      self.ui:beginShakeScreen(0.5)
+    else
+      self.ui:beginShakeScreen(1)
+    end
+
+    startvibration(3)
+    -- Play the earthquake sound. It has different names depending on language used though.
+    if TheApp.audio:soundExists("quake2.wav") then
+      self.ui:playSound("quake2.wav")
+    else
+      self.ui:playSound("quake.wav")
+    end
+
+    -- do not continue to damage phase while in a warning quake
+    if self.next_earthquake.warning_timer > 0 then
+      return
+    end
+
+    self.next_earthquake.damage_timer = self.next_earthquake.damage_timer - self.hours_per_tick
+    if self.next_earthquake.damage_timer <= 0 then
+      for _, room in pairs(self.rooms) do
+        for object, _ in pairs(room.objects) do
+          if object.strength then
+            object:machineUsed(room)
+          end
         end
       end
 
-      -- restrict the amount the earthquake can shift the user up and down
-      if self.ui.screen_offset_y > (self.currentY + 600) then
-        if self.randomY > 0 then
-          self.randomY = -self.randomY
-        end
-      elseif self.ui.screen_offset_y < (self.currentY - 600) then
-        if self.randomY < 0 then
-          self.randomY = -self.randomY
-        end
-      end
+      self.next_earthquake.remaining_damage = self.next_earthquake.remaining_damage - 1
+      self.next_earthquake.damage_timer = self.next_earthquake.damage_timer + earthquake_damage_time
+    end
 
-      self.ui.tick_scroll_amount = {x = self.randomX, y = self.randomY}
+    local hospital = self:getLocalPlayerHospital()
+    -- loop through the patients and allow the possibility for them to fall over
+    for _, patient in ipairs(hospital.patients) do
+      local current = patient.action_queue[1]
 
-      local hospital = self:getLocalPlayerHospital()
-      -- loop through the patients and allow the possibility for them to fall over
-      for _, patient in ipairs(hospital.patients) do
-        local current = patient.action_queue[1]
+      if not patient.in_room and patient.falling_anim then
 
-        if not patient.in_room and patient.falling_anim then
+        -- make the patients fall
 
-          -- make the patients fall
+        -- jpirie: this is currently disabled. Calling this function
+        -- really screws up the action queue, sometimes the patients
+        -- end up with nil action queues, and sometimes the resumed
+        -- actions throw exceptions. Also, patients in the hospital
+        -- who have not yet found reception throw exceptions after
+        -- they visit reception. Some debugging needed here to get
+        -- this working.
 
-          -- jpirie: this is currently disabled. Calling this function
-          -- really screws up the action queue, sometimes the patients
-          -- end up with nil action queues, and sometimes the resumed
-          -- actions throw exceptions. Also, patients in the hospital
-          -- who have not yet found reception throw exceptions after
-          -- they visit reception. Some debugging needed here to get
-          -- this working.
-
-          -- patient:falling()
-        end
+        -- patient:falling()
       end
     end
   end
@@ -758,7 +748,7 @@ end
 --!param parcel (int) Plot to change.
 --!param owner (int) New owner (may be 0).
 function World:setPlotOwner(parcel, owner)
-  self.map.th:setPlotOwner(parcel, owner)
+  self.map:setPlotOwner(parcel, owner)
   if owner ~= 0 and self.delayed_map_objects then
     for info, p in pairs(self.delayed_map_objects) do
       if p == parcel then
@@ -792,8 +782,7 @@ function World:newRoom(x, y, w, h, room_info, ...)
   -- Note: Room IDs will be unique, but they may not form continuous values
   -- from 1, as IDs of deleted rooms may not be re-issued for a while
   local class = room_info.class and _G[room_info.class] or Room
-  -- TODO: Take hospital based on the owner of the plot the room is built on
-  local hospital = self.hospitals[1]
+  local hospital = self:getHospital(x, y)
   local room = class(x, y, w, h, id, room_info, self, hospital, ...)
 
   self.rooms[id] = room
@@ -925,16 +914,15 @@ function World:setSpeed(speed)
   local pause_state_changed = nil
   if speed == "Pause" then
     -- stop screen shaking if there was an earthquake in progress
-    if self.active_earthquake then
-        stopvibration()
-      self.ui.tick_scroll_amount = {x = 0, y = 0}
+    if self.next_earthquake.active then
+      self.ui:endShakeScreen()
     end
     -- By default actions are not allowed when the game is paused.
     self.user_actions_allowed = TheApp.config.allow_user_actions_while_paused
     pause_state_changed = true
   elseif self:getCurrentSpeed() == "Pause" then
     self.user_actions_allowed = true
-    if self.active_earthquake then
+    if self.next_earthquake.active then
         startvibration(3)
     end
   end
@@ -1019,10 +1007,9 @@ function World:onTick()
     self.hour = self.hour + self.hours_per_tick
 
     -- if an earthquake is supposed to be going on, call the earthquake function
-    if self.active_earthquake then
+    if self.next_earthquake.active then
       self:tickEarthquake()
     end
-
 
     -- End of day/month/year
     if self.hour >= self.hours_per_day then
@@ -1046,11 +1033,6 @@ function World:onTick()
         self.month = self.month + 1
         if self.month > 12 then
           self.month = 12
-          if self.year == 1 then
-            for _, hospital in ipairs(self.hospitals) do
-              hospital.initial_grace = false
-            end
-          end
           -- It is crucial that the annual report gets to initialize before onEndYear is called.
           -- Yearly statistics are reset there.
           self.ui:addWindow(UIAnnualReport(self.ui, self))
@@ -1132,15 +1114,10 @@ function World:onEndDay()
   end
 
   -- check if it's time for an earthquake, and the user is at least on level 5
-  if (self.year - 1) * 12 + self.month == self.next_earthquake_month and
-      self.day == self.next_earthquake_day then
+  if (self.year - 1) * 12 + self.month == self.next_earthquake.start_month and
+      self.day == self.next_earthquake.start_day then
     -- warn the user that an earthquake is on the way
-    local announcements = {
-      "quake001.wav", "quake002.wav", "quake003.wav", "quake004.wav",
-    }
-    self.ui:playAnnouncement(announcements[math.random(1, #announcements)])
-
-    self:createEarthquake()
+    self.next_earthquake.active = true
   end
 
   -- Maybe it's time for an emergency?
@@ -1218,12 +1195,10 @@ function World:onEndMonth()
     self:checkIfGameWon()
   end
 
-  -- Change population share for the hospitals, TODO according to reputation.
-  -- Since there are no competitors yet the player's hospital can be considered
-  -- to be fairly good no matter what it looks like, so after gbv.AllocDelay
-  -- months, change the share to half of the new people.
+  local local_hospital = self:getLocalPlayerHospital()
+  local_hospital.population = 0.25
   if self.month >= self.map.level_config.gbv.AllocDelay then
-    self:getLocalPlayerHospital().population = 0.5
+    local_hospital.population = local_hospital.population * self:getReputationImpact(local_hospital)
   end
 
   -- Also possibly change world spawn rate according to the level configuration.
@@ -1263,6 +1238,28 @@ function World:updateSpawnDates()
     -- We are interested in the coming month, pick days from it at random.
     local day = math.random(1, month_length[self.month % 12 + 1])
     self.spawn_dates[day] = self.spawn_dates[day] and self.spawn_dates[day] + 1 or 1
+  end
+end
+
+--! Computes the impact of hospital reputation on the spawn rate.
+--! The relation between reputation and its impact is linear.
+--! Returns a percentage (as a float):
+--!     1% if reputation < 253
+--!    60% if reputation == 400
+--!   100% if reputation == 500
+--!   140% if reputation == 600
+--!   180% if reputation == 700
+--!   300% if reputation == 1000
+--!param hospital (hospital): the hospital used to compute the
+--! reputation impact
+function World:getReputationImpact(hospital)
+  local result = 1 + ((hospital.reputation - 500) / 250)
+
+  -- The result must be positive
+  if result <= 0 then
+    return 0.01
+  else
+    return result
   end
 end
 
@@ -1354,44 +1351,28 @@ end
 
 -- Called when it is time to have another earthquake
 function World:nextEarthquake()
+  self.next_earthquake = {}
+  self.next_earthquake.active = false
+
   local level_config = self.map.level_config
   -- check carefully that no value that we are going to use is going to be nil
   if level_config.quake_control and level_config.quake_control[self.current_map_earthquake] and
       level_config.quake_control[self.current_map_earthquake].Severity ~= 0 then
     -- this map has rules to follow when making earthquakes, let's follow them
     local control = level_config.quake_control[self.current_map_earthquake]
-    self.next_earthquake_month = math.random(control.StartMonth, control.EndMonth)
-    self.next_earthquake_day = math.random(1, month_length[(self.next_earthquake_month % 12)+1])
-    self.earthquake_size = control.Severity
+    self.next_earthquake.start_month = math.random(control.StartMonth, control.EndMonth)
+
+    -- Month length of the start of the earthquake. From start to finish
+    -- earthquakes do not persist for >= a month so we can wrap all days
+    -- after the start around the month length unambiguously.
+    local eqml = month_length[(self.next_earthquake.start_month % 12) + 1]
+    self.next_earthquake.start_day = math.random(1, eqml)
+
+    self.next_earthquake.size = control.Severity
+    self.next_earthquake.remaining_damage = self.next_earthquake.size
+    self.next_earthquake.damage_timer = earthquake_damage_time
+    self.next_earthquake.warning_timer = earthquake_warning_period
     self.current_map_earthquake = self.current_map_earthquake + 1
-  else
-    if (tonumber(self.map.level_number) and tonumber(self.map.level_number) >= 5) or
-    (not tonumber(self.map.level_number)) then
-      local current_month = (self.year - 1) * 12 + self.month
-
-      -- Support standard values for mean and variance
-      local mean = 180
-      local variance = 30
-      -- How many days until next earthquake?
-      local days = math.round(math.n_random(mean, variance))
-      local next_month = self.month
-
-      -- Walk forward to get the resulting month and day.
-      if days > month_length[next_month] - self.day then
-        days = days - (month_length[next_month] - self.day)
-        next_month = next_month + 1
-      end
-      while days > month_length[(next_month - 1) % 12 + 1] do
-        days = days - month_length[(next_month - 1) % 12 + 1]
-        next_month = next_month + 1
-      end
-      self.next_earthquake_month = next_month + (self.year - 1) * 12
-      self.next_earthquake_day = days
-
-      -- earthquake can be between 1 and 10 (non-inclusive) on the richter scale
-      -- Make quakes at around 4 more probable.
-      self.earthquake_size = math.round(math.min(math.max(math.n_random(4,2), 1), 9))
-    end
   end
 end
 
@@ -1933,13 +1914,13 @@ function World:newObject(id, ...)
   return entity
 end
 
-function World:canNonSideObjectBeSpawnedAt(x, y, objects_id, orientation, spawn_rooms_id)
+function World:canNonSideObjectBeSpawnedAt(x, y, objects_id, orientation, spawn_rooms_id, player_id)
   local object = self.object_types[objects_id]
   local objects_footprint = object.orientations[orientation].footprint
   for _, tile in ipairs(objects_footprint) do
     local tiles_world_x = x + tile[1]
     local tiles_world_y = y + tile[2]
-    if self:areFootprintTilesCoardinatesInvalid(tiles_world_x, tiles_world_y) then
+    if not self:isOnMap(tiles_world_x, tiles_world_y) then
       return false
     end
 
@@ -1947,15 +1928,19 @@ function World:canNonSideObjectBeSpawnedAt(x, y, objects_id, orientation, spawn_
       return false
     end
 
-    if not self:isFootprintTileBuildableOrPassable(x, y, tile, objects_footprint, "buildable") then
+    if not self:isFootprintTileBuildableOrPassable(x, y, tile, objects_footprint, "buildable", player_id) then
       return false
     end
   end
   return not self:wouldNonSideObjectBreakPathfindingIfSpawnedAt(x, y, object, orientation, spawn_rooms_id)
 end
 
-function World:areFootprintTilesCoardinatesInvalid(x, y)
-  return x < 1 or x > self.map.width or y < 1 or y > self.map.height
+--! Test whether the given coordinate is on the map.
+--!param x (int) X position of the coordinate to test.
+--!param y (int) Y position of the coordinate to test.
+--!return (boolean) Whether the provided position is on the map.
+function World:isOnMap(x, y)
+  return x >= 1 and x <= self.map.width and y >= 1 and y <= self.map.height
 end
 
 ---
@@ -1989,7 +1974,7 @@ end
 -- checks if its buildable/passable using the tile's appropriate flag and then returns this
 -- flag's boolean value or false if the tile isn't valid.
 ---
-function World:isFootprintTileBuildableOrPassable(x, y, tile, footprint, requirement_flag)
+function World:isFootprintTileBuildableOrPassable(x, y, tile, footprint, requirement_flag, player_id)
   local function isTileValid(x, y, complete_cell, flags, flag_name, need_side)
     if complete_cell or need_side then
       return flags[flag_name]
@@ -2009,7 +1994,8 @@ function World:isFootprintTileBuildableOrPassable(x, y, tile, footprint, require
       west = { x = -1, y = 0, buildable_flag = "buildableWest", passable_flag = "travelWest", needed_side = "need_west_side"}
     }
   local flags = {}
-  local requirement_met = self.map.th:getCellFlags(x, y, flags)[requirement_flag]
+  local requirement_met = self.map.th:getCellFlags(x, y, flags)[requirement_flag] and
+      (player_id == 0 or player_id == flags.owner)
 
   if requirement_met then
     -- For each direction check that the tile is valid:
@@ -2207,11 +2193,20 @@ function World:addObjectToTile(object, x, y)
   return true
 end
 
+--! Retrieve all objects from a given position.
+--!param x (int) X position of the object to retrieve.
+--!param y (int) Y position of the object to retrieve.
 function World:getObjects(x, y)
   local index = (y - 1) * self.map.width + x
   return self.objects[index]
 end
 
+--! Retrieve one object from a given position.
+--!param x (int) X position of the object to retrieve.
+--!param y (int) Y position of the object to retrieve.
+--!param id Id to search, nil gets first object, string gets first object with
+--! that id, set of strings gets first object that matches an entry in the set.
+--!return (Object or nil) The found object, or nil if the object is not found.
 function World:getObject(x, y, id)
   local objects = self:getObjects(x, y)
   if objects then
@@ -2234,22 +2229,73 @@ function World:getObject(x, y, id)
   return -- nil
 end
 
---! Remove litter from a tile.
---!param obj (Litter) litter to remove.
---!param x (int) X position of the tile.
---!param y (int) Y position of the tile.
-function World:removeLitter(obj, x, y)
-  self:removeObjectFromTile(obj, x, y)
-  self:destroyEntity(obj)
-  self.map.th:setCellFlags(x, y, {buildable = true})
+--! Remove all cleanable litter from a given tile.
+--!param x (int) X position of the tile to clean.
+--!param y (int) Y position of the tile to clean.
+function World:removeAllLitter(x, y)
+  local litters = {}
+  local objects = self:getObjects(x, y)
+  if not objects then return end
+
+  for _, obj in ipairs(objects) do
+    if obj.object_type.id == "litter" and obj:isCleanable() then
+      litters[#litters + 1] = obj
+    end
+  end
+  for _, litter in ipairs(litters) do litter:remove() end
+end
+
+--! Prepare all tiles of the footprint for build of an object.
+--!param object_footprint Footprint of the object being build.
+--!param x (int) X position of the object
+--!param y (int) Y position of the object
+function World:prepareFootprintTilesForBuild(object_footprint, x, y)
+  local hospital = self:getLocalPlayerHospital()
+
+  for _, tile in ipairs(object_footprint) do
+    if tile.complete_cell or not (tile.passable or tile.only_passable) then
+      self:removeAllLitter(x + tile[1], y + tile[2])
+      hospital:removeRatholeXY(x + tile[1], y + tile[2])
+    end
+  end
+end
+
+--! Prepare all tiles in the given rectangle for building a room.
+--!param x (int) Start x position of the area.
+--!param y (int) Start y position of the area.
+--!param w (int) Number of tiles in x direction.
+--!param h (int) Number of tiles in y direction.
+function World:prepareRectangleTilesForBuild(x, y, w, h)
+  local hospital = self:getLocalPlayerHospital()
+
+  x = x - 1
+  y = y - 1
+  for dx = 1, w do
+    for dy = 1, h do
+      self:removeAllLitter(x + dx, y + dy)
+      if dx == 1 or dx == w or dy == 1 or dy == h then hospital:removeRatholeXY(x + dx, y + dy) end
+    end
+  end
 end
 
 --! Get the room at a given tile location.
---!param x X position of the queried tile.
---!param y Y position of the queried tile.
+--!param x (int) X position of the queried tile.
+--!param y (int) Y position of the queried tile.
 --!return (Room) Room of the tile, or 'nil'.
 function World:getRoom(x, y)
   return self.rooms[self.map:getRoomId(x, y)]
+end
+
+--! Get the hospital at a given tile location.
+--!param x (int) X position of the queried tile.
+--!param y (int) Y position of the queried tile.
+--!return (Hospital) Hospital at the given location or 'nil'.
+function World:getHospital(x, y)
+  local th = self.map.th
+
+  local flags = th:getCellFlags(x, y)
+  if not flags.hospital then return nil end
+  return self.hospitals[flags.owner]
 end
 
 --! Returns localized name of the room, internal required staff name
@@ -2311,6 +2357,11 @@ end
 --! Because the save file only saves one thob per tile if they are more that information
 -- will be lost. To solve this after a load we need to set again all the thobs on each tile.
 function World:resetAnimations()
+  -- Erase entities from the map if they want.
+  for _, entity in ipairs(self.entities) do
+    entity:eraseObject()
+  end
+  -- Add them again.
   for _, entity in ipairs(self.entities) do
     entity:resetAnimation()
   end
@@ -2598,6 +2649,47 @@ function World:afterLoad(old, new)
   if old < 108 then
     self.room_build_callbacks = nil
   end
+  if old < 113 then -- Make cleanable littered tiles buildable.
+    for x = 1, self.map.width do
+      for y = 1, self.map.height do
+        local litter = self:getObject(x, y, "litter")
+        if litter and litter:isCleanable() then self.map:setCellFlags(x, y, {buildable=true}) end
+      end
+    end
+  end
+  if old < 115 then
+    self.next_earthquake = {
+      start_month = self.next_earthquake_month,
+      start_day = self.next_earthquake_day,
+      size = self.earthquake_size,
+      active = self.earthquake_active or false
+    }
+    self.next_earthquake_month = nil
+    self.next_earthquake_day = nil
+    self.earthquake_stop_day = nil
+    self.earthquake_size = nil
+    self.earthquake_active = nil
+    self.randomX = nil
+    self.randomY = nil
+    self.currentX = nil
+    self.currentY = nil
+
+    if self.next_earthquake.active then
+      local rd = 0
+      for _, room in pairs(self.rooms) do
+        for object, _ in pairs(room.objects) do
+          if object.quake_points then
+            rd = math.max(rd, object.quake_points)
+            object.quake_points = nil
+          end
+        end
+      end
+      self.next_earthquake.remaining_damage = rd
+      self.next_earthquake.damage_timer = earthquake_damage_time
+      self.next_earthquake.warning_timer = 0
+    end
+  end
+
   self.savegame_version = new
 end
 
