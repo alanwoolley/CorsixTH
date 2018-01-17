@@ -21,6 +21,9 @@ SOFTWARE. --]]
 --! Dropdown "window" used for selection of one item from a list.
 class "UIDropdown" (UIResizable)
 
+---@type UIDropdown
+local UIDropdown = _G["UIDropdown"]
+
 --! Constructor for the dropdown "window"
 --!param ui (UI) The ui the window is created in
 --!param parent_window (Window) The window that this dropdown will be attached to
@@ -34,25 +37,24 @@ function UIDropdown:UIDropdown(ui, parent_window, parent_button, items, callback
   local col = colour or parent_window.colour
   self:UIResizable(ui, 1, 1, col, true, true)
 
-  local app = ui.app
   self.modal_class = "dropdown"
   self.esc_closes = true
   self.resizable = false
   self.default_button_sound = "selectx.wav"
-  
+
   self.parent_window = parent_window
   self.parent_button = parent_button
   self.items = items
   self.callback = callback
-  
+
   local panel = parent_button.panel_for_sprite
-  
+
   local width = panel.w
   local height = panel.h
-  
+
   -- TODO: Somehow make the dropdown disappear if the user clicks outside it.
   self:setPosition(panel.x, panel.y + panel.h)
-  
+
   local y = 0
   for i, item in ipairs(items) do
     self:addBevelPanel(1, y + 1, width - 2, height - 2, parent_window.colour):setLabel(item.text, item.font)
@@ -61,7 +63,7 @@ function UIDropdown:UIDropdown(ui, parent_window, parent_button, items, callback
       --:setTooltip(item.tooltip)
     y = y + height
   end
-  
+
   -- Adjust size
   self:setSize(width, y)
 end

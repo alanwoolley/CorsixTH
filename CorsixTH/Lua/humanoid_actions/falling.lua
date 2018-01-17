@@ -18,6 +18,16 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE. --]]
 
+class "FallingAction" (HumanoidAction)
+
+---@type FallingAction
+local FallingAction = _G["FallingAction"]
+
+function FallingAction:FallingAction()
+  self:HumanoidAction("falling")
+  self.setMustHappen(true)
+end
+
 local action_falling_end = permanent"action_falling_end"( function(humanoid)
   humanoid:finishAction()
 end)
@@ -29,7 +39,7 @@ local function action_falling_start(action, humanoid)
   else
     humanoid.last_move_direction = "south"
   end
-  
+
   assert(humanoid.falling_anim, "Error: no falling animation for humanoid " .. humanoid.humanoid_class)
   action.must_happen = true
   humanoid:setAnimation(humanoid.falling_anim, humanoid.last_move_direction == "east" and 0 or 1)

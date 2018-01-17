@@ -19,11 +19,14 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE. --]]
 
 local lfs = require "lfs"
+local TH = require "TH"
+local lfsext = TH.lfsExt()
 
 --! A tree node representing a directory in the physical file-system.
 class "DirTreeNode" (FileTreeNode)
 
-local pathsep = package.config:sub(1, 1)
+---@type DirTreeNode
+local DirTreeNode = _G["DirTreeNode"]
 
 function DirTreeNode:DirTreeNode(path)
   self:FileTreeNode(path)
@@ -31,10 +34,10 @@ end
 
 function DirTreeNode:isValidFile(name)
   -- Check parent criteria and that it's a directory.
-  if FileTreeNode.isValidFile(self, name) 
-  and lfs.attributes(self:childPath(name), "mode") == "directory" then
+  if FileTreeNode.isValidFile(self, name) and
+      lfs.attributes(self:childPath(name), "mode") == "directory" then
     -- Make sure that we are allowed to read the directory.
-    local status, result = pcall(lfs.dir, self:childPath(name))
+    local status, _ = pcall(lfs.dir, self:childPath(name))
     return status
   end
 end
@@ -53,6 +56,9 @@ end
 --! This tree only shows directories and highlights valid TH directories.
 class "InstallDirTreeNode" (DirTreeNode)
 
+---@type InstallDirTreeNode
+local InstallDirTreeNode = _G["InstallDirTreeNode"]
+
 function InstallDirTreeNode:InstallDirTreeNode(path)
   self:FileTreeNode(path)
 end
@@ -69,7 +75,7 @@ function InstallDirTreeNode:getHighlightColour(canvas)
   local highlight_colour = self.highlight_colour
   if highlight_colour == nil then
     highlight_colour = false
-    
+
     if self:getLevel() == 0 and not self.has_looked_for_children then
       -- Assume root-level things are not TH directories, unless we've already
       -- got a list of their children.
@@ -91,18 +97,21 @@ function InstallDirTreeNode:getHighlightColour(canvas)
     end
     self.highlight_colour = highlight_colour
   end
-  return highlight_colour or nil 
+  return highlight_colour or nil
 end
 
 --! Prompter for Theme Hospital install directory
 class "UIDirectoryBrowser" (UIResizable)
+
+---@type UIDirectoryBrowser
+local UIDirectoryBrowser = _G["UIDirectoryBrowser"]
 
 --! Creates a new directory browser window
 --!param ui The active UI to hook into.
 --!param mode Whether the dialog has been opened from the main_menu or somewhere else. Currently
 --! valid are "menu" or "dir_browser".
 --!param instruction The textual instruction what the user should do in the dialog.
---!param treenode_type What TreeNode type the nodes will be built from. E.g. "InstallDirTreeNode"
+--!param treenode_class What TreeNode subclass the nodes will be built from. E.g. "InstallDirTreeNode"
 --!param callback The function that is called when the user has chosen a directory. Gets
 --! a path string as argument.
 function UIDirectoryBrowser:UIDirectoryBrowser(ui, mode, instruction, treenode_class, callback)
@@ -137,14 +146,14 @@ function UIDirectoryBrowser:UIDirectoryBrowser(ui, mode, instruction, treenode_c
   else
     self.font = ui.app.gfx:loadBuiltinFont()
     self:setDefaultPosition(0.05, 0.5)
-    self:addKeyHandler("esc", self.exit)
+    self:addKeyHandler("escape", self.exit)
     self.exit_button:setLabel(_S.install.exit, self.font):makeButton(0, 0, 100, 18, nil, self.exit)
   end
-   
+
   -- Create the root item (or items, on Windows), and set it as the
   -- first_visible_node.
   local root
-  local roots = lfs.volumes()
+  local roots = lfsext.volumes()
   if #roots > 1 then
     for k, v in pairs(roots) do
       roots[k] = _G[treenode_class](v)
@@ -160,10 +169,10 @@ function UIDirectoryBrowser:UIDirectoryBrowser(ui, mode, instruction, treenode_c
       self:close()
     end
   end
-  
+
   local control = TreeControl(root, 5, 55, 490, 340, self.col_bg, self.col_scrollbar)
     :setSelectCallback(select_function)
-    
+
   local ok_function = function()
     if control.selected_node then
       select_function(control.selected_node)

@@ -18,33 +18,19 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE. --]]
 
+local TH = require "TH"
+local lfsext = TH.lfsExt()
+
 --! Window where the user can choose a font file.
 class "UIChooseFont" (UIFileBrowser)
 
-local pathsep = package.config:sub(1, 1)
-
-local col_textbox = {
-  red = 0,
-  green = 0,
-  blue = 0,
-}
-
-local col_highlight = {
-  red = 174,
-  green = 166,
-  blue = 218,
-}
-
-local col_shadow = {
-  red = 134,
-  green = 126,
-  blue = 178,
-}
+---@type UIChooseFont
+local UIChooseFont = _G["UIChooseFont"]
 
 function UIChooseFont:UIChooseFont(ui, mode)
   -- Create the root item (or items, on Windows).
   local root
-  local roots = lfs.volumes()
+  local roots = lfsext.volumes()
   if #roots > 1 then
     for k, v in pairs(roots) do
       roots[k] = FilteredFileTreeNode(v, {".ttc", ".otf", ".ttf"})

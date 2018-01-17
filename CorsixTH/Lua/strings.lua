@@ -20,13 +20,12 @@ SOFTWARE. --]]
 
 local lfs = require "lfs"
 local TH = require "TH"
-local type, loadfile, pcall, tostring, setfenv, setmetatable, math_random
-    = type, loadfile, pcall, tostring, setfenv, setmetatable, math.random
-local rawset, rawget
-    = rawset, rawget
 
 --! Layer which handles the loading of localised text.
 class "Strings"
+
+---@type Strings
+local Strings = _G["Strings"]
 
 function Strings:Strings(app)
   self.app = app
@@ -53,7 +52,7 @@ function Strings:init()
       end
     end
   end
-  
+
   -- Build the language table from Language() calls
   -- Every file in the languages folder should have a call to Language() near
   -- the start of the file which gives the names for the language. These names
@@ -72,7 +71,7 @@ function Strings:init()
     -- the default value of nil.
     local infinite_table_mt
     infinite_table_mt = {
-      __index = function(t, k)
+      __index = function(_, _)
         return setmetatable({}, infinite_table_mt)
       end
     }
@@ -97,7 +96,7 @@ function Strings:init()
         for _, name in pairs(names) do
           self.language_to_chunk[name:lower()] = chunk
         end
-		self.chunk_to_names[chunk] = names
+        self.chunk_to_names[chunk] = names
         error(good_error_marker)
       end,
       Font = function(...)
@@ -112,7 +111,7 @@ function Strings:init()
     }, infinite_table_mt)
     -- Actually run the language file
     local status, err = pcall(chunk, env)
-    if not status and err ~= good_error_marker and app.good_install_folder then
+    if not status and err ~= good_error_marker and TheApp.good_install_folder then
       print("Error evaluating " .. filename .. ":\n" .. tostring(err))
     end
   end
@@ -133,23 +132,23 @@ local shadows = setmetatable({}, {__mode = "k"})
 -- "__random" to each table (which always resolves to a random string from
 -- the table), and to prevent editing or adding to a string table.
 local strings_metatable = function(no_restriction) return {
-  __index = function(t, k)
+  __index = function(t, key)
     t = shadows[t]
-    local v = t[k]
-    if v ~= nil then
-      return v
+    local val = t[key]
+    if val ~= nil then
+      return val
     end
-    if k ~= "__random" then
+    if key ~= "__random" then
       if no_restriction then return nil end
-      error("Non-existant string: " .. tostring(k), 2)
+      error("Non-existant string: " .. tostring(key), 2)
     end
     local candidates = {}
-    for k, v in pairs(t) do
+    for _, v in pairs(t) do
       candidates[#candidates + 1] = v
     end
-    return candidates[math_random(1, #candidates)]
+    return candidates[math.random(1, #candidates)]
   end,
-  __newindex = function(t, k, v)
+  __newindex = function(_, _, _)
     error("String tables are read-only", 2)
   end,
   __pairs = function(t)
@@ -203,13 +202,13 @@ function Strings:load(language, no_restriction, no_inheritance)
     end,
     -- Inherit() should evaluate the named language in the current environment
     -- NB: Inheritance of any but original_strings disabled when no_inheritance set
-    Inherit = function(language, ...)
-      if no_inheritance and language ~= "original_strings" then return end
+    Inherit = function(lang, ...)
+      if no_inheritance and lang ~= "original_strings" then return end
       local old_encoding = encoding
       encoding = default_encoding
       local old_language_called = language_called
       language_called = false
-      self:_loadPrivate(language, env, ...)
+      self:_loadPrivate(lang, env, ...)
       encoding = old_encoding
       language_called = old_language_called
     end,
@@ -226,7 +225,7 @@ function Strings:load(language, no_restriction, no_inheritance)
     -- LoadStrings() should return the original game string table
     LoadStrings = function(filename)
       return assert(TH.LoadStrings(self.app:readDataFile(filename)),
-                    "Cannot load original string file '"..filename.."'")
+                    "Cannot load original string file '" .. filename .. "'")
     end,
     -- SetSpeechFile() should remember the named file to return to our caller
     SetSpeechFile = function(...)
@@ -296,7 +295,7 @@ function Strings:_loadPrivate(language, env, ...)
   local chunk = self.language_to_chunk[language:lower()]
   if not chunk then -- If selected language could not be found, try to revert to English
     print_table(self.language_to_chunk)
-    print("Language '".. language .."' could not be found. Reverting to English.")
+    print("Language '" .. language .. "' could not be found. Reverting to English.")
     chunk = self.language_to_chunk["english"]
     if not chunk then -- If english could not be found, raise an error
       error("Language 'English' could not be found. Please verify your installation.")
@@ -334,21 +333,21 @@ function Strings:setupAdviserMessage(messages)
     --cheats
   }
   local formatFunc
-  formatFunc = function(self, arg)
+  formatFunc = function(format_self, arg)
     -- After 'format', it is not useful to have indexing magic anymore.
-    return { text = self.text:format(arg), priority = self.priority }
+    return { text = format_self.text:format(arg), priority = format_self.priority }
   end
   local indexFunc
-  indexFunc = function(self, field)
-    -- Since prioTable is a partial table, self.table may disappear, prevent infinite recursion.
+  indexFunc = function(index_self, field)
+    -- Since prioTable is a partial table, index_self.table may disappear, prevent infinite recursion.
     if field == "table" then
       return nil
     end
     local val = {}
-    val.text = self.text[field]
+    val.text = index_self.text[field]
     val.format = formatFunc
-    val.table = self.table
-    val.priority = self.priority
+    val.table = index_self.table
+    val.priority = index_self.priority
     if val.table ~= nil then
       val.table = val.table[field]
       if val.table ~= nil and val.table._priority ~= nil then
@@ -474,21 +473,21 @@ local function utf8encode(codepoint)
     return string.char(codepoint)
   elseif codepoint <= 0x7FF then
     local sextet = codepoint % 64
-    codepoint = (codepoint - sextet) / 64
+    codepoint = math.floor((codepoint - sextet) / 64)
     return string.char(0xC0 + codepoint, 0x80 + sextet)
   elseif codepoint <= 0xFFFF then
     local sextet2 = codepoint % 64
-    codepoint = (codepoint - sextet2) / 64
+    codepoint = math.floor((codepoint - sextet2) / 64)
     local sextet1 = codepoint % 64
-    codepoint = (codepoint - sextet2) / 64
+    codepoint = math.floor((codepoint - sextet2) / 64)
     return string.char(0xE0 + codepoint, 0x80 + sextet1, 0x80 + sextet2)
   else
     local sextet3 = codepoint % 64
-    codepoint = (codepoint - sextet3) / 64
+    codepoint = math.floor((codepoint - sextet3) / 64)
     local sextet2 = codepoint % 64
-    codepoint = (codepoint - sextet2) / 64
+    codepoint = math.floor((codepoint - sextet2) / 64)
     local sextet1 = codepoint % 64
-    codepoint = (codepoint - sextet2) / 64
+    codepoint = math.floor((codepoint - sextet2) / 64)
     return string.char(0xF0 + codepoint, 0x80 + sextet1, 0x80 + sextet2,
                        0x80 + sextet3)
   end
@@ -597,7 +596,7 @@ local function utf8char(c)
   end
   codepoint = codepoint + (c:byte(1) % 2^(7 - #c)) * multiplier
   -- If the utf-8 character is a combining diacritical mark, merge it with the
-  -- preceeding normal character
+  -- preceding normal character
   if prechar and (0x300 <= codepoint and codepoint < 0x370) then
     if combine_diacritical_marks[prechar] then
       if combine_diacritical_marks[prechar][codepoint] then
@@ -616,7 +615,7 @@ end
 
 utf8conv = function(s)
   -- Pull out each individual utf-8 character and pass it through utf8char
-  -- [\1-\127] picks up a preceeding ASCII character to combine diacritics
+  -- [\1-\127] picks up a preceding ASCII character to combine diacritics
   -- [\192-\253] picks up the first byte of a utf-8 character (technically
   --   only 194 through 244 should be used)
   -- [\128-\191] picks up the remaining bytes of a utf-8 character
@@ -641,10 +640,12 @@ case(0x86, 0x8F) -- a-ring
 case(0x94, 0x99) -- o-umlaut
 case(0xA4, 0xA5) -- n-tilde
 local case_pattern = "\195[\128-\191]" -- Unicode range [0xC0, 0xFF] as UTF-8
+
 local orig_upper = string.upper
 function string.upper(s)
   return orig_upper(s:gsub(case_pattern, lower_to_upper))
 end
+
 local orig_lower = string.lower
 function string.lower(s)
   return orig_lower(s:gsub(case_pattern, upper_to_lower))

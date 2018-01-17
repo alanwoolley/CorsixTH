@@ -29,8 +29,23 @@ SOFTWARE.
 #include <wx/panel.h>
 #include <wx/timer.h>
 #include <wx/listbox.h>
+#include <wx/vscroll.h>
 #include "th.h"
 #include <vector>
+
+static const int ROW_COUNT = 1000;
+
+// Derived class to add scrollbars to the window.
+class MyVScrolled : public wxVScrolledWindow {
+public:
+    MyVScrolled(wxWindow *parent) : wxVScrolledWindow(parent, wxID_ANY) { iMyCount = ROW_COUNT; }
+
+    wxCoord OnGetRowHeight(size_t  row) const { return 1; }
+
+    wxCoord EstimateTotalHeight() const { return iMyCount; }
+
+    int iMyCount;
+};
 
 class frmSprites : public wxFrame
 {
@@ -66,10 +81,10 @@ protected:
 
     std::vector<_sprite_t> m_vSprites;
     THAnimations m_oAnims;
-    
+
     wxTextCtrl* m_txtTable;
     wxTextCtrl* m_txtData;
     wxTextCtrl* m_txtPalette;
-    wxPanel* m_panFrame;
+    MyVScrolled* m_panFrame;
     DECLARE_EVENT_TABLE();
 };

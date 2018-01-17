@@ -1,4 +1,206 @@
 -------------------------------------------------------------------------------
+Version 0.60 - released May 2016
+-------------------------------------------------------------------------------
+
+--- Highlights from this release ---
+
+* User campaigns - It is now possible to create a series of levels that play
+  together just like the original game.
+* In game map editor - A new map editor is available directly from the game
+  menu.
+* Drug price impact - Patients will now react to the price you set for
+  treatments. If treatments cost too much patients will opt to go home instead
+  and this can affect your reputation.
+* Variable spawn rate - The spawn rate will now take into account your
+  hospital's reputation (after a date set in the level file.)
+* Machine smoke is now visible when machines are close to worn out.
+* Right clicking the timer is now supported like in the original game for
+  moving to affected patients - See issue #882 for details.
+* Numpad support - The number pad can now be used to move around the map when
+  numlock is off, or to type numbers when numlock is on, without side effects.
+* The MP3 folder can now be unset from within the game. Previously after
+  setting an mp3 folder it could only be removed by editing the config file by
+  hand.
+* Uses the proper cursor for resizing rooms.
+* Bins can now be placed in the hallways.
+* Temperature impact has been tweaked. The initial grace period has been
+  removed and the overall impact has been softened.
+* Custom maps can now be stored in a user directory separate from levels
+  shipped with the game.
+
+--- Notable bug fixes ---
+
+* Free build mode is now truly free - rooms used to cost money in this mode.
+* In game movies will now work correctly on more hardware.
+* Sound effects are no longer played when sound is disabled.
+* VIP rewards have been tweaked to closer match expectations when the
+  impression is mediocre.
+* Crash when a patient is selected while they walk off the map is fixed.
+* A room built next to an unowned parcel no longer loses its wall when the
+  parcel is bought.
+* Beta 1 regression that caused fired staff to continue to be paid has been
+  patched.
+* Beta 1 regression that caused the last cured emergency patient not to count
+  has been patched.
+* King complex patients only pay for their cure once.
+* Patients will notice when a room they are waiting for becomes available.
+* Properly load saves with more than one object on a tile.
+* Do not get stuck in an infinite loop when no disease is available to spawn.
+
+-------------------------------------------------------------------------------
+Version 0.50 - released July 2015
+-------------------------------------------------------------------------------
+
+The majority of changes in this update have been done under the hood.
+Most of our third-party libraries have been updated, and especially Windows
+users will notice that there is now only one executable after installation.
+No more "which one should I use if I want zoom?"!
+
+
+--- Gameplay ---
+
+* Fix: Crash when trying to play certain sounds from e.g. the French version.
+* Fix: Potential crash from Esc-press before main menu.
+* Fix: Patients could in some circumstances get really confused and try to exit
+  a room without putting any clothes on.
+
+* Added: Configuration of scroll speed.
+* Change: Midi tracks will be played in the order they appear in MIDI.txt
+
+* Most languages have been updated.
+
+
+--- Movies ---
+
+* Fix: Audio stutter in certain movies.
+* Fix: The game could sometimes crash when a movie had finished.
+* Support for LibAV as an alternative to FFMpeg.
+
+
+--- Animation Viewer ---
+
+* Added: A vertical scroll bar to the sprite display.
+
+
+--- CorsixTH development ---
+
+* We have moved to newer versions of a lot of libraries, most notably
+  SDL 1.2 -> SDL 2 and added support for Lua 5.2 and Lua 5.3.
+* New ready-to-use Eclipse Workspace.
+* Debugging Lua code using DBGp has been added. See
+  the Wiki for more information.
+* The Windows Installer now uses NSIS 3.0 and only produces one executable
+  since SDL 2 handles renderer itself.
+* Framework for Busted Unit Tests in Lua.
+* Support for custom graphics has been improved.
+
+
+-------------------------------------------------------------------------------
+Version 0.40 - released December 2014
+-------------------------------------------------------------------------------
+
+It has been a while since our last release, but good things come to those who wait!
+Or... in this case it's contagious diseases. Watch out for epidemics on the
+later levels in the campaign! Your patients are not as good as they used to be
+either, so those who are not lucky enough to get vaccinated and cured might
+get a visit from the Grim Reaper.
+Also, don't forget to try out the new map St. Peter's near Cawley!
+
+Happy gaming!
+
+
+--- Gameplay ---
+
+* Added: Epidemics. You can either choose to pay a fine to the authorities or
+  try to cover up the epidemic by vaccinating and curing the contagious patients.
+  Patients going between buildings will NOT trigger the alarm to the authorities.
+* Added: The Grim Reaper. Previously patients have always gone to heaven when
+  they die. No more! Sometimes they will instead fall down to the middle of the
+  earth in a Lava Hole.
+* Added: People with visual diseases will no longer arrive at the beginning of
+  the level if that has been specified in the level file. Instead they arrive
+  once a certain amount of months have passed.
+* Added: If you refuse VIP visits a few times he can sometimes show up anyway.
+
+* Change: Machine usage and explosions are now based on absolute number of uses.
+  A machine that goes down to 0 will explode. Previously they were percentage based.
+
+* Fix: The game would crash if you sacked a doctor in a room while a patient
+  was using some equipment in that room.
+* Fix: Sometimes the emergency bonus was not correctly calculated.
+* Fix: Patients could die inside a room. They will now die outside the room
+  unless they are just being cured.
+* Fix: If winning the level at end of year the annual report would hide the
+  winning fax.
+* Fix: If there was no queue to a room a leaving staff member would not trigger
+  a call for staff for the patient who had to abort their procedure in that room.
+* Fix: If a handyman had pending tasks when he died in an exploding room the game
+  could crash.
+* Fix: A surgeon that is removed in mid-operation will now get properly replaced
+  by a new one.
+* Fix: If the GP room was built too early in the tutorial the game would crash
+  when building a GP room later on if debug mode was turned off.
+* Fix: Patients would try to enter an exploding room.  As you can imagine,
+  this was bad.
+* Fix: Psychiatrists would become shut-ins and just wander about their office
+  forever.
+* Fix: Patients leaving the queue to get a drink could be left to sit on a
+  bench forever.
+
+
+--- User Interface ---
+
+* Added: Tooltips for the increase and decrease buttons in the research screen.
+* Added: A sound that indicates if a screenshot was taken successfully.
+* Added: Any dialog that pops up, such as the award screen, pauses the game.
+* Added: 'Continue Game' in the main menu.
+
+* Fix: Sometimes the game would not pause on year end.
+* Fix: Staff raise description was hard to read in some languages
+* Fix: The current language setting is translated and consistent with the
+  options in the list.
+
+
+--- Graphics ---
+
+* Fix: Instead of turning into a Bloaty Head, Baldness patients will die
+  with gracious hair.
+* Fix: Patients will no longer fall through walls when dying.
+* Fix: Dying Hairyitis patients should not lose their head when on the floor.
+
+
+--- Hotkeys ---
+
+* Added: 'Z' temporarily moves the game at maximum speed. Release to go back
+  to the previous speed.
+* Added: 'X' makes walls transparent until released.
+* Added: Use the Numpad to change game speed.
+* Added: Arrow key hotkeys in the staff management screen.
+* Added: Press and hold on '+' and '-' when buying furniture to
+  repeat the action.
+
+* Change: Quick Save is now Shift+Alt+S, Quick Load is Shift+Alt+L.
+
+
+--- Languages ---
+
+* Change: "Plot" is used instead of "Parcel" to indicate where a handyman has
+  been zoned to work in the Handyman staff dialog.
+
+Most languages have been updated since our last release, but if you find that
+your language has not, please help us to finish it!
+
+
+--- CorsixTH Development ---
+
+* Added: New flag for CMAKE: 'WITH_LUAJIT'. This way you can choose to use
+  either LuaJIT or Lua5.1.
+* Added: CMake toolchain for building with MinGW.
+* Added: New debug menu option 'Run debug Script' that executes
+  <install_directory>/Lua/debug_script.lua
+
+
+-------------------------------------------------------------------------------
 Version 0.30 - released November 2013
 -------------------------------------------------------------------------------
 
@@ -17,7 +219,7 @@ As usual there are of course also numerous minor tweaks here and there.
 * Change: You can now build more than one desk in the ward. More nurses means
   a slightly faster throughput.
 * Change: Patients would previously queue outside toilets even though there were
-  free loos since it was dependant on number of people in the room. Now, as soon
+  free loos since it was dependent on number of people in the room. Now, as soon
   as a loo becomes free another patient enters the room to use it, 
   even if there is a long queue for the sink). 
   If there is a queue for the sinks there is a chance the patient will leave 
@@ -366,7 +568,7 @@ changelog for version 0.10 below.
   
 -- User Interface --
 
-* Enchancement: Since consultants are unable to learn new skills icons for 
+* Enhancement: Since consultants are unable to learn new skills icons for
   not yet fully learned skills are now removed when a doctor is promoted.
 * Fix: Disabling background music no longer disables sound effects on Windows.
 * Fix: Checking if a sound exists crashed the game if there was no sound 
@@ -663,7 +865,7 @@ Version Beta 6 - released 2011-03-24
 * Fix: Various tweaks to the operating theatre logic.
 * Fix: Don't crash if the staff window of a leaving staff member
   is open when he/she leaves the world.
-* Fix: Persistant data (salary, built rooms etc) are no longer lost
+* Fix: Persistent data (salary, built rooms etc) are no longer lost
   after restarting a level.
 
 -- User Interface --
@@ -839,7 +1041,7 @@ Version Beta 2 - released 2010-03-24
 * Feature: Tooltips are displayed when hovering over buttons for some time.
 * Feature: Emergencies may happen every now and then.
 * Feature: Hospital reputation system.
-* Feature: Humurous disease description faxes are now shown when a disease is
+* Feature: Humorous disease description faxes are now shown when a disease is
   first diagnosed.
 * Feature: Room blueprints can be resized during the build process.
 

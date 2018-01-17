@@ -32,7 +32,7 @@ function values(root_table, wildcard)
   local function f()
     local value = root_table
     local nkey = 1
-    for i, part in ipairs(wildcard_parts) do
+    for _, part in ipairs(wildcard_parts) do
       if part == "*" then
         local key = keys[nkey]
         if nkey >= #keys then
@@ -72,11 +72,11 @@ local pt_reflist = {}
 -- Helper function to print the contents of a table. Child tables are printed recursively.
 -- Call without specifying level, only obj and (if wished) max_level.
 function print_table(obj, max_level, level)
-  assert(type(obj) == "table", "Tried to print ".. tostring(obj) .." with print_table.")
+  assert(type(obj) == "table", "Tried to print " .. tostring(obj) .. " with print_table.")
   pt_reflist[#pt_reflist + 1] = obj
   level = level or 0
   local spacer = ""
-  for i = 1, level do
+  for _ = 1, level do
     spacer = spacer .. " "
   end
   for k, v in pairs(obj) do
@@ -106,8 +106,8 @@ end
 -- Can return the length of any table, where as #table_name is only suitable for use with arrays of one contiguous part without nil values.
 function table_length(table)
   local count = 0
-  for _,_ in pairs(table) do 
-    count = count + 1 
+  for _,_ in pairs(table) do
+    count = count + 1
   end
   return count
 end
@@ -128,29 +128,29 @@ function loadfile_envcall(filename)
   local result = f:read(4)
   if result == "\239\187\191#" then
     -- UTF-8 BOM plus Unix Shebang
-    result = f:read"*a":gsub("^[^\r\n]*", "", 1)
+    result = f:read("*a"):gsub("^[^\r\n]*", "", 1)
   elseif result:sub(1, 3) == "\239\187\191" then
     -- UTF-8 BOM
-    result = result:sub(4,4) .. f:read"*a"
+    result = result:sub(4,4) .. f:read("*a")
   elseif result:sub(1, 1) == "#" then
     -- Unix Shebang
-    result = (result .. f:read"*a"):gsub("^[^\r\n]*", "", 1)
+    result = (result .. f:read("*a")):gsub("^[^\r\n]*", "", 1)
   else
     -- Normal
-    result = result .. f:read"*a"
+    result = result .. f:read("*a")
   end
   f:close()
-  return loadstring_envcall(result, "@".. filename)
+  return loadstring_envcall(result, "@" .. filename)
 end
-    
-if rawget(_G, "loadin") then
+
+if _G._VERSION == "Lua 5.2" or _G._VERSION == "Lua 5.3" then
   function loadstring_envcall(contents, chunkname)
-    -- Lua 5.2 lacks setfenv(), but does provide loadin()
-    -- loadin() still only allows a chunk to have an environment set once, so
+    -- Lua 5.2+ lacks setfenv()
+    -- load() still only allows a chunk to have an environment set once, so
     -- we give it an empty environment and use __[new]index metamethods on it
     -- to allow the same effect as changing the actual environment.
     local env_mt = {}
-    local result, err = loadin(setmetatable({}, env_mt), contents, chunkname)
+    local result, err = load(contents, chunkname, "bt", setmetatable({}, env_mt))
     if result then
       return function(env, ...)
         env_mt.__index = env
@@ -261,7 +261,7 @@ function compare_tables(t1, t2)
     if t2[k] ~= v then return false end
   end
   local count2 = 0
-  for k, v in pairs(t2) do
+  for _, _ in pairs(t2) do
     count2 = count2 + 1
   end
   if count1 ~= count2 then return false end
@@ -271,8 +271,25 @@ end
 -- Convert a list to a set
 function list_to_set(list)
   local set = {}
-  for i, v in ipairs(list) do
+  for _, v in ipairs(list) do
     set[v] = true
   end
   return set
+end
+
+--! Find the smallest bucket with its upper value less or equal to a given number,
+--! and return the value of the bucket, or its index.
+--!param number (number) Value to accept by the bucket.
+--!param buckets (list) Available buckets, pairs of {upper=x, value=y} tables,
+--  in increasing x value, where nil is taken as infinite. The y value is
+--  returned for the first bucket in the list where number <= x. If y is nil,
+--  the index of the bucket in the list is returned.
+--!return (number) Value or index of the matching bucket.
+function rangeMapLookup(number, buckets)
+  for index, bucket in ipairs(buckets) do
+    if not bucket.upper or bucket.upper >= number then
+      return bucket.value or index
+    end
+  end
+  assert(false) -- Should never get here.
 end

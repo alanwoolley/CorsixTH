@@ -21,6 +21,9 @@ SOFTWARE. --]]
 --! Calls Dispatcher Window
 class "UICallsDispatcher" (UIResizable)
 
+---@type UICallsDispatcher
+local UICallsDispatcher = _G["UICallsDispatcher"]
+
 local col_bg = {
   red = 154,
   green = 146,
@@ -51,9 +54,9 @@ function UICallsDispatcher:UICallsDispatcher(ui)
   self.call_list = {}
   self.list_table = {}
   self.rows_shown = 0
-  self:createControls()  
+  self:createControls()
   self:setDefaultPosition(0.05, 0.05)
-  
+
   self.default_button_sound = "selectx.wav"
 
   self.dispatcher:addChangeCallback(self.update, self)
@@ -65,19 +68,19 @@ local window_margin = 15
 
 function UICallsDispatcher:createControls()
   local rows = math.floor((self.height - window_margin * 3 - 60) / row_height)
-  
+
   if rows ~= self.rows_shown then
     local function assigned_factory(num)
-      return --[[persistable:calls_dispatcher_assigned_button]] function(self)
-        self:itemButtonClicked(num)
+      return --[[persistable:calls_dispatcher_assigned_button]] function(window)
+        window:itemButtonClicked(num)
       end
     end
     local function task_factory(num)
-      return --[[persistable:calls_dispatcher_task_button]] function(self)
-        self:itemButtonClicked(num)
+      return --[[persistable:calls_dispatcher_task_button]] function(window)
+        window:itemButtonClicked(num)
       end
     end
-    local callback = --[[persistable:calls_dispatcher_scrollbar]] function() 
+    local callback = --[[persistable:calls_dispatcher_scrollbar]] function()
       self:scrollbarChange()
     end
 
@@ -112,21 +115,21 @@ end
 function UICallsDispatcher:update()
   self.call_list = {}
   local assigned = 0
-  for object, queue in pairs(self.dispatcher.call_queue) do
-    for key, call in pairs(queue) do
+  for _, queue in pairs(self.dispatcher.call_queue) do
+    for _, call in pairs(queue) do
       table.insert(self.call_list, call)
       if call.assigned then
         assigned = assigned + 1
       end
     end
   end
-  table.sort(self.call_list, 
+  table.sort(self.call_list,
     function(a,b)
       if a.created == nil or b.created == nil then return false end
       return a.created < b.created
     end
   )
-  
+
   self.summary_panel:setLabel(_S.calls_dispatcher.summary:format(#self.call_list, assigned), nil, "left")
   self.scrollbar:setRange(1, math.max(1, #self.call_list), self.rows_shown, self.scrollbar.value)
   self:scrollbarChange()

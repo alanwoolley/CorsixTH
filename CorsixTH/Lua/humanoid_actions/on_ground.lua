@@ -18,6 +18,15 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE. --]]
 
+class "OnGroundAction" (HumanoidAction)
+
+---@type OnGroundAction
+local OnGroundAction = _G["OnGroundAction"]
+
+function OnGroundAction:OnGroundAction()
+  self:HumanoidAction("on_ground")
+end
+
 local action_on_ground_end = permanent"action_on_ground_end"( function(humanoid)
   humanoid:finishAction()
 end)
@@ -29,7 +38,7 @@ local function action_on_ground_start(action, humanoid)
   else
     humanoid.last_move_direction = "south"
   end
-  
+
   assert(humanoid.on_ground_anim, "Error: no on the ground animation for humanoid " .. humanoid.humanoid_class)
   action.must_happen = true
   humanoid:setAnimation(humanoid.on_ground_anim, humanoid.last_move_direction == "east" and 0 or 1)

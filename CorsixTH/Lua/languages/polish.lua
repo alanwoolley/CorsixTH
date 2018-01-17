@@ -1,4 +1,4 @@
-﻿--[[
+--[[
 Copyright (c) 2013 - translation -  BuTcHeR (extragry.pl)
 
 The study, diagnosis and surgery on the translation performed by:
@@ -7,7 +7,7 @@ The study, diagnosis and surgery on the translation performed by:
 - Johnny, as a doctor - correction (grajpopolsku.pl)
 - Machiner, as a GP - translation, corrections (grajpopolsku.pl)
 - Mziab, as a surgeon - translation, font, corrections, tools and preparing script to CAT software (mziab.grajpopolsku.pl)
-- Spec0071, as a doctor - correction, tests 
+- Spec0071, as a doctor - correction, tests
 - Twig, as a consultant - technical issues (grajpopolsku.pl)
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of
@@ -386,6 +386,7 @@ tooltip = {
   },
   main_menu = {
     exit = "Nie, nie, proszę nie odchodź!",
+    custom_campaign = "Rozegraj kampanię stworzoną przez społeczność",
     custom_level = "Zbuduj swój szpital na dodatkowych poziomach",
     network = "Rozpocznij grę sieciową",
     quit = "Wyjdź",
@@ -395,8 +396,9 @@ tooltip = {
       load_slot = "WCZYTAJ GRĘ",
       empty_slot = "PUSTY",
     },
-    new_game = "Start a completely new game from scratch",
+    new_game = "Zacznij grę od samego początku‏",
     load_game = "Wczytaj zapisaną grę",
+    map_edit = "Stwórz własną mapę",
   },
   patient_window = {
     graph = "Kliknij, aby przełączyć się pomiędzy wykresem zdrowia osób a ich historią leczenia",
@@ -595,6 +597,9 @@ tooltip = {
     fullscreen_button = "Kliknij aby włączyć tryb pełnoekranowy",
     resolution = "Rozdzielczość w jakiej powinna działać gra",
     select_resolution = "Wybierz nową rozdzielczość",
+    audio_toggle = "Włącz/wyłącz",
+    folder_button = "Opcje folderów",
+    customise_button = "Dodatkowe ustawienia modifikujące twoją rozgrywkę",
     width = "Wpisz żądaną szerokość ekranu",
     height = "Wpisz żądaną wysokość ekranu",
     apply = "Zatwierdź wybraną rozdzielczość",
@@ -796,6 +801,7 @@ errors = {
   dialog_missing_graphics = "Niestety, demo nie zawiera tego dialogu.",
   maximum_screen_size = "Proszę wpisać rozmiar ekranu, maksimum 3000x2000.",
   load_prefix = "Błąd podczas ładowania gry: ",
+  no_games_to_contine = "Nie ma zapisanych gier.",
   save_prefix = "Błąd podczas zapisywania gry: ",
   map_file_missing = "Nie można znaleźć pliku z mapą %s dla tego poziomu!",
   minimum_screen_size = "Proszę wpisać rozmiar ekranu, minimum 640x480.",
@@ -822,9 +828,12 @@ main_menu = {
   custom_level = "Gra niestandardowa",
   version = "Wersja: ",
   new_game = "Nowa gra",
+  custom_campaign = "Własna kampania",
+  continue = "Powrót do gry",
   load_game = "Wczytaj grę",
   options = "Ustawienia",
   savegame_version = "Wersja zapisu: ",
+  map_edit = "Edytor map"
 }
 date_format = {
   daymonth = "%1% %2:months%",
@@ -1267,17 +1276,23 @@ menu_options = {
   game_speed = "  SZYBKOŚĆ GRY ",
   music_vol = "  GŁOŚNOŚĆ MUZYKI ",
   sound_vol = "  GŁOŚNOŚĆ DŹWIĘKU ",
-  adviser_disabled = "  DORADCA  ",
+  adviser_disabled = " (SHIFT+A) DORADCA  ",
   warmth_colors = "  CIEPŁOŚĆ BARW  ",
+  wage_increase = "  ŻĄDANIA PODWYŻKI",
+  twentyfour_hour_clock = "  ZEGAR 24 GODZINNY  ",
   edge_scrolling = "  PRZEWIJANIE PRZY KRAWĘDZIACH  ",
-  announcements = "  POWIADOMIENIA   ",
+  announcements = " (ALT+A) POWIADOMIENIA   ",
   lock_windows = "  ZABLOKUJ OKNA  ",
   settings = "  USTAWIENIA  ",
-  sound = "  DŹWIĘK   ",
+  sound = " (ALT+S) DŹWIĘK   ",
   announcements_vol = "  GŁOŚNOŚĆ POWIADOMIEŃ  ",
-  music = "  MUZYKA  ",
+  music = " (ALT+M) MUZYKA  ",
   autosave = "  AUTOZAPIS ",
   jukebox = "  SZAFA GRAJĄCA ",
+}
+menu_options_wage_increase = {
+  grant = "    PRZYZNAWAJ ",
+  deny =  "    ODMAWIAJ ",
 }
 menu_options_warmth_colors = {
   choice_1 = "  CZERWONY  ",
@@ -2194,9 +2209,67 @@ options_window = {
   cancel = "Anuluj",
   data_location = "Lokalizacja danych",
   font_location = "Lokalizacja czcionki",
-  language = "Game language",
+  language = "Język gry",
   cancel = "Anuluj",
   back = "Wróć",
+  audio = "Dźwięk",
+  customise = "Modyfikuj",
+  folder = "Foldery",
+}
+folders_window = {
+  caption = "Ścieżki folderów",
+  data_label = "Dane TH",
+  font_label = "Czcionka",
+  music_label = "MP3",
+  savegames_label = "Zapisane stany gry",
+  screenshots_label = "Zrzuty ekranu",
+  new_th_location = "Tutaj możesz na nowo wybrać folder, w którym zainstalowana jest gra Theme Hospital. Po wybraniu folderu gra zostanie uruchomiona ponownie.",
+  savegames_location = "Wybierz folder, w którym chcesz zapisywać stany gry",
+  music_location = "Wybierz folder z muzyką, której chcesz użyć",
+  screenshots_location = "Wybierz folder, w którym chcesz zapisywać zrzuty ekranu",
+  back  = "Wstecz",
+}
+tooltip.folders_window = {
+  browse = "Przeglądaj foldery",
+  data_location = "Folder z orginalną grą Theme Hospital, wymagany do uruchomienia CorsixTH",
+  font_location = "Ścieżka do pliku czcionki będącej w stanie wyświetlić znaki Unicode wymagane przez twój język. Bez podania czcionki nie będzie możliwe wybrania języka, który używa znaki niewspierane przez orginalną grę. Przykład: Rosujski, Chinski, Polski.",
+  savegames_location = "Domyślnie folder 'Saves', w którym umieszczane są stany gry, leży obok pliku konfiguracyjnego. Jeśli to Ci nie odpowiada możesz wybrać swój własny folder.",
+  screenshots_location = "Domyślnie folder 'Screenshots', w którym umieszczane są zrzuty ekranu, leży obok pliku konfiguracyjnego. Jeśli to Ci nie odpowiada możesz wybrać swój własny folder.",
+  music_location = "Wybierz folder z plikami MP3. Folder musi już być stworzony.",
+  browse_data = "Wskaż inną ścieżkę instalacji Theme Hospital (aktualnie: %1%)",
+  browse_font = "Wskaż inny plik czcionki ( aktualnie: %1% )",
+  browse_saves = "Wskaż inną ścieżkę folderu ze stanami gry ( aktualnie: %1% ) ",
+  browse_screenshots = "Wskaż inną ścieżkę folderu ze zrzutami ekranu ( aktualnie: %1% ) ",
+  browse_music = "Wskaż inną ścieżkę folderu z twoją muzyką ( aktualnie: %1% ) ",
+  no_font_specified = "Nie podano jeszcze pliku czcionki!",
+  not_specified = "Nie podano jeszcze ścieżki folderu!",
+  default = "Domyślna ścieżka",
+  reset_to_default = "Przywróć domyślną ścieżkę dla folderu",
+  back  = "Zamknij to menu i wróć do ustawień",
+}
+customise_window = {
+  caption = "Własne ustawienia",
+  option_on = "Wł",
+  option_off = "Wył",
+  back = "Wróć",
+  movies = "Zarządzanie filmami",
+  intro = "Odtwórz intro",
+  paused = "Budoowanie w czasie pauzy",
+  volume = "Skrót ściszania",
+  aliens = "Pacjenci Obcy",
+  fractured_bones = "Pogruchotane kości",
+  average_contents = "Standardowe wyposarzenie",
+}
+
+tooltip.customise_window = {
+  movies = "Globalne zarządzanie filmami pozwoli Tobie na wyłączenie wszystkich filmików",
+  intro = "Włącz lub wyłącz intro. Filmiki muszą być globalnie włączone jeśli chcesz oglądać intro przy każdym uruchomieniu CorsixTH",
+  paused = "W grze Theme Hospital gracz mógł jedynie używać górnego menu podczas pauzy. Jest to również domyślne ustawianie CorsixTH, ale przez włączenie tej opcji wszystko jest dozwolone podczas pauzy",
+  volume = "Jeśli przycisk ściszania otwiera również 'Teczkę z lekami' , włącz tę opcję aby zmienić skrót do 'Teczki...' na Shift + C",
+  aliens = "Z powodu braku dobrych animacji dokonaliśmy zmian aby pacjęci z DNA Obcego domyślnie przybywali tylko z nagłych wypadków. Jeśli chcesz aby pacjensi z DNA Obcego mogli odwiedzać twój szpital nie tylko po nagłym wypadku wyłącz tę opcję",
+  fractured_bones = "Z powodu kiepskich animacji domyślnie wyłączyliśmy damskie modele pacjętów ze Zgruchotanymi Koścmi. Aby zezwolić, żeby pacjentki ze Zgruchotanymi koścmi odwiedzały twój szpital, wyłącz tę opcję",
+  average_contents = "Jeśli chcesz, żeby gra zapamiętała jakie dodatkowe wyposarzenie używasz zazwyczaj budując dany typ pomieszczenia, włącz tę opcję",
+  back = "Zamknij to menu i wróć do ustawień",
 }
 buy_objects_window = {
   price = "Cena: ",
@@ -2488,10 +2561,10 @@ menu_file_load = {
   [8] = "  GRA 8  ",
 }
 menu_file = {
-  quit = "  WYJDŹ ",
-  save = "  ZAPISZ ",
-  load = "  WCZYTAJ ",
-  restart = "  RESTART  ",
+  quit = " (SHIFT+Q) WYJDŹ ",
+  save = " (SHIFT+S) ZAPISZ ",
+  load = " (SHIFT+L) WCZYTAJ ",
+  restart = " (SHIFT+R) ZACZNIJ OD NOWA  ",
 }
 rooms_long = {
   ultrascan = "Ultraskaner",
@@ -2804,135 +2877,116 @@ dynamic_info = {
   },
 }
 introduction_texts = {
-  level17 = {
-    [1] = "Ostatnia rada - dbaj o Reputację - to ona przyciąga lub zniechęca do twojej placówki pacjentów z całej okolicy. ",
-    [2] = "Jeśli tylko uda ci się nie zabić zbyt wielu ludzi i będą oni w miarę zadowoleni, nie powinieneś mieć problemów z tym poziomem!//",
-    [3] = "Teraz już musisz radzić sobie sam. Życzę powodzenia.",
-  },
-  level1 = {
-    [1] = "Witaj w swoim pierwszym szpitalu!//",
-    [2] = "Aby rozpocząć działalność, postaw Biurko Recepcji, zbuduj Gabinet Lekarski i zatrudnij Recepcjonistkę oraz Lekarza. ",
-    [3] = "Następnie zaczekaj, aż pojawią się kolejne zadania.",
-    [4] = "Dobrym pomysłem jest budowa Gabinetu Psychiatrycznego oraz zatrudnienie Lekarza Psychiatry. ",
-    [5] = "Apteka i Pielęgniarka są także niezbędne w leczeniu pacjentów. ",
-    [6] = "Zwróć uwagę na ciężkie przypadki Głowowzdęcia - Napowietrzalnia rozwiąże ten problem. ",
-    [7] = "Będziesz musiał wyleczyć 10 ludzi i upewnić się, że twoja reputacja nie spadnie poniżej 200.",
-  },
-  level9 = {
-    [1] = "Skoro już wzbogaciłeś konto Ministerstwa oraz ufundowałeś nową limuzynę samemu Ministrowi, możesz wracać do szpitala i nieść pomoc chorym i potrzebującym. ",
-    [2] = "Tutaj napotkasz wiele różnych trudności.",
-    [3] = "Z dobrze wyszkolonym personelem i gabinetami, nie powinieneś się niczego obawiać. ",
-    [4] = "Twój szpital musi być wart 200,000 PLN, a na konto ma trafić 400,000 PLN. ",
-    [5] = "Ani grosza mniej, bo nie ukończysz poziomu.",
-  },
-  level2 = {
-    [1] = "Na tym obszarze jest dużo więcej rodzajów schorzeń. ",
-    [2] = "Urządź swój szpital tak, aby przyjął więcej pacjentów oraz zaplanuj budowę Działu Badawczego. ",
-    [3] = "Pamiętaj o utrzymywaniu czystości i postaraj się o możliwie najwyższą reputację - będziesz miał do czynienia z chorobami takimi jak Obwisły Język, więc potrzebujesz Przychodni Obrzynania. ",
-    [4] = "Możesz także zbudować Kardiograf, aby lepiej diagnozować nowe choroby. ",
-    [5] = "Oba te gabinety muszą zostać wynalezione zanim będziesz mógł je zbudować. Teraz możesz także kupić dodatkowy grunt, aby rozwinąć swój szpital - w tym celu użyj Mapy Miasta. ",
-    [6] = "Twój cel to reputacja na poziomie 300, stan konta 10000 PLN, i 40 wyleczonych osób.",
-  },
-  level7 = {
-    [1] = "Będziesz tu pod ścisłym nadzorem Ministerstwa Zdrowia, dopilnuj więc by twoje konto wykazywało duże zyski, a reputacja szybowała w górę. ",
-    [2] = "Nie stać nas na niepotrzebne zgony - nie służy to biznesowi. ",
-    [3] = "Upewnij się, że personel jest w dobrej formie i że masz wszystkie wymagane urządzenia. ",
-    [4] = "Wypracuj reputację 600 oraz 200,000 PLN na koncie.",
-  },
-  level5 = {
-    [1] = "To będzie szpital pełen życia, leczący wiele różnych dolegliwości. ",
-    [2] = "Twoi Lekarze dopiero skończyli studia, więc trzeba będzie wybudować salę szkoleniową, aby zdobyli niezbędne kwalifikacje. ",
-    [3] = "Masz tylko trzech Konsultantów szkolących twój personel. Dbaj więc o to, by byli zadowoleni. ",
-    [4] = "Zauważ także, że fundamenty szpitala znajdują się na uskoku tektonicznym San Android. ",
-    [5] = "Występuje tu duże ryzyko trzęsień ziemi. ",
-    [6] = "Trzęsienia mogą w znacznym stopniu uszkodzić urządzenia i zakłócić pracę szpitala. ",
-    [7] = "Aby odnieść sukces, dociągnij reputację do 400, zgromadź w banku okrągłe 50,000 PLN i wylecz 200 pacjentów.",
-  },
-  level4 = {
-    [1] = "Staraj się zadowolić swych pacjentów, obłsuguj ich najlepiej jak potrafisz, utrzymaj również liczbę zgonów na absolutnym minimum.",
-    [2] = "Stawką jest twoja reputacja, więc dopilnuj żeby osiągnęła wysoki poziom. ",
-    [3] = "Nie martw się za bardzo o pieniądze - uzyskasz je wraz z rosnącą reputacją. ",
-    [4] = "Będziesz też mógł szkolić swoich Lekarzy, aby zwiększać ich umiejętności. ",
-    [5] = "Wyszkolony personel będzie lepiej zajmować się pacjentami, którzy wyglądają na ciężej chorych niż pozostali. ",
-    [6] = "Osiągnij reputację na poziomie ponad 500.",
-  },
-  level14 = {
-    [1] = "Jest jeszcze jedno wyzwanie - totalnie niespodziewany szpital niespodzianka. ",
-    [2] = "Jeżeli tutaj odniesiesz sukces, będziesz zwycięzcą wszech czasów. ",
-    [3] = "Tylko nie myśl, że to będzie bułka z masłem, ponieważ jest to najtrudniejsze zadanie jakiemu stawisz czoła. ",
-    [4] = "Powodzenia!",
-  },
-  level15 = {
-    [1] = "Tak wyglądają podstawowe mechanizmy działalności szpitala.//",
-    [2] = "Twoi Lekarze będą potrzebować wszelkiej możliwej pomocy do diagnozowania niektórych pacjentów. Możesz im pomóc budując ",
-    [3] = "kolejne obiekty, takie jak Gabinet Badań Podstawowych.",
-  },
-  level8 = {
-    [1] = "Do ciebie należy zadanie urządzenia wydajnego i opłacalnego szpitala. ",
-    [2] = "Ludzie tutaj są dość zamożni, więc oskub ich z forsy jak tylko się da. ",
-    [3] = "Miło jest leczyć ludzi, ale pamiętaj, że tak naprawdę liczą się PIENIĄDZE. ",
-    [4] = "Wyczyść tych chorych ludzi z pieniędzy. ",
-    [5] = "Aby ukończyć ten poziom, zgromadź sumę 300,000 PLN.",
-  },
-  level13 = {
-    [1] = "Twoje niewiarygodne umiejętności w administrowaniu szpitala zwróciły uwagę Trzeciego Wydziału Tajnych Służb Specjalnych. ",
-    [2] = "Mają dla ciebie ekstra zadanie: w szpitalu zaatakowanym przez szczury potrzeba Terminatora. ",
-    [3] = "Musisz ustrzelić tyle szczurów, ile zdołasz, zanim Dozorcy uprzątną bałagan. ",
-    [4] = "Myślisz, że poradzisz sobie z zadaniem?",
-  },
-  demo = {
-    [1] = "Witaj w szpitalu demonstracyjnym!",
-    [2] = "Niestety wersja demo zawiera tylko ten poziom. Jednakże, jest to więcej niż wystarczająco, aby zając ci trochę czasu!",
-    [3] = "Napotkasz tutaj rozmaite choroby, które będą wymagały różnych gabinetów do ich wyleczenia. Od czasu do czasu moga tu również wystąpić nagłe wypadki. Będziesz musiał równiez wynaleźć nowe pomieszczenia przy użyciu gabinetu badawczego.",
-    [4] = "Twoim celem jest zarobienie 100,000 PLN, mieć szpital warty 70,000 PLN i reputację 700, przy czym musisz wyleczyć co najmniej 75% swoich pacjentów.",
-    [5] = "Upewnij się, że Twoja reputacja nie spadnie poniżej 300 oraz, że nie zabijesz więcej niż 40% pacjentów, albo przegrasz.",
-    [6] = "Powodzenia!",
-  },
-  level16 = {
-    [1] = "Kiedy już przebadasz część pacjentów, będziesz musiał zbudować pomieszczenia lecznicze oraz przychodnie, aby ich leczyć - ",
-    [2] = "dobrze jest zacząć od budowy Apteki. Do wydawania leków w Aptece będzie potrzebna Pielęgniarka .",
-  },
-  level6 = {
-    [1] = "Użyj całej swojej wiedzy, aby gładko poprowadzić szpital, który przyniesie dobry zysk i poradzi sobie ze wszystkim, co przyniesie mu chore społeczeństwo. ",
-    [2] = "Powinieneś uważać na panujący tu klimat, gdyż sprzyja on rozwojowi bakterii i infekcji. ",
-    [3] = "Jeśli nie utrzymasz tego miejsca we wzorowej czystości, musisz się liczyć z wybuchem epidemii wśród pacjentów. ",
-    [4] = "Powinieneś zarobić 150,000 PLN a twój szpital osiągnąć wartość co najmniej 140,000 PLN.",
-  },
-  level12 = {
-    [1] = "Masz teraz do czynienia z matką wszystkich wyzwań. ",
-    [2] = "Zachwycone twoimi sukcesami Ministerstwo ma dla ciebie zadanie specjalne. Masz zbudować kolejny wspaniały szpital, zarobić bajeczną ilość kasy i zyskać gigantyczną reputację. ",
-    [3] = "Musisz także wykupić wszystkie możliwe grunty, wyleczyć wszystko (tak - wszystko) oraz zgarnąć wszystkie nagrody. ",
-    [4] = "I jak? Dasz radę?",
-    [5] = "Zarób 650,000 PLN, wylecz 750 ludzi oraz osiągnij reputację 800, aby wygrać.",
-  },
-  level3 = {
-    [1] = "Tym razem urządzisz swój szpital w zamożej okolicy. ",
-    [2] = "Ministerstwo Zdrowia ma nadzieję, że osiągniesz tu znaczne zyski. ",
-    [3] = "Musisz wypracować dobrą reputację, jednak gdy szpital będzie już działał, skoncentruj się na zarabianiu tak dużo, jak tylko możliwe. ",
-    [4] = "Prawdopodobnie wystąpią tu też Nagłe Wypadki. ",
-    [5] = "Mają miejsce, gdy do szpitala przybywa duża grupa ludzi z tą samą dolegliwością. ",
-    [6] = "Wyleczenie ich wszystkich przed upływem czasu podnosi twoją reputację i zapewnia premię. ",
-    [7] = "Mogą wystąpić choroby takie jak Syndrom Króla. Przeznacz więc pieniądze na budowę Sali Operacyjnej z Oddziałem tuż obok. ",
-    [8] = "Aby stanąć na wysokości zadania, zarób 20,000 PLN.",
-  },
-  level10 = {
-    [1] = "Ministerstwo prosi, abyś poza leczeniem chorób typowych dla tych stron, poświęcił nieco czasu na poprawę skuteczności leków. ",
-    [2] = "Zrzeszenie Pacjentów Bolibrzuch zgłosiło kilka krytycznych uwag. Nie daj im powodów do skarg i dopilnuj, by leki były jak najskuteczniejsze. ",
-    [3] = "Nikt nie powinien też czynić zarzutów samemu szpitalowi. Zmniejsz poziom umieralności. ",
-    [4] = "Dobrze będzie, jeśli zarezerwujesz trochę miejsca na Galaretownicę. ",
-    [5] = "Aby wygrać, udoskonal wszystkie leki do 80% skuteczności, zdobądź reputację 650 i zbierz w banku 500,000 PLN. ",
-  },
-  level11 = {
-    [1] = "Dostałeś szansę budowy szpitala najdoskonalszego ze wszystkich. ",
-    [2] = "W tej niezwykle renomowanej okolicy Ministerstwo chciałoby mieć szpital najlepszy z możliwych. ",
-    [3] = "Oczekujemy, że zarobisz mnóstwo pieniędzy, zyskasz znakomitą reputację i poradzisz sobie ze wszelkimi ewentualnościami. ",
-    [4] = "To jest bardzo ważna robota. ",
-    [5] = "Będziesz musiał naprawdę się czymś wyróżnić. ",
-    [6] = "Trzeba ci wiedzieć, że w tych okolicach widywane jest UFO. Twój personel powinien być przygotowany na niespodziewanych gości. ",
-    [7] = "Warunki wygranej to: wartość szpitala 240,000 PLN, 500,000 PLN na koncie i reputacja na poziomie co najmniej 700.",
-  },
-  level18 = {
-  },
+  level17 =
+    "Ostatnia rada - dbaj o Reputację - to ona przyciąga lub zniechęca do twojej placówki pacjentów z całej okolicy. " ..
+    "Jeśli tylko uda ci się nie zabić zbyt wielu ludzi i będą oni w miarę zadowoleni, nie powinieneś mieć problemów z tym poziomem!//" ..
+    "Teraz już musisz radzić sobie sam. Życzę powodzenia.",
+  level1 =
+    "Witaj w swoim pierwszym szpitalu!//" ..
+    "Aby rozpocząć działalność, postaw Biurko Recepcji, zbuduj Gabinet Lekarski i zatrudnij Recepcjonistkę oraz Lekarza. " ..
+    "Następnie zaczekaj, aż pojawią się kolejne zadania." ..
+    "Dobrym pomysłem jest budowa Gabinetu Psychiatrycznego oraz zatrudnienie Lekarza Psychiatry. " ..
+    "Apteka i Pielęgniarka są także niezbędne w leczeniu pacjentów. " ..
+    "Zwróć uwagę na ciężkie przypadki Głowowzdęcia - Napowietrzalnia rozwiąże ten problem. " ..
+    "Będziesz musiał wyleczyć 10 ludzi i upewnić się, że twoja reputacja nie spadnie poniżej 200.",
+  level9 =
+    "Skoro już wzbogaciłeś konto Ministerstwa oraz ufundowałeś nową limuzynę samemu Ministrowi, możesz wracać do szpitala i nieść pomoc chorym i potrzebującym. " ..
+    "Tutaj napotkasz wiele różnych trudności." ..
+    "Z dobrze wyszkolonym personelem i gabinetami, nie powinieneś się niczego obawiać. " ..
+    "Twój szpital musi być wart 200,000 PLN, a na konto ma trafić 400,000 PLN. " ..
+    "Ani grosza mniej, bo nie ukończysz poziomu.",
+  level2 =
+    "Na tym obszarze jest dużo więcej rodzajów schorzeń. " ..
+    "Urządź swój szpital tak, aby przyjął więcej pacjentów oraz zaplanuj budowę Działu Badawczego. " ..
+    "Pamiętaj o utrzymywaniu czystości i postaraj się o możliwie najwyższą reputację - będziesz miał do czynienia z chorobami takimi jak Obwisły Język, więc potrzebujesz Przychodni Obrzynania. " ..
+    "Możesz także zbudować Kardiograf, aby lepiej diagnozować nowe choroby. " ..
+    "Oba te gabinety muszą zostać wynalezione zanim będziesz mógł je zbudować. Teraz możesz także kupić dodatkowy grunt, aby rozwinąć swój szpital - w tym celu użyj Mapy Miasta. " ..
+    "Twój cel to reputacja na poziomie 300, stan konta 10000 PLN, i 40 wyleczonych osób.",
+  level7 =
+    "Będziesz tu pod ścisłym nadzorem Ministerstwa Zdrowia, dopilnuj więc by twoje konto wykazywało duże zyski, a reputacja szybowała w górę. " ..
+    "Nie stać nas na niepotrzebne zgony - nie służy to biznesowi. " ..
+    "Upewnij się, że personel jest w dobrej formie i że masz wszystkie wymagane urządzenia. " ..
+    "Wypracuj reputację 600 oraz 200,000 PLN na koncie.",
+  level5 =
+    "To będzie szpital pełen życia, leczący wiele różnych dolegliwości. " ..
+    "Twoi Lekarze dopiero skończyli studia, więc trzeba będzie wybudować salę szkoleniową, aby zdobyli niezbędne kwalifikacje. " ..
+    "Masz tylko trzech Konsultantów szkolących twój personel. Dbaj więc o to, by byli zadowoleni. " ..
+    "Zauważ także, że fundamenty szpitala znajdują się na uskoku tektonicznym San Android. " ..
+    "Występuje tu duże ryzyko trzęsień ziemi. " ..
+    "Trzęsienia mogą w znacznym stopniu uszkodzić urządzenia i zakłócić pracę szpitala. " ..
+    "Aby odnieść sukces, dociągnij reputację do 400, zgromadź w banku okrągłe 50,000 PLN i wylecz 200 pacjentów.",
+  level4 =
+    "Staraj się zadowolić swych pacjentów, obłsuguj ich najlepiej jak potrafisz, utrzymaj również liczbę zgonów na absolutnym minimum." ..
+    "Stawką jest twoja reputacja, więc dopilnuj żeby osiągnęła wysoki poziom. " ..
+    "Nie martw się za bardzo o pieniądze - uzyskasz je wraz z rosnącą reputacją. " ..
+    "Będziesz też mógł szkolić swoich Lekarzy, aby zwiększać ich umiejętności. " ..
+    "Wyszkolony personel będzie lepiej zajmować się pacjentami, którzy wyglądają na ciężej chorych niż pozostali. " ..
+    "Osiągnij reputację na poziomie ponad 500.",
+  level14 =
+    "Jest jeszcze jedno wyzwanie - totalnie niespodziewany szpital niespodzianka. " ..
+    "Jeżeli tutaj odniesiesz sukces, będziesz zwycięzcą wszech czasów. " ..
+    "Tylko nie myśl, że to będzie bułka z masłem, ponieważ jest to najtrudniejsze zadanie jakiemu stawisz czoła. " ..
+    "Powodzenia!",
+  level15 =
+    "Tak wyglądają podstawowe mechanizmy działalności szpitala.//" ..
+    "Twoi Lekarze będą potrzebować wszelkiej możliwej pomocy do diagnozowania niektórych pacjentów. Możesz im pomóc budując " ..
+    "kolejne obiekty, takie jak Gabinet Badań Podstawowych.",
+  level8 =
+    "Do ciebie należy zadanie urządzenia wydajnego i opłacalnego szpitala. " ..
+    "Ludzie tutaj są dość zamożni, więc oskub ich z forsy jak tylko się da. " ..
+    "Miło jest leczyć ludzi, ale pamiętaj, że tak naprawdę liczą się PIENIĄDZE. " ..
+    "Wyczyść tych chorych ludzi z pieniędzy. " ..
+    "Aby ukończyć ten poziom, zgromadź sumę 300,000 PLN.",
+  level13 =
+    "Twoje niewiarygodne umiejętności w administrowaniu szpitala zwróciły uwagę Trzeciego Wydziału Tajnych Służb Specjalnych. " ..
+    "Mają dla ciebie ekstra zadanie: w szpitalu zaatakowanym przez szczury potrzeba Terminatora. " ..
+    "Musisz ustrzelić tyle szczurów, ile zdołasz, zanim Dozorcy uprzątną bałagan. " ..
+    "Myślisz, że poradzisz sobie z zadaniem?",
+  demo =
+    "Witaj w szpitalu demonstracyjnym!" ..
+    "Niestety wersja demo zawiera tylko ten poziom. Jednakże, jest to więcej niż wystarczająco, aby zając ci trochę czasu!" ..
+    "Napotkasz tutaj rozmaite choroby, które będą wymagały różnych gabinetów do ich wyleczenia. Od czasu do czasu moga tu również wystąpić nagłe wypadki. Będziesz musiał równiez wynaleźć nowe pomieszczenia przy użyciu gabinetu badawczego." ..
+    "Twoim celem jest zarobienie 100,000 PLN, mieć szpital warty 70,000 PLN i reputację 700, przy czym musisz wyleczyć co najmniej 75% swoich pacjentów." ..
+    "Upewnij się, że Twoja reputacja nie spadnie poniżej 300 oraz, że nie zabijesz więcej niż 40% pacjentów, albo przegrasz." ..
+    "Powodzenia!",
+  level16 =
+    "Kiedy już przebadasz część pacjentów, będziesz musiał zbudować pomieszczenia lecznicze oraz przychodnie, aby ich leczyć - " ..
+    "dobrze jest zacząć od budowy Apteki. Do wydawania leków w Aptece będzie potrzebna Pielęgniarka .",
+  level6 =
+    "Użyj całej swojej wiedzy, aby gładko poprowadzić szpital, który przyniesie dobry zysk i poradzi sobie ze wszystkim, co przyniesie mu chore społeczeństwo. " ..
+    "Powinieneś uważać na panujący tu klimat, gdyż sprzyja on rozwojowi bakterii i infekcji. " ..
+    "Jeśli nie utrzymasz tego miejsca we wzorowej czystości, musisz się liczyć z wybuchem epidemii wśród pacjentów. " ..
+    "Powinieneś zarobić 150,000 PLN a twój szpital osiągnąć wartość co najmniej 140,000 PLN.",
+  level12 =
+    "Masz teraz do czynienia z matką wszystkich wyzwań. " ..
+    "Zachwycone twoimi sukcesami Ministerstwo ma dla ciebie zadanie specjalne. Masz zbudować kolejny wspaniały szpital, zarobić bajeczną ilość kasy i zyskać gigantyczną reputację. " ..
+    "Musisz także wykupić wszystkie możliwe grunty, wyleczyć wszystko (tak - wszystko) oraz zgarnąć wszystkie nagrody. " ..
+    "I jak? Dasz radę?" ..
+    "Zarób 650,000 PLN, wylecz 750 ludzi oraz osiągnij reputację 800, aby wygrać.",
+  level3 =
+    "Tym razem urządzisz swój szpital w zamożej okolicy. " ..
+    "Ministerstwo Zdrowia ma nadzieję, że osiągniesz tu znaczne zyski. " ..
+    "Musisz wypracować dobrą reputację, jednak gdy szpital będzie już działał, skoncentruj się na zarabianiu tak dużo, jak tylko możliwe. " ..
+    "Prawdopodobnie wystąpią tu też Nagłe Wypadki. " ..
+    "Mają miejsce, gdy do szpitala przybywa duża grupa ludzi z tą samą dolegliwością. " ..
+    "Wyleczenie ich wszystkich przed upływem czasu podnosi twoją reputację i zapewnia premię. " ..
+    "Mogą wystąpić choroby takie jak Syndrom Króla. Przeznacz więc pieniądze na budowę Sali Operacyjnej z Oddziałem tuż obok. " ..
+    "Aby stanąć na wysokości zadania, zarób 20,000 PLN.",
+  level10 =
+    "Ministerstwo prosi, abyś poza leczeniem chorób typowych dla tych stron, poświęcił nieco czasu na poprawę skuteczności leków. " ..
+    "Zrzeszenie Pacjentów Bolibrzuch zgłosiło kilka krytycznych uwag. Nie daj im powodów do skarg i dopilnuj, by leki były jak najskuteczniejsze. " ..
+    "Nikt nie powinien też czynić zarzutów samemu szpitalowi. Zmniejsz poziom umieralności. " ..
+    "Dobrze będzie, jeśli zarezerwujesz trochę miejsca na Galaretownicę. " ..
+    "Aby wygrać, udoskonal wszystkie leki do 80% skuteczności, zdobądź reputację 650 i zbierz w banku 500,000 PLN. ",
+  level11 =
+    "Dostałeś szansę budowy szpitala najdoskonalszego ze wszystkich. " ..
+    "W tej niezwykle renomowanej okolicy Ministerstwo chciałoby mieć szpital najlepszy z możliwych. " ..
+    "Oczekujemy, że zarobisz mnóstwo pieniędzy, zyskasz znakomitą reputację i poradzisz sobie ze wszelkimi ewentualnościami. " ..
+    "To jest bardzo ważna robota. " ..
+    "Będziesz musiał naprawdę się czymś wyróżnić. " ..
+    "Trzeba ci wiedzieć, że w tych okolicach widywane jest UFO. Twój personel powinien być przygotowany na niespodziewanych gości. " ..
+    "Warunki wygranej to: wartość szpitala 240,000 PLN, 500,000 PLN na koncie i reputacja na poziomie co najmniej 700.",
+  level18 = "",
 }
 humanoid_name_starts = {
   [1] = "GOLD",
@@ -3182,6 +3236,46 @@ menu = {
   file = "  PLIK  ",
   options = "  OPCJE  ",
   charts = "  STATYSTYKI ",
+}
+map_editor_window = {
+  pages = {
+    inside = "Wnętrze",
+    outside = "Na zewnątrz",
+    foliage = "Ulistowienie",
+    hedgerow = "Żywopłot",
+    pond = "Sadzawka",
+    road = "Droga",
+    north_wall = "Ściana północna",
+    west_wall = "Ściana zachodnia",
+    helipad = "Lądowisko",
+    delete_wall = "Usuń ściany",
+    parcel_0 = "Parcela 0",
+    parcel_1 = "Parcela 1",
+    parcel_2 = "Parcela 2",
+    parcel_3 = "Parcela 3",
+    parcel_4 = "Parcela 4",
+    parcel_5 = "Parcela 5",
+    parcel_6 = "Parcela 6",
+    parcel_7 = "Parcela 7",
+    parcel_8 = "Parcela 8",
+    parcel_9 = "Parcela 9",
+    camera_1 = "Kamera 1",
+    camera_2 = "Kamera 2",
+    camera_3 = "Kamera 3",
+    camera_4 = "Kamera 4",
+    heliport_1 = "Lądowisko 1",
+    heliport_2 = "Lądowisko 2",
+    heliport_3 = "Lądowisko 3",
+    heliport_4 = "Lądowisko 4",
+    paste = "Wklej obszar",
+  }
+}
+menu["player_count"] = "LICZBA GRACZY"
+menu_player_count = {
+	players_1 = "  1 GRACZ  ",
+	players_2 = "  2 GRACZY  ",
+	players_3 = "  3 GRACZY  ",
+	players_4 = "  4 GRACZY  ",
 }
 
 

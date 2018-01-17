@@ -24,6 +24,9 @@ _ = nil
 --! Interactive Lua Console for ingame debugging.
 class "UILuaConsole" (UIResizable)
 
+---@type UILuaConsole
+local UILuaConsole = _G["UILuaConsole"]
+
 local col_bg = {
   red = 46,
   green = 186,
@@ -58,17 +61,17 @@ function UILuaConsole:UILuaConsole(ui)
   self.min_width = 200
   self.min_height = 150
   self:setDefaultPosition(0.1, 0.1)
-  
+
   -- Window parts definition
   self.default_button_sound = "selectx.wav"
-  
+
   -- Textbox for entering code
   self.textbox = self:addBevelPanel(20, 20, 280, 140, col_textbox, col_highlight, col_shadow)
     :setLabel("", app.gfx:loadBuiltinFont(), "left"):setTooltip(_S.tooltip.lua_console.textbox):setAutoClip(true)
     :makeTextbox():allowedInput("all"):setText({""})
-  
+
   self.textbox:setActive(true) -- activated by default
-  
+
   -- "Execute" button
   self.execute_button = self:addBevelPanel(20, self.height - 60, 130, 40, col_bg):setLabel(_S.lua_console.execute_code)
     :makeButton(0, 0, 130, 40, nil, self.buttonExecute):setTooltip(_S.tooltip.lua_console.execute_code)
@@ -79,21 +82,21 @@ end
 
 function UILuaConsole:setSize(width, height)
   UIResizable.setSize(self, width, height)
-  
+
   self.textbox:setSize(self.width - 40, self.height - 100)
-  
+
   local button_width = math.floor((self.width - 60) / 2)
-  
+
   self.execute_button:setPosition(20, self.height - 60)
   self.execute_button:setSize(button_width, 40)
-  
+
   self.close_button:setPosition(self.width - 20 - button_width, self.height - 60)
   self.close_button:setSize(button_width, 40)
 end
 
 function UILuaConsole:buttonExecute()
   print("Loading UserFunction...")
-  local func, err
+  local func, err, s
 
   _ = TheApp.ui and TheApp.ui.debug_cursor_entity
 
@@ -110,13 +113,14 @@ function UILuaConsole:buttonExecute()
   if not func then
     print("Error while loading UserFunction:")
     print(err)
-  else
-    print("Executing UserFunction...")
-    local s, err = pcall(func)
-    if not s then
-      print("Error while executing UserFunction:")
-      print(err)
-    end
+    return
+  end
+
+  print("Executing UserFunction...")
+  s, err = pcall(func)
+  if not s then
+    print("Error while executing UserFunction:")
+    print(err)
   end
 end
 

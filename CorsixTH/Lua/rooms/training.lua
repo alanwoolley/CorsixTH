@@ -38,6 +38,9 @@ room.has_no_queue_dialog = true
 
 class "TrainingRoom" (Room)
 
+---@type TrainingRoom
+local TrainingRoom = _G["TrainingRoom"]
+
 function TrainingRoom:TrainingRoom(...)
   self:Room(...)
 end
@@ -49,7 +52,7 @@ function TrainingRoom:roomFinished()
   local chairs = 0
   local skeletons = 0
   local bookcases = 0
-  for object, value in pairs(objects) do
+  for object, _ in pairs(objects) do
     if object.object_type.id == "lecture_chair" then
       chairs = chairs + 1
     elseif object.object_type.id == "skeleton" then
@@ -99,8 +102,8 @@ function TrainingRoom:getStaffCount()
 end
 
 function TrainingRoom:testStaffCriteria(criteria, extra_humanoid)
-  if extra_humanoid and extra_humanoid.profile
-  and extra_humanoid.profile.is_consultant and self.staff_member then
+  if extra_humanoid and extra_humanoid.profile and
+      extra_humanoid.profile.is_consultant and self.staff_member then
     -- Training room can only have on consultant
     return false
   end
@@ -117,36 +120,35 @@ end
 
 function TrainingRoom:doStaffUseCycle(humanoid)
   local projector, ox, oy = self.world:findObjectNear(humanoid, "projector")
-  humanoid:queueAction{name = "walk", x = ox, y = oy}
+  humanoid:queueAction(WalkAction(ox, oy))
   local projector_use_time = math.random(6,20)
-  humanoid:queueAction{name = "use_object",
-    object = projector,
-    loop_callback = --[[persistable:training_loop_callback]] function()
-      projector_use_time = projector_use_time - 1
-      if projector_use_time == 0 then
-        local skeleton, sox, soy = self.world:findFreeObjectNearToUse(humanoid, "skeleton", "near")
-        local bookcase, box, boy = self.world:findFreeObjectNearToUse(humanoid, "bookcase", "near")
-        if math.random(0, 1) == 0 and bookcase then skeleton = nil end -- choose one
-        if skeleton then
-          humanoid:walkTo(sox, soy)
-          for i = 1, math.random(3, 10) do
-            humanoid:queueAction{name = "use_object", object = skeleton}
-          end
-        elseif bookcase then
-          humanoid:walkTo(box, boy)
-          for i = 1, math.random(3, 10) do
-            humanoid:queueAction{name = "use_object", object = bookcase}
-          end
+  local loop_callback_training = --[[persistable:training_loop_callback]] function()
+    projector_use_time = projector_use_time - 1
+    if projector_use_time == 0 then
+      local skeleton, sox, soy = self.world:findFreeObjectNearToUse(humanoid, "skeleton", "near")
+      local bookcase, box, boy = self.world:findFreeObjectNearToUse(humanoid, "bookcase", "near")
+      if math.random(0, 1) == 0 and bookcase then skeleton = nil end -- choose one
+      if skeleton then
+        humanoid:walkTo(sox, soy)
+        for _ = 1, math.random(3, 10) do
+          humanoid:queueAction(UseObjectAction(skeleton))
         end
-        -- go back to the projector
-        self:doStaffUseCycle(humanoid)
-      elseif projector_use_time < 0 then
-        -- reset variable to avoid potential overflow (over a VERY long
-        -- period of time)
-        projector_use_time = 0
+      elseif bookcase then
+        humanoid:walkTo(box, boy)
+        for _ = 1, math.random(3, 10) do
+          humanoid:queueAction(UseObjectAction(bookcase))
+        end
       end
-    end,
-  }
+      -- go back to the projector
+      self:doStaffUseCycle(humanoid)
+    elseif projector_use_time < 0 then
+      -- reset variable to avoid potential overflow (over a VERY long
+      -- period of time)
+      projector_use_time = 0
+    end
+  end
+
+  humanoid:queueAction(UseObjectAction(projector):setLoopCallback(loop_callback_training))
 end
 
 function TrainingRoom:onHumanoidEnter(humanoid)
@@ -154,7 +156,7 @@ function TrainingRoom:onHumanoidEnter(humanoid)
     -- use default behavior for staff other than doctors
     return Room.onHumanoidEnter(self, humanoid)
   end
-  
+
   assert(not self.humanoids[humanoid], "Humanoid entering a room that they are already in")
   humanoid.in_room = self
   humanoid.last_room = self -- Remember where the staff was for them to come back after staffroom rest
@@ -163,7 +165,7 @@ function TrainingRoom:onHumanoidEnter(humanoid)
   if self.humanoids_enroute[humanoid] then
     self.humanoids_enroute[humanoid] = nil -- humanoid is no longer walking to this room
   end
-  
+
   humanoid:setCallCompleted()
   self:commandEnteringStaff(humanoid)
   self.humanoids[humanoid] = true
@@ -178,18 +180,18 @@ function TrainingRoom:commandEnteringStaff(humanoid)
     -- Consultants try to use the projector and/or skeleton
     if profile.is_consultant then
       obj, ox, oy = self.world:findFreeObjectNearToUse(humanoid, "projector")
-      if self.staff_member then 
+      if self.staff_member then
         if self.waiting_staff_member then
           local staff = self.waiting_staff_member
           staff.waiting_on_other_staff = nil
           staff:setNextAction(self:createLeaveAction())
-          staff:queueAction{name = "meander"}
+          staff:queueAction(MeanderAction())
         end
         humanoid.waiting_on_other_staff = true
-        humanoid:setNextAction{name = "meander"}
+        humanoid:setNextAction(MeanderAction())
         self.waiting_staff_member = humanoid
         self.staff_member:setNextAction(self:createLeaveAction())
-        self.staff_member:queueAction{name = "meander"}
+        self.staff_member:queueAction(MeanderAction())
       else
         if obj then
           obj.reserved_for = humanoid
@@ -198,7 +200,7 @@ function TrainingRoom:commandEnteringStaff(humanoid)
           self:setStaffMember(humanoid)
         else
           humanoid:setNextAction(self:createLeaveAction())
-          humanoid:queueAction{name = "meander"}
+          humanoid:queueAction(MeanderAction())
         end
       end
     else
@@ -206,11 +208,11 @@ function TrainingRoom:commandEnteringStaff(humanoid)
       if obj then
         obj.reserved_for = humanoid
         humanoid:walkTo(ox, oy)
-        humanoid:queueAction{name = "use_object", object = obj}
-        humanoid:queueAction{name = "meander"}
+        humanoid:queueAction(UseObjectAction(obj))
+        humanoid:queueAction(MeanderAction())
       else
         humanoid:setNextAction(self:createLeaveAction())
-        humanoid:queueAction{name = "meander"}
+        humanoid:queueAction(MeanderAction())
         humanoid.last_room = nil
       end
     end
@@ -218,7 +220,7 @@ function TrainingRoom:commandEnteringStaff(humanoid)
     self.world.ui.adviser:say(_A.staff_place_advice.only_doctors_in_room
     :format(_S.rooms_long.training_room))
     humanoid:setNextAction(self:createLeaveAction())
-    humanoid:queueAction{name = "meander"}
+    humanoid:queueAction(MeanderAction())
     return
   end
 
@@ -230,19 +232,19 @@ function TrainingRoom:onHumanoidLeave(humanoid)
     -- unreserve whatever it was they we using
     local fx, fy = self:getEntranceXY(true)
     local objects = self.world:findAllObjectsNear(fx,fy)
-    for object, value in pairs(objects) do
+    for object, _ in pairs(objects) do
       if object.reserved_for == humanoid then
         object:removeReservedUser()
       end
     end
-    
+
     if humanoid.profile.is_consultant and humanoid == self.staff_member then
-      local humanoid = self.waiting_staff_member
+      local staff = self.waiting_staff_member
       self:setStaffMember(nil)
-      if humanoid then
-        humanoid.waiting_on_other_staff = nil
+      if staff then
+        staff.waiting_on_other_staff = nil
         self.waiting_staff_member = nil
-        self:commandEnteringStaff(humanoid)
+        self:commandEnteringStaff(staff)
       end
     end
   end

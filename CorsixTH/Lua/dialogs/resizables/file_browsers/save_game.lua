@@ -21,7 +21,8 @@ SOFTWARE. --]]
 --! Save Game Window
 class "UISaveGame" (UIFileBrowser)
 
-local pathsep = package.config:sub(1, 1)
+---@type UISaveGame
+local UISaveGame = _G["UISaveGame"]
 
 local col_textbox = {
   red = 0,
@@ -48,7 +49,7 @@ function UISaveGame:UISaveGame(ui)
   -- The most probable preference of sorting is by date - what you played last
   -- is the thing you want to play soon again.
   self.control:sortByDate()
-  
+
   -- Textbox for entering new savegame name
   self.new_savegame_textbox = self:addBevelPanel(5, 310, self.width - 10, 17, col_textbox, col_highlight, col_shadow)
     :setLabel(_S.save_game_window.new_save_game, nil, "left"):setTooltip(_S.tooltip.save_game_window.new_save_game)
@@ -65,11 +66,12 @@ end
 --! Function called when textbox is confirmed (e.g. by pressing enter)
 function UISaveGame:confirmName()
   local filename = self.new_savegame_textbox.text
+  local app = self.ui.app
   if filename == "" then
     self:abortName()
     return
   end
-  self:trySave(filename .. ".sav")
+  self:trySave(app.savegame_dir .. filename .. ".sav")
 end
 
 --! Function called by clicking button of existing save #num
@@ -79,7 +81,7 @@ end
 
 --! Try to save the game with given filename; if already exists, create confirmation window first.
 function UISaveGame:trySave(filename)
-  if lfs.attributes(self.ui.app.savegame_dir .. filename, "size") ~= nil then
+  if lfs.attributes(filename, "size") ~= nil then
     self.ui:addWindow(UIConfirmDialog(self.ui, _S.confirmation.overwrite_save, --[[persistable:save_game_confirmation]] function() self:doSave(filename) end))
   else
     self:doSave(filename)
@@ -92,7 +94,7 @@ function UISaveGame:doSave(filename)
   local ui = self.ui
   local app = ui.app
   self:close()
-  
+
   local status, err = pcall(app.save, app, filename)
   if not status then
     err = _S.errors.save_prefix .. err

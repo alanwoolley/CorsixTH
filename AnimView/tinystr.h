@@ -224,7 +224,7 @@ class TiXmlString
             // to the normal allocation, although use an 'int' for systems
             // that are overly picky about structure alignment.
             const size_type bytesNeeded = sizeof(Rep) + cap;
-            const size_type intsNeeded = ( bytesNeeded + sizeof(int) - 1 ) / sizeof( int ); 
+            const size_type intsNeeded = ( bytesNeeded + sizeof(int) - 1 ) / sizeof( int );
             rep_ = reinterpret_cast<Rep*>( new int[ intsNeeded ] );
 
             rep_->str[ rep_->size = sz ] = '\0';
@@ -279,7 +279,7 @@ TiXmlString operator + (const char* a, const TiXmlString & b);
 
 /*
    TiXmlOutStream is an emulation of std::ostream. It is based on TiXmlString.
-   Only the operators that we need for TinyXML have been developped.
+   Only the operators that we need for TinyXML have been developed.
 */
 class TiXmlOutStream : public TiXmlString
 {

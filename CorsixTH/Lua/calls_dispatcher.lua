@@ -20,9 +20,12 @@ SOFTWARE. --]]
 
 class "CallsDispatcher"
 
+---@type CallsDispatcher
+local CallsDispatcher = _G["CallsDispatcher"]
+
 local debug = false -- Turn on for debug message
 
-function CallsDispatcher:CallsDispatcher(world, entities)
+function CallsDispatcher:CallsDispatcher(world)
   self.world = world
   self.call_queue = {}
   self.change_callback = {}
@@ -54,7 +57,7 @@ function CallsDispatcher:callForStaff(room)
     anyone_missed = true
     for i = 1, count do
       self:callForStaffEachRoom(room, attribute, attribute .. i)
-    end    
+    end
   end
   local sound = room.room_info.call_sound
   if anyone_missed and sound and not room.sound_played then
@@ -91,7 +94,7 @@ end
 --  If urgent or manual is specified, lock_room will be true automatically
 function CallsDispatcher:callForRepair(object, urgent, manual, lock_room)
   lock_room = manual or lock_room
-  
+
   local call = {
     verification = --[[persistable:call_dispatcher_repair_verification]] function(staff) return false end,
     priority = --[[persistable:call_dispatcher_repair_priority]] function(staff) return 1 end,
@@ -104,7 +107,7 @@ function CallsDispatcher:callForRepair(object, urgent, manual, lock_room)
     assigned = nil,
     dropped = nil
   }
-  
+
   object:setRepairingMode(lock_room and true or false)
   local message
   local ui = object.world.ui
@@ -112,20 +115,20 @@ function CallsDispatcher:callForRepair(object, urgent, manual, lock_room)
     -- Advise about hiring Handyman
     message = _A.warnings.machinery_damaged2
   end
-  
+
   if not manual and urgent then
-    local room = object:getRoom();
+    local room = object:getRoom()
     local sound = room.room_info.handyman_call_sound
     if sound then
       ui:playAnnouncement(sound)
-      ui:playSound "machwarn.wav"
+      ui:playSound("machwarn.wav")
     end
     message = _A.warnings.machines_falling_apart
   end
   if message then
     ui.adviser:say(message)
   end
-  
+
   if not self.call_queue[object] then
     self.call_queue[object] = {}
   end
@@ -135,9 +138,9 @@ end
 
 function CallsDispatcher:callForWatering(plant)
   local call = {
-    verification = --[[persistable:call_dispatcher_watering_verification]]function(staff) 
+    verification = --[[persistable:call_dispatcher_watering_verification]]function(staff)
       return false end,
-    priority = --[[persistable:call_dispatcher_watering_priority]] function(staff) 
+    priority = --[[persistable:call_dispatcher_watering_priority]] function(staff)
       return 1 end,
     execute = --[[persistable:call_dispatcher_watering_execute]] function(staff) return CallsDispatcher.sendStaffToWatering(plant, staff) end,
     object = plant,
@@ -154,6 +157,113 @@ function CallsDispatcher:callForWatering(plant)
   self.call_queue[plant]["watering"] = call
   return call
 end
+
+--[[ Queues a call for vaccination of a patient
+  @param patient (Patient) the patient who wishes to be vaccinated
+  @return call (table) the call which was queued ]]
+function CallsDispatcher:callNurseForVaccination(patient)
+  local call = {
+    object = patient,
+    key = "vaccinate",
+    description = "Vaccinating patient at: " ..
+        tostring(patient.tile_x) .. "," .. tostring(patient.tile_y),
+    verification = --[[persistable:call_dispatcher_vaccinate_verification]] function(staff)
+      return CallsDispatcher.verifyStaffForVaccination(patient, staff)
+    end,
+    priority = --[[persistable:call_dispatcher_vaccinate_priority]] function(staff)
+      return CallsDispatcher.getPriorityForVaccination(patient,staff)
+    end,
+    execute = --[[persistable:call_dispatcher_vaccinate_execute]] function(staff)
+      return CallsDispatcher.sendNurseToVaccinate(patient, staff)
+    end,
+    dispatcher = self,
+    created = self.tick,
+    assigned = nil,
+    dropped = nil
+  }
+  if not self.call_queue[patient] then
+    self.call_queue[patient] = {}
+  end
+  self.call_queue[patient]["vaccinate"] = call
+
+  return call
+end
+
+--[[Determines if a member of staff is suitable to vaccinate a patient they
+  must be a nurse and not busy or too far away.
+  @param patient (Patient) the patient calling for vaccination
+  @param staff (Staff) staff member to verify if suitable to vaccinate
+  @return true if suitable for vaccination false otherwise (boolean) ]]
+function CallsDispatcher.verifyStaffForVaccination(patient, staff)
+  -- If staff is not a nurse, or nurse is busy, or patient is busy, cannot vaccinate.
+  if staff.humanoid_class ~= "Nurse" or not staff:isIdle() or
+      staff:getRoom() or patient:getRoom() then
+    return false
+  end
+
+  -- Test proximity of staff and patient.
+  local px,py = patient.tile_x, patient.tile_y
+  local nx,ny = staff.tile_x, staff.tile_y
+
+  -- If any of the nurse or the patient tiles are nil
+  if not px or not py or not nx or not ny then return false end
+
+  local x_diff = math.abs(px - nx)
+  local y_diff = math.abs(py - ny)
+  local test_radius = 5
+
+  -- Test if the patient's room is still empty in case they are just entering
+  -- a room when they call for a staff to vaccinate them
+  return x_diff <= test_radius and y_diff <= test_radius
+end
+
+--[[ Determine which nurse has the highest priority to vaccinate a patient
+  the patient should be easily reachable from the nurse
+  @param patient (Patient) the patient calling for vaccination
+  @param nurse (Staff, humanoid_class Nurse) the nurse to verify if they
+  have priority to vaccinate
+  @return score (Integer) lowest score has higher priority to vaccinate ]]
+function CallsDispatcher.getPriorityForVaccination(patient, nurse)
+  assert(nurse.humanoid_class == "Nurse")
+  --Lower the priority "score" the more urgent it is
+  --The closest nurse to the patient has the highest priority for vaccination
+  --Any nurse who cannot reach the paitient suffers a priority penalty
+  local score = 0
+  local nil_penalty = 10000
+  local x, y = patient.tile_x, patient.tile_y
+
+  -- Nurses prefer to vaccinate the closest patient
+  local distance =
+    patient.world:getPathDistance(nurse.tile_x, nurse.tile_y, x, y)
+  if distance then
+    score = score + distance
+  else
+    score = score + nil_penalty
+  end
+  return score
+end
+
+--[[ Once a nurse has been verified and priority decided do the actions to
+  perform the actually vaccination, delegated to Epidemic class (@see
+  Epidemic:createVaccinationActions) @param patient (Patient) the patient calling
+  for vaccination @param nurse (Staff, humanoid_class Nurse) the nurse to perform
+  the vaccination actions ]]
+function CallsDispatcher.sendNurseToVaccinate(patient, nurse)
+  assert(nurse.humanoid_class == "Nurse")
+
+  local epidemic = nurse.hospital.epidemic
+  if epidemic then
+    epidemic:createVaccinationActions(patient,nurse)
+  else
+    -- The epidemic may have ended before the call can be executed
+    -- so just finish the call immediately
+    CallsDispatcher.queueCallCheckpointAction(nurse)
+    nurse:queueAction(AnswerCallAction())
+    nurse:finishAction()
+    patient.reserved_for = nil
+  end
+end
+
 
 -- Enqueue the call
 -- returns: True if the call is inserted and queued, but not served
@@ -182,15 +292,15 @@ function CallsDispatcher:enqueue(object, key, description, verification, priorit
 end
 
 -- Find suitable (best) staff for working on a specific call
--- True 
+-- True
 function CallsDispatcher:findSuitableStaff(call)
-  if call.dropped then 
+  if call.dropped then
     -- If a call was thought needed to be reinserted, but actually it was dropped...
     return
-  end 
+  end
 
   -- TODO: Preempt staff those even on_call already.
-  --       Say - when an machine broke down, preempt the nearby handyman for repairing 
+  --       Say - when an machine broke down, preempt the nearby handyman for repairing
   --         even if he was going to water a far away plant
   -- TODO: Doctor could go to other room with real needs, even there are patients queued up
   --       (think of emergency? or surgeons still in GP office?)
@@ -199,12 +309,12 @@ function CallsDispatcher:findSuitableStaff(call)
   for _, e in ipairs(self.world.entities) do
     if class.is(e, Staff) then
       if e.humanoid_class ~= "Handyman" then
-    local score = call.verification(e) and call.priority(e) or nil
-    if score ~= nil and score < min_score then
-      min_score = score
-      min_staff = e
-    end
-    end
+        local score = call.verification(e) and call.priority(e) or nil
+        if score ~= nil and score < min_score then
+          min_score = score
+          min_staff = e
+        end
+      end
     end
   end
 
@@ -225,8 +335,8 @@ end
 function CallsDispatcher:answerCall(staff)
   local min_score = 2^30
   local min_call = nil
-  local min_key = nil
   assert(not staff.on_call, "Staff should be idea before he can answer another call")
+  assert(staff.hospital, "Staff should still be a member of the hospital to answer a call")
 
   if staff.humanoid_class == "Handyman" then
    staff:searchForHandymanTask()
@@ -234,8 +344,8 @@ function CallsDispatcher:answerCall(staff)
   end
   -- Find the call with the highest priority (smaller means more urgency)
   --   if the staff satisfy the criteria
-  for object, queue in pairs(self.call_queue) do
-    for key, call in pairs(queue) do
+  for _, queue in pairs(self.call_queue) do
+    for _, call in pairs(queue) do
       local score = call.verification(staff) and call.priority(staff) or nil
       if score ~= nil then
         if call.assigned then -- already being assigned? Can it be preempted?
@@ -247,7 +357,6 @@ function CallsDispatcher:answerCall(staff)
         if score ~= nil and score < min_score then
           min_score = score
           min_call = call
-          min_key = key
         end
       end
     end
@@ -255,8 +364,8 @@ function CallsDispatcher:answerCall(staff)
 
   if min_call then
     if debug then self:dump() CallsDispatcher.dumpCall(min_call, 'answered') end
-    if min_call.assigned then 
-      CallsDispatcher.unassignCall(min_call) 
+    if min_call.assigned then
+      CallsDispatcher.unassignCall(min_call)
     end
     -- Check if the object is still in the world, live and not destroy
     assert(min_call.object.tile_x or min_call.object.x, "An destroyed object still has requested in the dispatching queue. Please check the Entity:onDestroy function")
@@ -269,8 +378,8 @@ end
 -- Dump the current call table for debugging
 function CallsDispatcher:dump()
   print("--- Queue ---")
-  for object, queue in pairs(self.call_queue) do
-    for key, call in pairs(queue) do
+  for _, queue in pairs(self.call_queue) do
+    for _, call in pairs(queue) do
       CallsDispatcher.dumpCall(call, (call.assigned and 'assigned' or 'unassigned'))
     end
   end
@@ -283,28 +392,32 @@ function CallsDispatcher.dumpCall(call, message)
   else
     message = ''
   end
+
+  local call_obj = call.object
+
   local position = 'nowhere'
-  if call.object.tile_x then
-    position = call.object.tile_x ..','..call.object.tile_y
+  if call_obj.tile_x then
+    position = call_obj.tile_x .. ',' .. call_obj.tile_y
   end
-  if call.object.x then
-    position = call.object.x ..','..call.object.y
+  if call_obj.x then
+    position = call_obj.x .. ',' .. call_obj.y
   end
-  print((call.object.room_info and call.object.room_info.id or call.object.object_type.id) .. '-' .. call.key .. 
-    '@' .. position .. message)
+  if(class.is(call_obj,Humanoid)) then
+    print(call.key .. '@' .. position .. message)
+  else
+    print((call_obj.room_info and call_obj.room_info.id or call_obj.object_type.id) ..
+        '-' .. call.key .. '@' .. position .. message)
+  end
 end
 
 -- Add checkpoint action
--- All call execution method should add this action in apporiate place to signify 
+-- All call execution method should add this action in appropriate place to signify
 --   the job is finished.
--- A interrupt handler could be supplied if special handling is needed. 
+-- A interrupt handler could be supplied if special handling is needed.
 -- If not, the default would be reinsert the call into the queue
 function CallsDispatcher.queueCallCheckpointAction(humanoid, interrupt_handler)
-  return humanoid:queueAction{
-    name = "call_checkpoint", 
-    call = humanoid.on_call, 
-    on_remove = interrupt_handler or CallsDispatcher.actionInterruptHandler
-  }
+  interrupt_handler = interrupt_handler or CallsDispatcher.actionInterruptHandler
+  return humanoid:queueAction(CallCheckPointAction(humanoid.on_call, interrupt_handler))
 end
 
 -- Default checkpoint interrupt handler
@@ -317,7 +430,7 @@ function CallsDispatcher.actionInterruptHandler(action, humanoid)
   end
 end
 
--- Called when a call is completed sucessfully
+--! Called when a call is completed successfully.
 function CallsDispatcher.onCheckpointCompleted(call)
   if not call.dropped and call.assigned then
     if debug then CallsDispatcher.dumpCall(call, "completed") end
@@ -339,7 +452,7 @@ end
 
 -- Drop any call associated with the object (and/or key).
 --
--- Expected to be called when the call is no longer needed 
+-- Expected to be called when the call is no longer needed
 --   (like a machine that needed repaired were replaced),
 --   or when the object is destroyed, etc.
 function CallsDispatcher:dropFromQueue(object, key)
@@ -348,13 +461,13 @@ function CallsDispatcher:dropFromQueue(object, key)
     local call = self.call_queue[object][key]
     if call then
       call.dropped = true
-      if call.assigned then 
+      if call.assigned then
         CallsDispatcher.unassignCall(call)
       end
       self.call_queue[object][key] = nil
     end
   elseif self.call_queue[object] then
-    for key, call in pairs(self.call_queue[object]) do
+    for _, call in pairs(self.call_queue[object]) do
       call.dropped = true
       if call.assigned then
         CallsDispatcher.unassignCall(call)
@@ -370,27 +483,30 @@ function CallsDispatcher.unassignCall(call)
   assert(assigned.on_call == call, "Unassigning call but the staff was not on call or a different call")
   call.assigned = nil
   assigned.on_call = nil
-  assigned:setNextAction{name = "answer_call"}
+  assigned:setNextAction(AnswerCallAction())
 end
 
 function CallsDispatcher.verifyStaffForRoom(room, attribute, staff)
-  if staff:isIdle() and staff:fulfillsCriterion(attribute) then
-    local current_room = staff:getRoom()
-    if not staff.hospital.policies["staff_allowed_to_move"]
-    and current_room and current_room ~= room then
-      return false
-    end
-    return true
+  if not staff:isIdle() or not staff:fulfillsCriterion(attribute) then
+    return false
   end
-  return false
+
+  -- Staff is in another room, not usable.
+  local current_room = staff:getRoom()
+  if not staff.hospital.policies["staff_allowed_to_move"] and
+      current_room and current_room ~= room then
+    return false
+  end
+
+  return true
 end
 
 function CallsDispatcher.getPriorityForRoom(room, attribute, staff)
-  local score = 0;
+  local score = 0
   local x, y = room:getEntranceXY()
-  
+
   -- Doctor prefer serving nearby rooms
-  local distance = room.world:getPathDistance(staff.tile_x, staff.tile_y, x, y);
+  local distance = room.world:getPathDistance(staff.tile_x, staff.tile_y, x, y)
   if distance then
     score = score + distance
   end
@@ -419,11 +535,11 @@ end
 function CallsDispatcher.sendStaffToRoom(room, staff)
   if staff:getRoom() == room then
     room:onHumanoidLeave(staff)
-    CallsDispatcher.queueCallCheckpointAction(staff, CallsDispatcher.staffActionInterruptHandler)  
+    CallsDispatcher.queueCallCheckpointAction(staff, CallsDispatcher.staffActionInterruptHandler)
     room:onHumanoidEnter(staff)
   else
     staff:setNextAction(room:createEnterAction(staff))
-    CallsDispatcher.queueCallCheckpointAction(staff, CallsDispatcher.staffActionInterruptHandler)  
+    CallsDispatcher.queueCallCheckpointAction(staff, CallsDispatcher.staffActionInterruptHandler)
   end
   staff:setDynamicInfoText(_S.dynamic_info.staff.actions.heading_for:format(room.room_info.name))
 end
@@ -438,10 +554,16 @@ function CallsDispatcher.staffActionInterruptHandler(action, humanoid, high_prio
   end
 end
 
+--! 'execute' callback for repairing an object (eg a machine).
+--!param object Object to repair.
+--!param handyman Staff to use.
 function CallsDispatcher.sendStaffToRepair(object, handyman)
   object:createHandymanActions(handyman)
 end
 
+--! 'execute' callback for watering a plant.
+--!param plant Plant to give water.
+--!param handyman Staff to use.
 function CallsDispatcher.sendStaffToWatering(plant, handyman)
   plant:createHandymanActions(handyman)
 end

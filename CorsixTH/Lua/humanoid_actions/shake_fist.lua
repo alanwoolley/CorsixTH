@@ -18,6 +18,16 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE. --]]
 
+class "ShakeFistAction" (HumanoidAction)
+
+---@type ShakeFistAction
+local ShakeFistAction = _G["ShakeFistAction"]
+
+function ShakeFistAction:ShakeFistAction()
+  self:HumanoidAction("shake_fist")
+  self:setMustHappen(true)
+end
+
 local action_shake_fist_end = permanent"action_shake_fist_end"( function(humanoid)
   humanoid:finishAction()
 end)
@@ -29,7 +39,7 @@ local function action_shake_fist_start(action, humanoid)
   else
     humanoid.last_move_direction = "south"
   end
-  
+
   assert(humanoid.shake_fist_anim, "Error: no shaking fist animation for humanoid " .. humanoid.humanoid_class)
   action.must_happen = true
   humanoid:setAnimation(humanoid.shake_fist_anim, humanoid.last_move_direction == "east" and 0 or 1)

@@ -23,8 +23,11 @@ local TH = require "TH"
 --! An `Object` which needs occasional repair (to prevent explosion).
 class "Machine" (Object)
 
+---@type Machine
+local Machine = _G["Machine"]
+
 function Machine:Machine(world, object_type, x, y, direction, etc)
-  
+
   self.total_usage = -1 -- Incremented in the constructor of Object.
   self:Object(world, object_type, x, y, direction, etc)
 
@@ -36,15 +39,9 @@ function Machine:Machine(world, object_type, x, y, direction, etc)
 
   -- We actually don't want any dynamic info just yet
   self:clearDynamicInfo()
-  -- TODO: Smoke, 3424
   -- Change hover cursor once the room has been finished.
-  local callback
-  callback = --[[persistable:machine_build_callback]] function(room)
-    if room.objects[self] then
-      self:finalize(room)
-      self.world:unregisterRoomBuildCallback(callback)
-    end
-  end
+  self.waiting_for_finalize = true -- Waiting until the room is completed (reset by new-room callback).
+
   local orientation = object_type.orientations[direction]
   local handyman_position = orientation.handyman_position
   if handyman_position then
@@ -68,48 +65,131 @@ function Machine:Machine(world, object_type, x, y, direction, etc)
   else
     self.handyman_position = {orientation.use_position[1], orientation.use_position[2]}
   end
-  self.world:registerRoomBuildCallback(callback)
+end
+
+function Machine:notifyNewRoom(room)
+  if self.waiting_for_finalize and room.objects[self] then
+    self:finalize(room)
+    self.waiting_for_finalize = false
+  end
 end
 
 function Machine:setCrashedAnimation()
   self:setAnimation(self.object_type.crashed_animation)
 end
 
+--! Calculates the number of times the machine can be used before crashing (unless repaired first)
+function Machine:getRemainingUses()
+  return self.strength - self.times_used
+end
+
+--! Set whether the smoke animation should be showing
+local function setSmoke(self, isSmoking)
+  -- If turning smoke on for this machine
+  if isSmoking then
+    -- If there is no smoke animation for this machine, make one
+    if not self.smokeInfo then
+      self.smokeInfo = TH.animation()
+      -- Note: Set the location of the smoke to that of the machine
+      -- rather than setting the machine to the parent so that the smoke
+      -- doesn't get hidden with the machine during use
+      self.smokeInfo:setTile(self.th:getTile())
+      -- Always show the first smoke layer
+      self.smokeInfo:setLayer(10, 2)
+      -- tick to animate over all frames
+      self.ticks = true
+    end
+    -- TODO: select the smoke icon based on the type of machine
+    self.smokeInfo:setAnimation(self.world.anims, 3424)
+  else -- Otherwise, turning smoke off
+    -- If there is currently a smoke animation, remove it
+    if self.smokeInfo then
+      self.smokeInfo:setTile(nil)
+    end
+    self.smokeInfo = nil
+  end
+end
+
+--! Call on machine use. Handles crashing the machine & queueing repairs
 function Machine:machineUsed(room)
+  -- Do nothing if the room has already crashed
   if room.crashed then
-    -- Do nothing if the room has already crashed.
     return
   end
+  -- Update dynamic info (strength & times used)
   self:updateDynamicInfo()
-  local threshold = self.times_used/self.strength
-
+  -- How many uses this machine has left until it explodes
+  local threshold = self:getRemainingUses()
+  -- Find a queued task for a handyman coming to repair this machine
   local taskIndex = self.hospital:getIndexOfTask(self.tile_x, self.tile_y, "repairing")
-  if threshold >= 0.9 then
+
+  -- Too late it is about to explode
+  if threshold < 1 then
+    -- Clean up any task of handyman coming to repair the machine
     self.hospital:removeHandymanTask(taskIndex, "repairing")
+    -- Blow up the room
     room:crashRoom()
     self:setCrashedAnimation()
+    -- No special cursor required when hovering over the crashed room
     self.hover_cursor = nil
+    -- Clear dynamic info (tracks machine usage which is no longer required)
     self:clearDynamicInfo()
+    -- Prevent the machine from smoking, it's now just a pile of rubble
+    setSmoke(self, false)
+    -- If we have the window for this machine open, close it
     local window = self.world.ui:getWindow(UIMachine)
     if window and window.machine == self then
       window:close()
     end
+    -- Clear the icon showing a handyman is coming to repair the machine
     self:setRepairing(nil)
     return true
-  elseif threshold >= 0.70 then
-    -- TODO: 3428 is smoke, add it when additional objects can be made
-    -- Urgent
+  -- Else if urgent repair needed
+  elseif threshold < 4 then
+    -- If the job of repairing the machine isn't queued, queue it now (higher priority)
     if taskIndex == -1 then
       local call = self.world.dispatcher:callForRepair(self, true, false, true)
       self.hospital:addHandymanTask(self, "repairing", 2, self.tile_x, self.tile_y, call)
-    else 
+    else -- Otherwise the task is already queued. Increase the priority to above that of machines with at least 4 uses left
       self.hospital:modifyHandymanTaskPriority(taskIndex, 2, "repairing")
     end
-  elseif threshold >= 0.4 then
-    -- Not urgent
+  -- Else if repair is needed, but not urgently
+  elseif threshold < 6 then
+    -- If the job of repairing the machine isn't queued, queue it now (low priority)
     if taskIndex == -1 then
       local call = self.world.dispatcher:callForRepair(self)
       self.hospital:addHandymanTask(self, "repairing", 1, self.tile_x, self.tile_y, call)
+    end
+  end
+
+  -- Update whether smoke gets displayed for this machine (and if so, how much)
+  self:calculateSmoke(room)
+end
+
+--! Calculates whether smoke gets displayed for this machine (and if so, how much)
+function Machine:calculateSmoke(room)
+  -- Do nothing if the room has already crashed
+  if room.crashed then
+    return
+  end
+
+  -- How many uses this machine has left until it explodes
+  local threshold = self:getRemainingUses()
+
+  -- If now exploding, clear any smoke
+  if threshold < 1 then
+    setSmoke(self, false)
+  -- Else if urgent repair needed
+  elseif threshold < 4 then
+    -- Display smoke, up to three animations per machine
+    -- i.e. < 4 one plume, < 3 two plumes or < 2 three plumes of smoke
+    setSmoke(self, true)
+    -- turn on additional layers of the animation for extra smoke plumes, depending on how damaged the machine is
+    if threshold < 3 then
+      self.smokeInfo:setLayer(11, 2)
+    end
+    if threshold < 2 then
+      self.smokeInfo:setLayer(12, 2)
     end
   end
 end
@@ -129,50 +209,68 @@ function Machine:createHandymanActions(handyman)
   self.repairing = handyman
   self:setRepairingMode()
 
-  local --[[persistable:handyman_repair_after_use]] function after_use()
+  local --[[persistable:handyman_repair_after_use]] function repair_after_use()
     handyman:setCallCompleted()
-    handyman:setDynamicInfoText("") 
+    handyman:setDynamicInfoText("")
     self:machineRepaired(self:getRoom())
   end
-  local action = {name = "walk", x = ux, y = uy, is_entering = this_room and true or false}
-  local repair_action = {
-    name = "use_object",
-    object = self,
-    prolonged_usage = false,
-    loop_callback = --[[persistable:handyman_repair_loop_callback]] function()
-      action_use.prolonged_usage = false
-    end,
-    after_use = after_use,
-    min_length = 20,
-  }
+
+  local action = WalkAction(ux, uy):setIsEntering(this_room and true or false)
+
+  local repair_action = UseObjectAction(self):setProlongedUsage(false)
+      :setAfterUse(repair_after_use)
+  repair_action.min_length = 20
+
   if handyman_room and handyman_room ~= this_room then
     handyman:setNextAction(handyman_room:createLeaveAction())
     handyman:queueAction(action)
   else
     handyman:setNextAction(action)
   end
+
+  local meander_loop_callback = --[[persistable:handyman_meander_repair_loop_callback]] function()
+    if not self.user then
+      -- The machine is ready to be repaired.
+      -- The following statement will finish the meander action in the handyman's
+      -- action queue.
+      handyman:finishAction()
+    end
+    -- Otherwise do nothing and let the meandering continue.
+  end
+
   -- Before the actual repair action, insert a meander action to wait for the machine
   -- to become free for use.
-  handyman:queueAction({
-    name = "meander",
-    loop_callback = --[[persistable:handyman_meander_repair_loop_callback]] function()
-      if not self.user then
-        -- The machine is ready to be repaired.
-        -- The following statement will finish the meander action in the handyman's 
-        -- action queue.
-        handyman:finishAction()
-      end
-      -- Otherwise do nothing and let the meandering continue.
-    end,
-  })
-  -- The last one is another walk action to the repair tile. If the handymand goes directly
+  handyman:queueAction(MeanderAction():setLoopCallback(meander_loop_callback))
+
+  -- The last one is another walk action to the repair tile. If the handyman goes directly
   -- to repair it will simply complete in an instant.
   handyman:queueAction(action)
   handyman:queueAction(repair_action)
   CallsDispatcher.queueCallCheckpointAction(handyman)
-  handyman:queueAction{name = "answer_call"}
+  handyman:queueAction(AnswerCallAction())
   handyman:setDynamicInfoText(_S.dynamic_info.staff.actions.going_to_repair
     :format(self.object_type.name))
+end
+
+--! Replace this machine (make it pretend it's brand new)
+function Machine:machineReplaced()
+  -- Reset usage stats
+  self.total_usage = 0
+  self.times_used = 0
+
+  -- Update strength to match the current level of research for it
+  self.strength = self.hospital.research.research_progress[self.object_type].start_strength
+
+  -- Remove any queued repair jobs
+  local index = self.hospital:getIndexOfTask(self.tile_x, self.tile_y, "repairing")
+  if index ~= -1 then
+    self.hospital:removeHandymanTask(index, "repairing")
+  end
+
+  -- Clear icon showing handyman is coming to repair the machine
+  self:setRepairing(nil)
+  -- Clear smoke
+  setSmoke(self, false)
 end
 
 function Machine:machineRepaired(room)
@@ -183,6 +281,7 @@ function Machine:machineRepaired(room)
   end
   self.times_used = 0
   self:setRepairing(nil)
+  setSmoke(self, false)
 
   local taskIndex = self.hospital:getIndexOfTask(self.tile_x, self.tile_y, "repairing")
   self.hospital:removeHandymanTask(taskIndex, "repairing")
@@ -246,7 +345,7 @@ function Machine:updateDynamicInfo(only_update)
   end
   if self.strength then
     self:setDynamicInfo("text", {
-      self.object_type.name, 
+      self.object_type.name,
       _S.dynamic_info.object.strength:format(self.strength),
       _S.dynamic_info.object.times_used:format(self.times_used),
     })
@@ -272,6 +371,10 @@ function Machine:onDestroy()
   if index ~= -1 then
     self.hospital:removeHandymanTask(index, "repairing")
   end
+
+  -- Stop this machine from smoking
+  setSmoke(self, false)
+
   Object.onDestroy(self)
 end
 
@@ -293,3 +396,16 @@ function Machine:afterLoad(old, new)
   end
   return Object.afterLoad(self, old, new)
 end
+
+function Machine:tick()
+  -- Tick any smoke animation
+  if self.smokeInfo then
+    self.smokeInfo:tick()
+  end
+
+  return Object.tick(self)
+end
+
+-- Dummy callbacks for savegame compatibility
+local callbackNewRoom = --[[persistable:machine_build_callback]] function(room) end
+local repair_loop_callback = --[[persistable:handyman_repair_loop_callback]] function() end

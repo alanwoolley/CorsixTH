@@ -1,4 +1,4 @@
---[[ Copyright (c) 2009 Manuel König
+--[[ Copyright (c) 2009 Manuel KÃ¶nig
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of
 this software and associated documentation files (the "Software"), to deal in
@@ -44,7 +44,7 @@ object.usage_animations = copy_north_to_south {
       Doctor =  {4878, object_visible = true}
     },
   },
-} 
+}
 object.orientations = {
   north = {
     footprint = { {-1, -1}, {0, -1}, {1, -1}, {-1, 0}, {0, 0, only_passable = true}, {1, 0} },
@@ -57,6 +57,9 @@ object.orientations = {
 }
 
 class "AtomAnalyser" (Object)
+
+---@type AtomAnalyser
+local AtomAnalyser = _G["AtomAnalyser"]
 
 function AtomAnalyser:AtomAnalyser(...)
   self:Object(...)

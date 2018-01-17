@@ -21,12 +21,15 @@ SOFTWARE. --]]
 --! Small fax notification window which sits on the bottom bar.
 class "UIMessage" (Window)
 
+---@type UIMessage
+local UIMessage = _G["UIMessage"]
+
 function UIMessage:UIMessage(ui, x, stop_x, onClose, type, message, owner, timeout, default_choice, callback)
   self:Window()
-  
+
   local app = ui.app
   ui:playSound("NewFax.wav")
-  
+
   self.esc_closes = false
   self.on_top = false
   self.onClose = onClose
@@ -57,17 +60,17 @@ function UIMessage:UIMessage(ui, x, stop_x, onClose, type, message, owner, timeo
   self.y = 4
   self.panel_sprites = app.gfx:loadSpriteTable("Data", "Panel02V", true)
   self.type = type
-  
+
   local types = { emergency = 43, epidemy = 45, strike = 47, personality = 49, information = 51, disease = 53, report = 55 }
-  local type = types[type]
-  
+  local kind = types[type]
+
   self.can_dismiss = self.type ~= "strike" and #self.message.choices == 1
-  
-  self.button = self:addPanel(type, 0, 0)
+
+  self.button = self:addPanel(kind, 0, 0)
     :setTooltip(self.can_dismiss and _S.tooltip.message.button_dismiss or _S.tooltip.message.button) -- FIXME: tooltip doesn't work very well here
-    :makeToggleButton(0, 0, 30, 28, type + 1, self.openMessage, nil, self.dismissMessage)
+    :makeToggleButton(0, 0, 30, 28, kind + 1, self.openMessage, nil, self.dismissMessage)
   -- The emergency has a rotating siren
-  if type == 43 then
+  if kind == 43 then
     self.rotator = {}
     for i = 57, 60 do
       self.rotator[i] = self:addPanel(i, 10, 8)
@@ -95,13 +98,19 @@ end
 
 -- Adjust the toggle state to match if the message is open or not
 function UIMessage:adjustToggle()
-  if self.button.toggled and not self.fax
-  or not self.button.toggled and self.fax then
+  if (self.button.toggled and not self.fax) or
+      (not self.button.toggled and self.fax) then
     self.button:toggle()
   end
 end
 
 function UIMessage:openMessage()
+  if TheApp.world:isCurrentSpeed("Speed Up") then
+    TheApp.world:previousSpeed()
+  end
+  if not TheApp.world:isCurrentSpeed("Pause") then
+    TheApp.world:setSpeed("Pause")
+  end
   if self.type == "strike" then -- strikes are special cases, as they are not faxes
     self.ui:addWindow(UIStaffRise(self.ui, self.owner, self.message))
     self:removeMessage()
@@ -116,6 +125,7 @@ function UIMessage:openMessage()
     -- Manual adjustion of toggle state is necessary if owner's message_callback was used
     self:adjustToggle()
   end
+  TheApp.video:setBlueFilterActive(false)
 end
 
 -- Removes the Message, executing a choice if given, else just deletes it
@@ -125,7 +135,7 @@ function UIMessage:removeMessage(choice_number)
     if not self.fax then
       self.fax = UIFax(self.ui, self) -- NB: just create, don't add to ui
     end
-    self.fax:choice(self.message.choices[choice_number].choice)
+    self.fax:choice(choice_number)
   else
     if self.fax then
       self.fax:close()

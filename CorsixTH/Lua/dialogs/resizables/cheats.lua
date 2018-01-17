@@ -21,6 +21,9 @@ SOFTWARE. --]]
 --! A dialog for activating cheats
 class "UICheats" (UIResizable)
 
+---@type UICheats
+local UICheats = _G["UICheats"]
+
 local col_bg = {
   red = 154,
   green = 146,
@@ -59,6 +62,8 @@ function UICheats:UICheats(ui)
     {name = "money",          func = self.cheatMoney},
     {name = "all_research",   func = self.cheatResearch},
     {name = "emergency",      func = self.cheatEmergency},
+    {name = "epidemic",       func = self.cheatEpidemic},
+    {name = "toggle_infected", func = self.cheatToggleInfected},
     {name = "vip",            func = self.cheatVip},
     {name = "earthquake",     func = self.cheatEarthquake},
     {name = "create_patient", func = self.cheatPatient},
@@ -66,35 +71,36 @@ function UICheats:UICheats(ui)
     {name = "end_year",       func = self.cheatYear},
     {name = "lose_level",     func = self.cheatLose},
     {name = "win_level",      func = self.cheatWin},
+    {name = "increase_prices", func = self.cheatIncreasePrices},
+    {name = "decrease_prices", func = self.cheatDecreasePrices},
   }
-  
-  
+
+
   self:UIResizable(ui, 300, 200, col_bg)
 
   self.default_button_sound = "selectx.wav"
-  
-  local app = ui.app
+
   self.modal_class = "cheats"
   self.esc_closes = true
   self.resizable = false
   self:setDefaultPosition(0.2, 0.4)
-  
+
   local y = 10
   self:addBevelPanel(20, y, 260, 20, col_caption):setLabel(_S.cheats_window.caption)
     .lowered = true
-  
+
   y = y + 30
   self:addColourPanel(20, y, 260, 40, col_bg.red, col_bg.green, col_bg.blue):setLabel({_S.cheats_window.warning})
-  
+
   y = y + 40
   self.cheated_panel = self:addBevelPanel(20, y, 260, 18, col_cheated_no, col_border, col_border)
-  
+
   local function button_clicked(num)
-    return --[[persistable:cheats_button]] function(self)
-      self:buttonClicked(num)
+    return --[[persistable:cheats_button]] function(window)
+      window:buttonClicked(num)
     end
   end
-  
+
   self.item_panels = {}
   self.item_buttons = {}
 
@@ -106,11 +112,11 @@ function UICheats:UICheats(ui)
       :setTooltip(_S.tooltip.cheats_window.cheats[self.cheats[num].name])
     y = y + 20
   end
-  
+
   y = y + 20
   self:addBevelPanel(20, y, 260, 40, col_bg):setLabel(_S.cheats_window.close)
     :makeButton(0, 0, 260, 40, nil, self.buttonBack):setTooltip(_S.tooltip.cheats_window.close)
-  
+
   y = y + 60
   self:setSize(300, y)
   self:updateCheatedStatus()
@@ -135,7 +141,7 @@ function UICheats:buttonClicked(num)
     end
   else
     -- It was not possible to use this cheat.
-    self.ui:addWindow(UIInformation(self.ui, {_S.information.cheat_not_possible})) 
+    self.ui:addWindow(UIInformation(self.ui, {_S.information.cheat_not_possible}))
   end
 end
 
@@ -155,6 +161,31 @@ end
 function UICheats:cheatEmergency()
   if not self.ui.hospital:createEmergency() then
     self.ui:addWindow(UIInformation(self.ui, {_S.misc.no_heliport}))
+  end
+end
+
+--[[ Creates a new contagious patient in the hospital - potentially an epidemic]]
+function UICheats:cheatEpidemic()
+  self.ui.hospital:spawnContagiousPatient()
+end
+
+--[[ Before an epidemic has been revealed toggle the infected icons
+to easily distinguish the infected patients -- will toggle icons
+for ALL future epidemics you cannot distingush between epidemics
+by disease ]]
+function UICheats:cheatToggleInfected()
+  local hospital = self.ui.hospital
+  if hospital.future_epidemics_pool and #hospital.future_epidemics_pool > 0 then
+    for _, future_epidemic in ipairs(hospital.future_epidemics_pool) do
+      local show_mood = future_epidemic.cheat_always_show_mood
+      future_epidemic.cheat_always_show_mood = not show_mood
+      local mood_action = show_mood and "deactivate" or "activate"
+      for _, patient in ipairs(future_epidemic.infected_patients) do
+        patient:setMood("epidemy4",mood_action)
+      end
+    end
+  else
+    print("Unable to toggle icons - no epidemics in progress that are not revealed")
   end
 end
 
@@ -184,6 +215,30 @@ end
 
 function UICheats:cheatWin()
   self.ui.app.world:winGame(1) -- TODO adjust for multiplayer
+end
+
+function UICheats:cheatIncreasePrices()
+  local hosp = self.ui.app.world.hospitals[1]
+  for _, casebook in pairs(hosp.disease_casebook) do
+    local new_price = casebook.price + 0.5
+    if new_price > 2 then
+      casebook.price = 2
+    else
+      casebook.price = new_price
+    end
+  end
+end
+
+function UICheats:cheatDecreasePrices()
+  local hosp = self.ui.app.world.hospitals[1]
+  for _, casebook in pairs(hosp.disease_casebook) do
+    local new_price = casebook.price - 0.5
+    if new_price < 0.5 then
+      casebook.price = 0.5
+    else
+      casebook.price = new_price
+    end
+  end
 end
 
 function UICheats:buttonBack()

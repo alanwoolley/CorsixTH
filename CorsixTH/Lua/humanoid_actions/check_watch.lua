@@ -17,6 +17,17 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE. --]]
+
+class "CheckWatchAction" (HumanoidAction)
+
+---@type CheckWatchAction
+local CheckWatchAction = _G["CheckWatchAction"]
+
+function CheckWatchAction:CheckWatchAction()
+  self:HumanoidAction("check_watch")
+  self:setMustHappen(true)
+end
+
 local action_check_watch_end = permanent"action_check_watch_end"( function(humanoid)
   humanoid:finishAction()
 end)
@@ -28,7 +39,7 @@ local function action_check_watch_start(action, humanoid)
   else
     humanoid.last_move_direction = "south"
   end
-  
+
   assert(humanoid.check_watch_anim, "Error: watch checking animation for humanoid " .. humanoid.humanoid_class)
   action.must_happen = true
   humanoid:setAnimation(humanoid.check_watch_anim, humanoid.last_move_direction == "east" and 0 or 1)

@@ -29,6 +29,7 @@ disease.cure = _S.diseases.fractured_bones.cure
 disease.cure_price = 450
 disease.emergency_sound = "emerg005.wav"
 disease.emergency_number = 16
+disease.contagious = false
 disease.initPatient = function(patient)
   if not TheApp.config.disable_fractured_bones_females and math.random(1, 2) == 2 then -- The female animation in the cast remover is bad
   -- so by default it is disabled.  They can though be allowed by turning them on in config
@@ -47,7 +48,7 @@ disease.initPatient = function(patient)
     patient:setLayer(2, num1 * 2)
     local num2 = math.random(0, 5) -- The second bandage yes/no
     -- 6 does not exist, a few more arm bandages instead
-    if num2 == 3 then num2 = 4 end 
+    if num2 == 3 then num2 = 4 end
     patient:setLayer(3, num2 * 2)
     -- There needs to be at least one bandage on the patient
     local num3 = math.random(0, 5)
@@ -67,7 +68,7 @@ disease.diagnosis_rooms = {
 disease.treatment_rooms = {
   "fracture_clinic",
 }
- 
+
 -- If a machine is required a small icon should appear in the drug casebook.
 disease.requires_machine = true
 

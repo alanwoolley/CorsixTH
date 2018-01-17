@@ -21,6 +21,9 @@ SOFTWARE. --]]
 --! Iterface for items within a UI tree control
 class "TreeNode"
 
+---@type TreeNode
+local TreeNode = _G["TreeNode"]
+
 function TreeNode:TreeNode()
   self.is_expanded = false
   self.num_visible_descendants = 0
@@ -28,7 +31,7 @@ end
 
 --! Get the number of childrem which the item has
 function TreeNode:getChildCount()
-  error "To be implemented in subclasses"
+  error("To be implemented in subclasses")
 end
 
 --! Query if the item has any children at all.
@@ -41,18 +44,18 @@ end
 --! Get a child of the item.
 --!param idx (integer) An integer between 1 and getChildCount() (inclusive).
 function TreeNode:getChildByIndex(idx)
-  error "To be implemented in subclasses"
+  error("To be implemented in subclasses")
 end
 
 --! Given a child of the item, determine which index it is
 --!param child (TreeNode) A value returned from getChildByIndex()
 function TreeNode:getIndexOfChild(child)
-  error "To be implemented in subclasses"
+  error("To be implemented in subclasses")
 end
 
 --! Get the text to be displayed for the item
 function TreeNode:getLabel()
-  error "To be implemented in subclasses"
+  error("To be implemented in subclasses")
 end
 
 --! Get the item's parent, if it has one
@@ -181,6 +184,9 @@ end
 --! A tree node representing a file (or directory) in the physical file-system.
 class "FileTreeNode" (TreeNode)
 
+---@type FileTreeNode
+local FileTreeNode = _G["FileTreeNode"]
+
 local pathsep = package.config:sub(1, 1)
 
 function FileTreeNode:FileTreeNode(path)
@@ -194,6 +200,62 @@ function FileTreeNode:FileTreeNode(path)
   -- Default sorting is by name
   self.sort_by = "name"
   self.order = "ascending"
+end
+
+function FileTreeNode:isDirectory()
+  return lfs.attributes(self.path, "mode") == "directory"
+end
+
+---
+--@param <file_name_filter> (optional) return the most recently modified child file which has this string in its name.
+--@return nil if no child file is found otherwise return the FileTreedNode for mostly recently modified child file.
+function FileTreeNode:getMostRecentlyModifiedChildFile(file_name_filter)
+  self:checkForChildren()
+  self:reSortChildren("date", "descending")
+  local most_recently_mod_child_dir_file = nil
+  local root_child = nil
+  --A. Search for files matching the file name filter in the root directory and its child directories:
+  for i = 1, self:getChildCount(), 1 do
+    root_child = self:getChildByIndex(i)
+    -- 1. Get the most recently modified child directory file which matches the name filter:
+    if root_child:isDirectory() then
+      local current_child_dir_file = root_child:getMostRecentlyModifiedChildFile(file_name_filter)
+      if current_child_dir_file ~= nil then
+        if most_recently_mod_child_dir_file == nil then
+          most_recently_mod_child_dir_file = current_child_dir_file
+        elseif current_child_dir_file:getLastModification() > most_recently_mod_child_dir_file:getLastModification() then
+          most_recently_mod_child_dir_file = current_child_dir_file
+        end
+      end
+
+    -- Sort always puts directories first so when this else closure is reached in this iterative for loop
+    -- all the sub directories will have been checked:
+    else
+      -- 2. Get the most recently modified root directory file which matches the name filter:
+      local matches_filter = true
+      if(file_name_filter) then
+        matches_filter = string.find(root_child:getLabel(), file_name_filter)
+      end
+      -- End this for loop to begin step B:
+      if matches_filter then
+        break
+      end
+    end
+    root_child = nil
+  end
+  --B. Return the most recently modified file or nil if no file matching the name filter was found:
+  if most_recently_mod_child_dir_file then
+    if root_child then
+      if root_child:getLastModification() > most_recently_mod_child_dir_file:getLastModification() then
+        return root_child
+      end
+    end
+    return most_recently_mod_child_dir_file
+  elseif root_child then
+    return root_child
+  else
+    return nil
+  end
 end
 
 function FileTreeNode:childPath(item)
@@ -276,7 +338,7 @@ end
 --!param sort_by What to sort by. Either "name" or "date".
 --!param order If the ordering should be "ascending" or "descending".
 function FileTreeNode:reSortChildren(sort_by, order)
-  for i, child in ipairs(self.children) do
+  for _, child in ipairs(self.children) do
     if sort_by == "date" then
       child.sort_key = lfs.attributes(child.path, "modification")
       child.sort_by = sort_by
@@ -387,6 +449,9 @@ end
 -- multiple root nodes.
 class "DummyRootNode" (TreeNode)
 
+---@type DummyRootNode
+local DummyRootNode = _G["DummyRootNode"]
+
 --!param roots (array) An array of `TreeNode`s which should be displayed as
 -- root nodes.
 function DummyRootNode:DummyRootNode(roots)
@@ -417,6 +482,9 @@ end
 -- tree of items and select one item from it.
 class "TreeControl" (Window)
 
+---@type TreeControl
+local TreeControl = _G["TreeControl"]
+
 --!param root (TreeNode) The single root node of the tree (use a `DummyRootNode`
 -- here if multiple root nodes are desired).
 --!param x (integer) The X-position, in pixels, where the control should start
@@ -437,7 +505,7 @@ function TreeControl:TreeControl(root, x, y, width, height, col_bg, col_fg, y_of
   self.width = width
   self.height = height
   self.y_offset = y_offset or 0
-  
+
   -- Load the graphical resources
   local gfx = TheApp.gfx
   if not has_font then
@@ -447,7 +515,7 @@ function TreeControl:TreeControl(root, x, y, width, height, col_bg, col_fg, y_of
   end
   self.tree_sprites = gfx:loadSpriteTable("Bitmap", "tree_ctrl", true,
     gfx:loadPalette("Bitmap", "tree_ctrl.pal"))
-    
+
   -- Calculate sizes and counts
   local scrollbar_width = 20
   self.row_height = 14
@@ -537,32 +605,31 @@ end
 
 function TreeControl:onMouseUp(button, x, y)
   local redraw = Window.onMouseUp(self, button, x, y)
-  if button == 4 or button == 5 then
-    -- Scrollwheel
-    self.scrollbar:setXorY(self.scrollbar:getXorY() + (button - 4.5) * 8)
-  else
-    local node, expand = self:hitTestTree(x, y)
-    if self.mouse_down_in_self and node then
-      if expand then
-        if node:hasChildren() then
-          if node:isExpanded() then
-            node:contract()
-          else
-            node:expand()
-          end
-          redraw = true
+  local node, expand = self:hitTestTree(x, y)
+  if self.mouse_down_in_self and node then
+    if expand then
+      if node:hasChildren() then
+        if node:isExpanded() then
+          node:contract()
+        else
+          node:expand()
         end
-      elseif self.selected_node == node and self.select_callback then
-        self.select_callback(node)
-      else
-        self.selected_node = node
-        node:select()
         redraw = true
       end
+    elseif self.selected_node == node and self.select_callback then
+      self.select_callback(node)
+    else
+      self.selected_node = node
+      node:select()
+      redraw = true
     end
-    self.mouse_down_in_self = false
   end
+  self.mouse_down_in_self = false
   return redraw
+end
+
+function TreeControl:onMouseWheel(x, y)
+  self.scrollbar:setXorY(self.scrollbar:getXorY() - y * 8)
 end
 
 function TreeControl:onNumVisibleNodesChange()
@@ -572,11 +639,11 @@ end
 
 function TreeControl:onScroll()
   if self.scrollbar.value > self.first_visible_ordinal then
-    for i = 1, self.scrollbar.value - self.first_visible_ordinal do
+    for _ = 1, self.scrollbar.value - self.first_visible_ordinal do
       self.first_visible_node = self.first_visible_node:getNextVisible()
     end
   elseif self.scrollbar.value < self.first_visible_ordinal then
-    for i = 1, self.first_visible_ordinal - self.scrollbar.value do
+    for _ = 1, self.first_visible_ordinal - self.scrollbar.value do
       self.first_visible_node = self.first_visible_node:getPrevVisible()
     end
   end
@@ -590,18 +657,17 @@ end
 
 function TreeControl:draw(canvas, x, y)
   Window.draw(self, canvas, x, y)
-  x, y = self.x + x, self.y + y + self.y_offset
-  
+  x = x + self.x + self.tree_rect.x
+  y = y + self.y + self.tree_rect.y + self.y_offset
+
   local node = self.first_visible_node
   local num_nodes_drawn = 0
-  local y = y + self.tree_rect.y
-  local x = x + self.tree_rect.x
   while node and num_nodes_drawn < self.num_rows do
     local level = node:getLevel()
     for i = 0, level - 1 do
       self.tree_sprites:draw(canvas, 1, x + i * 14, y)
     end
-    
+
     if node == self.highlighted_node then
       local offset = (level + 1) * 14
       local colour = node:getHighlightColour(canvas) or self.scrollbar.slider.colour
@@ -612,7 +678,7 @@ function TreeControl:draw(canvas, x, y)
       local colour = node:getSelectColour(canvas) or self.scrollbar.slider.colour
       canvas:drawRect(colour, x + offset - 1, y, self.tree_rect.w - offset - 1, self.row_height)
     end
-    
+
     local icon
     if not node:hasChildren() then
       icon = 2

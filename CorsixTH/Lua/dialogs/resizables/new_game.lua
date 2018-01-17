@@ -21,16 +21,13 @@ SOFTWARE. --]]
 --! Class for the difficulty choice window.
 class "UINewGame" (UIResizable)
 
+---@type UINewGame
+local UINewGame = _G["UINewGame"]
+
 local col_bg = {
   red = 154,
   green = 146,
   blue = 198,
-}
-
-local col_button = {
-  red = 84,
-  green = 180,
-  blue = 84,
 }
 
 local col_caption = {
@@ -59,14 +56,14 @@ local col_shadow = {
 
 function UINewGame:UINewGame(ui)
   self:UIResizable(ui, 320, 220, col_bg)
-  
+
   local app = ui.app
   self.esc_closes = true
   self.resizable = false
   self.modal_class = "main menu"
   self.on_top = true
   self:setDefaultPosition(0.5, 0.25)
-  
+
   if TheApp.using_demo_files then
     -- We're using the demo version of TH. Load directly and activate the tutorial.
     -- Those who use the demo files probably want that anyway.
@@ -79,8 +76,8 @@ function UINewGame:UINewGame(ui)
   self.border_sprites = app.gfx:loadSpriteTable("Bitmap", "aux_ui", true)
   self.start_tutorial = false
   self.difficulty = 1
-  
-  
+
+
   local avail_diff = {
     {text = _S.new_game_window.medium, tooltip = _S.tooltip.new_game_window.medium, param = "full"},
   }
@@ -162,11 +159,10 @@ function UINewGame:hitTest(x, y)
   if (0 <= x and x < self.width) or (0 <= y and y < self.height) then
     return true
   end
-  local test = sprites.hitTest
-  return test(sprites, 10, x + 9, y + 9)
-      or test(sprites, 12, x - 160, y + 9)
-      or test(sprites, 15, x + 9, y - 240)
-      or test(sprites, 17, x - 160, y - 240)
+  return sprites.hitTest(sprites, 10, x + 9,   y + 9) or
+         sprites.hitTest(sprites, 12, x - 160, y + 9) or
+         sprites.hitTest(sprites, 15, x + 9,   y - 240) or
+         sprites.hitTest(sprites, 17, x - 160, y - 240)
 end
 
 function UINewGame:buttonTutorial(checked, button)
@@ -198,6 +194,10 @@ end
 
 function UINewGame:startGame(difficulty)
   self.ui.app:loadLevel(1, difficulty)
+  -- Initiate campaign progression. The UI above may now have changed.
+  if TheApp.world and not TheApp.using_demo_files then
+    TheApp.world.campaign = "TH.campaign"
+  end
   if self.start_tutorial then
     TheApp.ui.start_tutorial = true
     TheApp.ui:startTutorial()

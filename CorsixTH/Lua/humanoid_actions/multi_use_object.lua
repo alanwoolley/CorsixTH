@@ -18,7 +18,59 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE. --]]
 
+class "MultiUseObjectAction" (HumanoidAction)
+
+---@type MultiUseObjectAction
+local MultiUseObjectAction = _G["MultiUseObjectAction"]
+
+--! Construct a multi-use object action.
+--!param object (Object) Object being used.
+--!param use_with (Humanoid) Fellow user of the object.
+function MultiUseObjectAction:MultiUseObjectAction(object, use_with)
+  assert(class.is(object, Object), "Invalid value for parameter 'object'")
+  assert(class.is(use_with, Humanoid), "Invalid value for parameter 'use_with'")
+
+  self:HumanoidAction("multi_use_object")
+  self.object = object
+  self.use_with = use_with
+  self.prolonged_usage = nil -- If true, the usage is prolonged.
+  self.layer3 = nil
+end
+
+--! Set the invisibility span.
+--!param span (array) Span of invisibility, {from, to}
+--!return (action) self, for daisy-chaining.
+function MultiUseObjectAction:setInvisiblePhaseSpan(span)
+  assert(type(span) == "table" and type(span[1]) == "number" and
+      type(span[2] == "number") and span[1] <= span[2],
+      "Invalid value for parameter 'span'")
+
+  self.invisible_phase_span = span
+  return self
+end
+
+--! Set prolonged usage of the object.
+--!param prolonged (bool) If set, enable prolonged usage of the object.
+--!return (action) self, for daisy-chaining.
+function MultiUseObjectAction:setProlongedUsage(prolonged)
+  assert(type(prolonged), "boolean", "Invalid value for parameter 'prolonged'")
+
+  self.prolonged_usage = prolonged
+  return self
+end
+
+-- Set animation layer3 to the given value.
+--!param layer3 (int) Value to set for animation layer 3.
+--!return (action) self, for daisy-chaining.
+function MultiUseObjectAction:setLayer3(layer3)
+  assert(type(layer3) == "number", "Invalid value for parameter 'layer3'")
+
+  self.layer3 = layer3
+  return self
+end
+
 local TH = require "TH"
+
 local orient_mirror = {
   north = "west",
   west = "north",
@@ -118,7 +170,7 @@ local function action_multi_use_phase(action, humanoid, phase)
     end
   end
   humanoid:setAnimation(anim, action.mirror_flags)
-  
+
   local offset = object.object_type.orientations
   if offset then
     local tx, ty
@@ -133,7 +185,7 @@ local function action_multi_use_phase(action, humanoid, phase)
   else
     humanoid:setTilePositionSpeed(object.tile_x, object.tile_y, 0, 0)
   end
-  
+
   humanoid.user_of = object
   local length = humanoid.world:getAnimLength(anim)
   local secondary_anim = action.anims.secondary and action.anims.secondary[anim_name]
@@ -246,7 +298,7 @@ action_multi_use_object_tick = permanent"action_multi_use_object_tick"( function
       humanoid:setLayer(3, action.old_layer3_humanoid)
       use_with:setLayer(3, action.old_layer3_use_with)
     end
-    
+
     use_with.th:makeVisible()
     use_with.action_queue[1].on_interrupt = action.idle_interrupt
     use_with.action_queue[1].must_happen = action.idle_must_happen
@@ -288,7 +340,7 @@ local function action_multi_use_object_start(action, humanoid)
     end
   end
   if use_with.action_queue[1].name ~= "idle" then
-    humanoid:queueAction({name = "idle", count = 2}, 0)
+    humanoid:queueAction(IdleAction():setCount(2), 0)
     return
   else
     action.idle_interrupt = use_with.action_queue[1].on_interrupt
@@ -325,7 +377,7 @@ local function action_multi_use_object_start(action, humanoid)
   local anims = object.object_type.multi_usage_animations[anim_set][orient]
   action.anims = anims
   action.mirror_flags = flags
-  
+
   object:setUser(humanoid)
   humanoid.user_of = object
   copy_layers(humanoid, use_with)
@@ -343,7 +395,7 @@ local function action_multi_use_object_start(action, humanoid)
     end
     object.ticks = true
   end
-  
+
   action_multi_use_phase(action, humanoid, action_multi_use_next_phase(action, -100))
 end
 

@@ -18,6 +18,29 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE. --]]
 
+class "PickupAction" (HumanoidAction)
+
+---@type PickupAction
+local PickupAction = _G["PickupAction"]
+
+-- Construct a pick-up action
+--!param ui User interface
+function PickupAction:PickupAction(ui)
+  assert(class.is(ui, UI), "Invalid value for parameter 'ui'")
+
+  self:HumanoidAction("pickup")
+  self.ui = ui
+  self.todo_close = nil
+  self:setMustHappen(true)
+end
+
+function PickupAction:setTodoClose(dialog)
+  assert(class.is(dialog, Window), "Invalid value for parameter 'dialog'")
+
+  self.todo_close = dialog
+  return self
+end
+
 local action_pickup_interrupt = permanent"action_pickup_interrupt"( function(action, humanoid)
   if action.window then
     action.window:close()
@@ -72,7 +95,7 @@ local function action_pickup_start(action, humanoid)
   local ui = action.ui
   action.window = UIPlaceStaff(ui, humanoid, ui.cursor_x, ui.cursor_y)
   ui:addWindow(action.window)
-  ui:playSound "pickup.wav"
+  ui:playSound("pickup.wav")
   ui:setDefaultCursor(ui.grab_cursor)
 end
 

@@ -50,6 +50,9 @@ litter_types[4] = 1900
 
 class "Litter" (Entity)
 
+---@type Litter
+local Litter = _G["Litter"]
+
 function Litter:Litter(world, object_type, x, y, direction, etc)
   local th = TH.animation()
   self:Entity(th)
@@ -59,11 +62,9 @@ function Litter:Litter(world, object_type, x, y, direction, etc)
 end
 
 function Litter:setTile(x, y)
-  local map = self.world.map.th
   Entity.setTile(self, x, y)
   if x then
     self.world:addObjectToTile(self, x, y)
-    map:setCellFlags(x, y, {buildable = false})
   end
 end
 -- Litter is an Entity and not an Object so it does not inherit this method
@@ -81,21 +82,30 @@ function Litter:setLitterType(anim_type, mirrorFlag)
     if anim then
       self:setAnimation(anim, mirrorFlag)
     else
-      error "Unknown litter type"
+      error("Unknown litter type")
     end
     if self:isCleanable() then
-      local hospital = self.world:getLocalPlayerHospital()
+      local hospital = self.world:getHospital(self.tile_x, self.tile_y)
       hospital:addHandymanTask(self, "cleaning", 1, self.tile_x, self.tile_y)
     end
   end
 end
 
-function Litter:getDrawingLayer()
-  return 0
+--! Remove the litter from the world.
+function Litter:remove()
+  assert(self:isCleanable())
+
+  self.world:removeObjectFromTile(self, self.tile_x, self.tile_y)
+
+  local hospital = self.world:getHospital(self.tile_x, self.tile_y)
+  local taskIndex = hospital:getIndexOfTask(self.tile_x, self.tile_y, "cleaning", self)
+  hospital:removeHandymanTask(taskIndex, "cleaning")
+
+  self.world:destroyEntity(self)
 end
 
-function Litter:randomiseLitter()
-  self:setAnimation(litter_types[math.random(1, 4)], math.random(0, 1))
+function Litter:getDrawingLayer()
+  return 0
 end
 
 function Litter:vomitInducing()
@@ -109,7 +119,7 @@ function Litter:vomitInducing()
 end
 
 function Litter:isCleanable()
-  return self:vomitInducing() or self:anyLitter() 
+  return self:vomitInducing() or self:anyLitter()
 end
 
 function Litter:anyLitter()
@@ -134,8 +144,8 @@ function Litter:afterLoad(old, new)
   end
   if old < 54 then
     if not self:isCleanable() then
-      local hospital = self.world:getLocalPlayerHospital()
-      local taskIndex = hospital:getIndexOfTask(self.tile_x, self.tile_y, "cleaning")
+      local hospital = self.world:getHospital(self.tile_x, self.tile_y)
+      local taskIndex = hospital:getIndexOfTask(self.tile_x, self.tile_y, "cleaning", self)
       hospital:removeHandymanTask(taskIndex, "cleaning")
     end
   end

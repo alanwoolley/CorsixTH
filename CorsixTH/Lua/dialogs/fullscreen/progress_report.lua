@@ -18,10 +18,11 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE. --]]
 
-local TH = require "TH"
-
 --! Progress Report fullscreen window (check level goals, competitors and alerts).
 class "UIProgressReport" (UIFullscreen)
+
+---@type UIProgressReport
+local UIProgressReport = _G["UIProgressReport"]
 
 function UIProgressReport:UIProgressReport(ui)
   -- TODO: Refactor this file!
@@ -45,16 +46,16 @@ function UIProgressReport:UIProgressReport(ui)
     self:close()
     return
   end
-  
+
   self.default_button_sound = "selectx.wav"
-  
+
   -- Selected hospital number
   self.selected = 1
 
   -- Add the icons for the criteria
   local x = 263
   local world_goals = world.goals
-  for i, tab in ipairs(world_goals) do
+  for _, tab in ipairs(world_goals) do
     local crit_name = world.level_criteria[tab.criterion].name
     local res_value = world_goals[crit_name].win_value
     world_goals[crit_name].visible = true
@@ -65,7 +66,7 @@ function UIProgressReport:UIProgressReport(ui)
     end
     if world_goals[crit_name].lose_value then
       world_goals[crit_name].red = false
-      
+
       if cur_value < world_goals[crit_name].boundary then
         world_goals[crit_name].red = true
         res_value = world_goals[crit_name].lose_value
@@ -86,18 +87,18 @@ function UIProgressReport:UIProgressReport(ui)
     if res_value then
       local tooltip
       if world.level_criteria[tab.criterion].formats == 2 then
-        tooltip = _S.tooltip.status[crit_name]:format(res_value, cur_value)
+        tooltip = _S.tooltip.status[crit_name]:format(math.floor(res_value), math.floor(cur_value))
       else
-        tooltip = _S.tooltip.status[crit_name]:format(res_value)
+        tooltip = _S.tooltip.status[crit_name]:format(math.floor(res_value))
       end
       self:addPanel(world.level_criteria[tab.criterion].icon, x, 240)
       self:makeTooltip(tooltip, x, 180, x + 30, 180 + 90)
       x = x + 30
     end
   end
-  
+
   self:addPanel(0, 606, 447):makeButton(0, 0, 26, 26, 8, self.close):setTooltip(_S.tooltip.status.close)
-  
+
   -- Own and competitor hospital buttons
   local function btn_handler(num)
     return --[[persistable:progress_report_hospital_button]] function()
@@ -114,16 +115,16 @@ function UIProgressReport:UIProgressReport(ui)
       :setTooltip(tooltip(num))
       :enable(num == 1)
   end
-  
+
   for i = 1, math.min(#world.hospitals, 4) do
     make_hosp_button(i)
   end
-  
+
   self:makeTooltip(_S.tooltip.status.population_chart .. " " .. _S.misc.not_yet_implemented, 433, 64, 578, 179)
   self:makeTooltip(_S.tooltip.status.happiness, 433, 179, 578, 209)
   self:makeTooltip(_S.tooltip.status.thirst, 433, 209, 578, 239)
   self:makeTooltip(_S.tooltip.status.warmth, 433, 239, 578, 270)
-  
+
   self.warning = self:addPanel(7, 252, 295)
   self.warning.visible = false
   -- TODO: 6 gray
@@ -138,21 +139,21 @@ function UIProgressReport:drawMarkers(canvas, x, y)
   local x_min = 455
   local x_max = 551
   local width = x_max - x_min
-  local happiness = self.ui.hospital:getAveragePatientAttribute("happiness")
-  local thirst = 1 - self.ui.hospital:getAveragePatientAttribute("thirst")
-  local warmth = self.ui.hospital:getAveragePatientAttribute("warmth")
-  local world = self.ui.app.world
-
+  local happiness = self.ui.hospital:getAveragePatientAttribute("happiness", 0.5)
+  local thirst = 1 - self.ui.hospital:getAveragePatientAttribute("thirst", 0.5)
+  local warmth = self.ui.hospital:getAveragePatientAttribute("warmth", nil)
   warmth = UIPatient.normaliseWarmth(warmth)
-  self.panel_sprites:draw(canvas, 5, x + x_min + width * happiness, y + 193)
-  self.panel_sprites:draw(canvas, 5, x + x_min + width * thirst, y + 223)
-  self.panel_sprites:draw(canvas, 5, x + x_min + width * warmth, y + 254)
-  
+
+  self.panel_sprites:draw(canvas, 5, math.floor(x + x_min + width * happiness), y + 193)
+  self.panel_sprites:draw(canvas, 5, math.floor(x + x_min + width * thirst), y + 223)
+  self.panel_sprites:draw(canvas, 5, math.floor(x + x_min + width * warmth), y + 254)
+
+  local world = self.ui.app.world
   if world.free_build_mode then
     self.normal_font:drawWrapped(canvas, _S.progress_report.free_build, x + 265, y + 194, 150, "center")
   end
 
-  -- Possibly show warning that it's too cold, too hot, patients not happy 
+  -- Possibly show warning that it's too cold, too hot, patients not happy
   -- or if theres need to build drink machines as folks are thirsty.  Only show one at a time though!
   -- TODO the levels may need adjustment
   local msg = self.ui.hospital.show_progress_screen_warnings
@@ -179,13 +180,12 @@ end
 function UIProgressReport:draw(canvas, x, y)
   self.background:draw(canvas, self.x + x, self.y + y)
   UIFullscreen.draw(self, canvas, x, y)
-  
+
   x, y = self.x + x, self.y + y
-  local app      = self.ui.app
   local hospital = self.ui.hospital
   local world    = hospital.world
   local world_goals = world.goals
-  
+
   -- Names of the players playing
   local ly = 73
   for pnum, player in ipairs(world.hospitals) do
@@ -193,10 +193,10 @@ function UIProgressReport:draw(canvas, x, y)
     font:draw(canvas, player.name:upper(), x + 272, y + ly)
     ly = ly + 25
   end
-  
+
   -- Draw the vertical bars for the winning conditions
   local lx = 270
-  for i, tab in ipairs(world_goals) do
+  for _, tab in ipairs(world_goals) do
     local crit_name = world.level_criteria[tab.criterion].name
     if world_goals[crit_name].visible then
       local sprite_offset = world_goals[crit_name].red and 2 or 0
@@ -208,9 +208,9 @@ function UIProgressReport:draw(canvas, x, y)
       local height
       if world_goals[crit_name].red then
         local lose = world_goals[crit_name].lose_value
-        height = 1 + 49*(1 - ((cur_value - lose)/(world_goals[crit_name].boundary - lose)))
+        height = 1 + 49 * (1 - ((cur_value - lose)/(world_goals[crit_name].boundary - lose)))
       else
-        height = 1 + 49*(cur_value/world_goals[crit_name].win_value)
+        height = 1 + 49 * (cur_value/world_goals[crit_name].win_value)
       end
       if height > 50 then height = 50 end
       local result_y = 0
@@ -224,10 +224,10 @@ function UIProgressReport:draw(canvas, x, y)
   end
 
   self:drawMarkers(canvas, x, y)
-      
-  self.normal_font:draw(canvas, _S.progress_report.header .. " " 
-  .. (world.year + 1999), x + 227, y + 40, 400, 0)
+
+  self.normal_font:draw(canvas, _S.progress_report.header .. " " ..
+      (world.year + 1999), x + 227, y + 40, 400, 0)
   self.small_font:draw(canvas, _S.progress_report.win_criteria:upper(), x + 263, y + 172)
-  self.small_font:draw(canvas, _S.progress_report.percentage_pop:upper() .. " " 
-  .. (hospital.population*100) .. "%", x + 450, y + 65)
+  self.small_font:draw(canvas, _S.progress_report.percentage_pop:upper() .. " " ..
+      (hospital.population * 100) .. "%", x + 450, y + 65)
 end

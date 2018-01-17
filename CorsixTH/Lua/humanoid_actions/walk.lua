@@ -18,13 +18,55 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE. --]]
 
+class "WalkAction" (HumanoidAction)
+
+---@type WalkAction
+local WalkAction = _G["WalkAction"]
+
+--! Action to walk to a given position.
+--!param x (int) X coordinate of the destination tile.
+--!param y (int) Y coordinate of the destination tile.
+function WalkAction:WalkAction(x, y)
+  assert(type(x) == "number", "Invalid value for parameter 'x'")
+  assert(type(y) == "number", "Invalid value for parameter 'y'")
+
+  self:HumanoidAction("walk")
+  self.x = x
+  self.y = y
+  self.truncate_only_on_high_priority = false
+  self.walking_to_vaccinate = false -- Nurse walking with the intention to vaccinate
+  self.is_entering = false -- Whether the walk enters a room.
+end
+
+function WalkAction:truncateOnHighPriority()
+  self.truncate_only_on_high_priority = true
+  return self
+end
+
+--! Nurse is walking with the intention to vaccinate.
+--!return (action) self, for daisy-chaining.
+function WalkAction:enableWalkingToVaccinate()
+  self.walking_to_vaccinate = true
+  return self
+end
+
+--! Set a flag whether the walk enters a room.
+--!param entering (bool) If set or nil, set the flag of entering the room.
+--!return (action) self, for daisy-chaining.
+function WalkAction:setIsEntering(entering)
+  assert(type(entering) == "boolean", "Invalid value for parameter 'entering'")
+
+  self.is_entering = entering
+  return self
+end
+
 local action_walk_interrupt
 action_walk_interrupt = permanent"action_walk_interrupt"( function(action, humanoid, high_priority)
   if action.truncate_only_on_high_priority and not high_priority then
     action.on_interrupt = action_walk_interrupt
     return
   end
-  
+
   -- Truncate the remainder of the path
   for j = #action.path_x, action.path_index + 1, -1 do
     action.path_x[j] = nil
@@ -59,10 +101,17 @@ action_walk_interrupt = permanent"action_walk_interrupt"( function(action, human
     humanoid:setTimer(nil)
     timer_function(humanoid)
   end
+
+  if action.walking_to_vaccinate then
+    local hospital = humanoid.hospital or humanoid.last_hospital
+    local epidemic = hospital.epidemic
+    if epidemic then
+      epidemic:interruptVaccinationActions(humanoid)
+    end
+  end
 end)
 
 local flag_list_bottom = 2048
-local flag_early_list = 1024
 local flag_flip_h = 1
 
 local navigateDoor
@@ -74,7 +123,7 @@ local function action_walk_raw(humanoid, x1, y1, x2, y2, map, timer_fn)
     factor = 2
     quantity = 4
   end
-       
+
   local anims = humanoid.walk_anims
   local world = humanoid.world
   local notify_object = world:getObjectToNotifyOfOccupants(x2, y2)
@@ -134,7 +183,7 @@ local action_walk_tick; action_walk_tick = permanent"action_walk_tick"( function
   local check_doors = not not humanoid.door_anims
   local x1, y1 = path_x[path_index  ], path_y[path_index  ]
   local x2, y2 = path_x[path_index+1], path_y[path_index+1]
-  
+
   if not x2 then
     -- Arrival at final tile
     humanoid:setTilePositionSpeed(x1, y1)
@@ -144,7 +193,7 @@ local action_walk_tick; action_walk_tick = permanent"action_walk_tick"( function
     humanoid:finishAction(action)
     return
   end
-  
+
   -- Make sure that the next tile hasn't somehow become impassable since our
   -- route was determined
   local map = humanoid.world.map.th
@@ -156,9 +205,10 @@ local action_walk_tick; action_walk_tick = permanent"action_walk_tick"( function
   if not recalc_route and flags_here.roomId ~= flags_there.roomId then
     local door = TheApp.objects.door.thob
     local door2 = TheApp.objects.swing_door_right.thob
-    if ((flags_here.thob ~= door and flags_here.thob ~= door2) and (flags_there.thob ~= door 
-    and flags_there.thob ~= door2)) and (not flags_there.room 
-    or map:getCellFlags(path_x[#path_x], path_y[#path_y]).roomId ~= flags_there.roomId) then
+    if flags_here.thob ~= door and flags_here.thob ~= door2 and
+        flags_there.thob ~= door and flags_there.thob ~= door2 and
+        (not flags_there.room or
+          map:getCellFlags(path_x[#path_x], path_y[#path_y]).roomId ~= flags_there.roomId) then
       recalc_route = true
     end
   end
@@ -171,7 +221,7 @@ local action_walk_tick; action_walk_tick = permanent"action_walk_tick"( function
       return action:on_restart(humanoid)
     end
   end
-  
+
   -- on_next_tile_set can be set in the call to action_walk_raw, but it is
   -- then to be called AFTER the next raw walk or tile set, which is why we
   -- remember the previous value and call that, rather than call the new value.
@@ -221,21 +271,20 @@ navigateDoor = function(humanoid, x1, y1, dir)
   local room = door:getRoom()
   local is_entering_room = room and humanoid:getRoom() ~= room
 
-  if class.is(humanoid, Staff) and is_entering_room 
-  and humanoid.humanoid_class ~= "Handyman" then
-    -- A member of staff is entering, but is maybe no longer needed 
+  if class.is(humanoid, Staff) and is_entering_room and
+      humanoid.humanoid_class ~= "Handyman" then
+    -- A member of staff is entering, but is maybe no longer needed
     -- in this room?
     if not room.is_active or not room:staffFitsInRoom(humanoid) then
-      humanoid:queueAction({name = "idle"},0)
+      humanoid:queueAction(IdleAction(), 0)
       humanoid:setTilePositionSpeed(x1, y1)
-      humanoid:setNextAction({name = "idle", count = 10},0)
-      humanoid:queueAction{name = "meander"}
+      humanoid:setNextAction(IdleAction():setCount(10), 0)
+      humanoid:queueAction(MeanderAction())
       return
     end
   end
-  if (door.user)
-  or (door.reserved_for and door.reserved_for ~= humanoid)
-  or (is_entering_room and not room:canHumanoidEnter(humanoid)) then
+  if door.user or (door.reserved_for and door.reserved_for ~= humanoid) or
+      (is_entering_room and not room:canHumanoidEnter(humanoid)) then
     --queueing patients are no longer enroute
     room.humanoids_enroute[humanoid] = nil
     local queue = door.queue
@@ -248,23 +297,14 @@ navigateDoor = function(humanoid, x1, y1, dir)
     end
     humanoid:setTilePositionSpeed(x1, y1)
     local action_index = 0
-    if is_entering_room and queue:size() == 0 and not room:getPatient()
-    and not door.user and not door.reserved_for and humanoid.should_knock_on_doors 
-    and room.room_info.required_staff and not swinging then
-      humanoid:queueAction({
-        name = "knock_door",
-        door = door,
-        direction = dir,
-      }, action_index)
+    if is_entering_room and queue:size() == 0 and not room:getPatient() and
+        not door.user and not door.reserved_for and humanoid.should_knock_on_doors and
+        room.room_info.required_staff and not swinging then
+      humanoid:queueAction(KnockDoorAction(door, dir), action_index)
       action_index = action_index + 1
     end
-    humanoid:queueAction({
-      name = "queue",
-      x = x1,
-      y = y1,
-      queue = queue,
-      reserve_when_done = door,
-    }, action_index)
+    humanoid:queueAction(QueueAction(x1, y1, queue):setIsLeaving(humanoid:isLeaving())
+        :setReserveWhenDone(door), action_index)
     action.must_happen = action.saved_must_happen
     action.reserve_on_resume = door
     return
@@ -272,19 +312,15 @@ navigateDoor = function(humanoid, x1, y1, dir)
   if action.reserve_on_resume then
     assert(action.reserve_on_resume == door)
     action.reserve_on_resume = nil
-  elseif is_entering_room and not action.done_knock and humanoid.should_knock_on_doors  
-  and room.room_info.required_staff and not swinging then
+  elseif is_entering_room and not action.done_knock and humanoid.should_knock_on_doors and
+      room.room_info.required_staff and not swinging then
     humanoid:setTilePositionSpeed(x1, y1)
-    humanoid:queueAction({
-      name = "knock_door",
-      door = door,
-      direction = dir,
-    }, 0)
+    humanoid:queueAction(KnockDoorAction(door, dir), 0)
     action.reserve_on_resume = door
     action.done_knock = true
     return
   end
-  
+
   local to_x, to_y
   local anims = humanoid.door_anims
   if not anims.leaving or not anims.entering then
@@ -329,7 +365,7 @@ navigateDoor = function(humanoid, x1, y1, dir)
   if swinging then
     door:swingDoors(direction, duration)
   end
-  
+
   -- We want to notify the rooms on either side of the door that the humanoid
   -- has entered / left, but we want to do this AFTER the humanoid has gone
   -- through the door (so that their tile position reflects the room which they
@@ -338,21 +374,21 @@ navigateDoor = function(humanoid, x1, y1, dir)
     if action.on_next_tile_set == on_next_tile_set then
       action.on_next_tile_set = nil
     end
-    local room = humanoid.world:getRoom(x1, y1)
-    if room then
-      room:onHumanoidLeave(humanoid)
+    local rm = humanoid.world:getRoom(x1, y1)
+    if rm then
+      rm:onHumanoidLeave(humanoid)
     end
-    room = humanoid.world:getRoom(to_x, to_y)
-    if room then
-      room:onHumanoidEnter(humanoid)
+    rm = humanoid.world:getRoom(to_x, to_y)
+    if rm then
+      rm:onHumanoidEnter(humanoid)
     end
   end
   action.on_next_tile_set = on_next_tile_set
-  
+
   if is_entering_room then
     humanoid.in_room = room
   end
-  
+
   action.path_index = action.path_index + 1
   humanoid:setTimer(duration, action_walk_tick_door)
 end
@@ -387,7 +423,7 @@ local function action_walk_start(action, humanoid)
   if action.reserve_on_resume and not action.todo_interrupt then
     action.reserve_on_resume.reserved_for = humanoid
   end
-  
+
   return action_walk_tick(humanoid)
 end
 

@@ -21,17 +21,19 @@ SOFTWARE. --]]
 --! Base class for 640x480px dialogs (fullscreen in original game resolution).
 class "UIFullscreen" (Window)
 
+---@type UIFullscreen
+local UIFullscreen = _G["UIFullscreen"]
+
 function UIFullscreen:UIFullscreen(ui)
   self:Window()
-  
-  local app = ui.app
+
   self.esc_closes = true
   self.ui = ui
   self.modal_class = "fullscreen"
 
   self.width = 640
   self.height = 480
-  
+
   self:onChangeResolution()
 end
 
@@ -51,7 +53,7 @@ function UIFullscreen:onChangeResolution()
   end
   -- not draggable in actual fullscreen mode
   self.draggable = not not self.border_sprites
-  
+
   local config = self.ui.app.runtime_config.window_position
   if config then
     config = config[self:getSavedWindowPositionName()]
@@ -59,16 +61,16 @@ function UIFullscreen:onChangeResolution()
       return self:setPosition(config.x, config.y)
     end
   end
-  
-  self.x = (app.config.width - self.width) / 2
-  
+
+  self.x = math.floor((app.config.width - self.width) / 2)
+
   -- NB: Bottom panel is 48 pixels high
   if app.config.height > 480 + 48 then
-    self.y = (app.config.height - 48 - self.height) / 2
+    self.y = math.floor((app.config.height - 48 - self.height) / 2)
   elseif app.config.height >= 480 then
     self.y = 0
   else
-    self.y = (app.config.height - self.height) / 2
+    self.y = math.floor((app.config.height - self.height) / 2)
   end
 end
 
@@ -76,20 +78,20 @@ function UIFullscreen:draw(canvas, x, y)
   local sprites = self.border_sprites
   if sprites then
     local draw = sprites.draw
-    local x = self.x + x
-    local y = self.y + y
+    local scr_x = self.x + x
+    local scr_y = self.y + y
     canvas:nonOverlapping(true)
-    draw(sprites, canvas, 10, x - 9, y - 9)
-    draw(sprites, canvas, 12, x + 600, y - 9)
-    draw(sprites, canvas, 15, x - 9, y + 440)
-    draw(sprites, canvas, 17, x + 600, y + 440)
-    for x = x + 40, x + 560, 40 do
-      draw(sprites, canvas, 11, x, y - 9)
-      draw(sprites, canvas, 16, x, y + 480)
+    draw(sprites, canvas, 10, scr_x - 9, scr_y - 9)
+    draw(sprites, canvas, 12, scr_x + 600, scr_y - 9)
+    draw(sprites, canvas, 15, scr_x - 9, scr_y + 440)
+    draw(sprites, canvas, 17, scr_x + 600, scr_y + 440)
+    for loop_x = scr_x + 40, scr_x + 560, 40 do
+      draw(sprites, canvas, 11, loop_x, scr_y - 9)
+      draw(sprites, canvas, 16, loop_x, scr_y + 480)
     end
-    for y = y + 40, y + 400, 40 do
-      draw(sprites, canvas, 13, x - 9, y)
-      draw(sprites, canvas, 14, x + 640, y)
+    for loop_y = scr_y + 40, scr_y + 400, 40 do
+      draw(sprites, canvas, 13, scr_x - 9, loop_y)
+      draw(sprites, canvas, 14, scr_x + 640, loop_y)
     end
     canvas:nonOverlapping(false)
   end
@@ -99,7 +101,7 @@ end
 function UIFullscreen:onMouseDown(button, x, y)
   local repaint = Window.onMouseDown(self, button, x, y)
   if button == "left" and not repaint and not (x >= 0 and y >= 0 and
-  x < self.width and y < self.height) and self:hitTest(x, y) then
+      x < self.width and y < self.height) and self:hitTest(x, y) then
     return self:beginDrag(x, y)
   end
   return repaint
@@ -119,11 +121,11 @@ function UIFullscreen:hitTest(x, y)
   if (0 <= x and x < self.width) or (0 <= y and y < self.height) then
     return true
   end
-  local test = sprites.hitTest
-  return test(sprites, 10, x + 9, y + 9)
-      or test(sprites, 12, x - 600, y + 9)
-      or test(sprites, 15, x + 9, y - 440)
-      or test(sprites, 17, x - 600, y - 440)
+
+  return sprites.hitTest(sprites, 10, x + 9,   y + 9) or
+         sprites.hitTest(sprites, 12, x - 600, y + 9) or
+         sprites.hitTest(sprites, 15, x + 9,   y - 440) or
+         sprites.hitTest(sprites, 17, x - 600, y - 440)
 end
 
 function UIFullscreen:afterLoad(old, new)

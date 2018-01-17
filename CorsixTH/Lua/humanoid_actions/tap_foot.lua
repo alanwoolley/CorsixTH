@@ -17,10 +17,20 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE. --]]
+
+class "TapFootAction" (HumanoidAction)
+
+---@type TapFootAction
+local TapFootAction = _G["TapFootAction"]
+
+function TapFootAction:TapFootAction()
+  self:HumanoidAction("tap_foot")
+  self:setMustHappen(true)
+end
+
 local action_tap_foot_end = permanent"action_tap_foot_end"( function(humanoid)
   humanoid:finishAction()
 end)
-
 
 local function action_tap_foot_start(action, humanoid)
   if math.random(0, 1) == 1 then
@@ -28,7 +38,7 @@ local function action_tap_foot_start(action, humanoid)
   else
     humanoid.last_move_direction = "south"
   end
-  
+
   assert(humanoid.tap_foot_anim, "Error: foot tapping animation for humanoid " .. humanoid.humanoid_class)
   action.must_happen = true
   humanoid:setAnimation(humanoid.tap_foot_anim, humanoid.last_move_direction == "east" and 0 or 1)

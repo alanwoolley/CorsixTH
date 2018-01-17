@@ -20,7 +20,6 @@ SOFTWARE. --]]
 
 local TH = require "TH"
 local lpeg = require "lpeg"
-local type = type
 local _unwrap = TH.stringProxy._unwrap
 
 function TH.stringProxy.gsub(str, patt, repl)
@@ -66,13 +65,11 @@ local format_pattern = lpeg.Cs(
         args.idx = idx
         local arg, proxy_found = _unwrap(args[idx])
         local t = type(arg)
-        if key == "%d" and t == "number"
-        -- NB: Numbers are allowed for %s as well to allow concatenation with number.
-        -- TODO the third check should really be class.is(arg, TH.stringProxy), but
-        -- it doesn't currently work due to TH.stringProxy overriding __index
-        or key == "%s" and (t == "string"
-                         or t == "number"
-                         or t == "userdata") then
+        if (key == "%d" and t == "number") or
+            -- NB: Numbers are allowed for %s as well to allow concatenation with number.
+            -- TODO the third check should really be class.is(arg, TH.stringProxy), but
+            -- it doesn't currently work due to TH.stringProxy overriding __index
+            (key == "%s" and (t == "string" or t == "number" or t == "userdata")) then
           if proxy_found then
             args.proxy_found = true
           end
@@ -110,7 +107,7 @@ local format_pattern = lpeg.Cs(
 --! NB: %s and %d are only replaced if none of the new keywords (%[num]% and %[num]:[tab]%) are present.
 --! NB: Always escape percent sign (i.e. use %% instead of %) in strings with formatting keywords! Failure
 --!     to do so can cause unwanted behavior.
---! 
+--!
 --! Keywords:
 --!  %s, %d        : replaced with the n-th parameter, if the type matches (%s = string, %d = number).
 --!  %%            : replaced by single percent sign "%". Needed for escaping.
@@ -147,6 +144,6 @@ function TH.stringProxy.sub(str, ...)
   return result
 end
 
-for _, method_name in ipairs{"gsub", "format", "find", "sub"} do
-  permanent("TH.stringProxy.".. method_name, TH.stringProxy[method_name])
+for _, method_name in ipairs({"gsub", "format", "find", "sub"}) do
+  permanent("TH.stringProxy." .. method_name, TH.stringProxy[method_name])
 end

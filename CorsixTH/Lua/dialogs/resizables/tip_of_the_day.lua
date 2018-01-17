@@ -21,6 +21,9 @@ SOFTWARE. --]]
 --! Tip of the Day Window
 class "UITipOfTheDay" (UIResizable)
 
+---@type UITipOfTheDay
+local UITipOfTheDay = _G["UITipOfTheDay"]
+
 local col_bg = {
   red = math.random(20, 200),
   green = math.random(20, 200),
@@ -29,13 +32,13 @@ local col_bg = {
 
 function UITipOfTheDay:UITipOfTheDay(ui)
   self:UIResizable(ui, 380, 110, col_bg)
-  
+
   local app = ui.app
   self.ui = ui
   self.resizable = false
   self:setDefaultPosition(-20, -20)
   self.white_font = app.gfx:loadFont("QData", "Font01V")
-  
+
   self.num_tips = #_S.totd_window.tips
   if self.num_tips == 0 then
     -- NB: #_S.totd_window.tips == 0, which implies something went wrong with
@@ -45,7 +48,7 @@ function UITipOfTheDay:UITipOfTheDay(ui)
     return
   end
   self.tip_num = math.random(1, self.num_tips)
-  
+
   self:addBevelPanel(10, self.height - 30, self.width / 2 - 20, 20, col_bg):setLabel(_S.totd_window.previous)
     :makeButton(0, 0, self.width / 2 - 20, 20, nil, self.buttonPrev):setTooltip(_S.tooltip.totd_window.previous)
   self:addBevelPanel(self.width / 2 + 10, self.height - 30, self.width / 2 - 20, 20, col_bg):setLabel(_S.totd_window.next)

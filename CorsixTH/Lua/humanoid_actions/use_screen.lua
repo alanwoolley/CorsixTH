@@ -18,6 +18,23 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE. --]]
 
+class "UseScreenAction" (HumanoidAction)
+
+---@type UseScreenAction
+local UseScreenAction = _G["UseScreenAction"]
+
+--! Action to use the screen.
+--!param screen (object) Screen to use.
+function UseScreenAction:UseScreenAction(screen)
+  assert(class.is(screen, Object) and (
+      screen.object_type.id == "screen" or
+      screen.object_type.id == "surgeon_screen"),
+      "Invalid value for parameter 'screen'")
+
+  self:HumanoidAction("use_screen")
+  self.object = screen
+end
+
 local finish = permanent"action_use_screen_finish"( function(humanoid)
   local screen = humanoid.user_of
   humanoid.user_of = nil
@@ -112,7 +129,7 @@ local function action_use_screen_start(action, humanoid)
     anim, when_done = 1052, normal_state
   elseif class == "Stripped Female Patient 3" then
     humanoid:setType "Standard Female Patient"
-    anim, when_done = 2844, normal_state    
+    anim, when_done = 2844, normal_state
   elseif class == "Gowned Male Patient" then
     humanoid:setType "Standard Male Patient"
     anim, when_done = 4768, finish
@@ -132,7 +149,7 @@ local function action_use_screen_start(action, humanoid)
         anim, when_done = 1048, patient_clothes_state
       else
         humanoid:setType "Stripped Male Patient 3"
-        anim, when_done = 1048, patient_clothes_state      
+        anim, when_done = 1048, patient_clothes_state
       end
     end
   elseif class == "Standard Female Patient" then
@@ -148,7 +165,7 @@ local function action_use_screen_start(action, humanoid)
         anim, when_done = 2848, patient_clothes_state
       else
         humanoid:setType "Stripped Female Patient 3"
-        anim, when_done = 2848, patient_clothes_state      
+        anim, when_done = 2848, patient_clothes_state
       end
     end
   elseif class == "Doctor" then
@@ -182,7 +199,7 @@ local function action_use_screen_start(action, humanoid)
   else
     error(class .. " trying to use screen")
   end
-  
+
   humanoid:setAnimation(anim)
   local mood_info = humanoid.mood_info
   humanoid.mood_info = nil -- Do not move mood_info
@@ -192,11 +209,11 @@ local function action_use_screen_start(action, humanoid)
   humanoid.mood_info = mood_info
   humanoid:setSpeed(0, 0)
   humanoid:setTimer(humanoid.world:getAnimLength(anim), when_done)
-  
+
   screen:setUser(humanoid)
   humanoid.user_of = screen
   action.must_happen = true
-  
+
   if action.todo_interrupt == "high" then
     humanoid:setTimer(nil)
     when_done(humanoid)

@@ -20,9 +20,12 @@ SOFTWARE. --]]
 
 class "UIMachine" (Window)
 
+---@type UIMachine
+local UIMachine = _G["UIMachine"]
+
 function UIMachine:UIMachine(ui, machine, room)
   self:Window()
-  
+
   local app = ui.app
   self.esc_closes = true
   self.machine = machine
@@ -34,7 +37,7 @@ function UIMachine:UIMachine(ui, machine, room)
   self:setDefaultPosition(-20, 30)
   self.panel_sprites = app.gfx:loadSpriteTable("QData", "Req03V", true)
   self.white_font = app.gfx:loadFont("QData", "Font01V")
-  
+
   self:addPanel(333,    0,   0) -- Dialog header
   self:addPanel(334,    0,  74) -- The next part
   for y = 131, 180, 7 do
@@ -55,7 +58,7 @@ function UIMachine:UIMachine(ui, machine, room)
   -- Close button
   self:addPanel(337, 146,  18):makeButton(0, 0, 24, 24, 338, self.close)
     :setTooltip(_S.tooltip.machine_window.close)
-  
+
   self:makeTooltip(_S.tooltip.machine_window.name, 18, 19, 139, 42)
   self:makeTooltip(_S.tooltip.machine_window.times_used, 18, 49, 139, 77)
   self:makeTooltip(_S.tooltip.machine_window.status, 24, 88, 128, 115)
@@ -65,7 +68,7 @@ function UIMachine:draw(canvas, x, y)
   Window.draw(self, canvas, x, y)
   x, y = self.x + x, self.y + y
   local mach = self.machine
-  
+
   local font = self.white_font
   local output
   if self.room.needs_repair then
@@ -86,13 +89,13 @@ end
 
 function UIMachine:callHandyman()
   if self.machine.times_used ~= 0 then
-    local taskIndex = self.machine.hospital:getIndexOfTask(self.machine.tile_x, self.machine_tile_y, "repairing")
-  if taskIndex == -1 then
-    local call = self.ui.app.world.dispatcher:callForRepair(self.machine, false, true)
-    self.machine.hospital:addHandymanTask(self.machine, "repairing", 2, self.machine.tile_x, self.machine.tile_y, call)
-  else
-    self.machine.hospital:modifyHandymanTaskPriority(taskIndex, 2, "repairing")
-  end
+    local taskIndex = self.machine.hospital:getIndexOfTask(self.machine.tile_x, self.machine.tile_y, "repairing")
+    if taskIndex == -1 then
+      local call = self.ui.app.world.dispatcher:callForRepair(self.machine, false, true)
+      self.machine.hospital:addHandymanTask(self.machine, "repairing", 2, self.machine.tile_x, self.machine.tile_y, call)
+    else
+      self.machine.hospital:modifyHandymanTaskPriority(taskIndex, 2, "repairing")
+    end
   end
 end
 
@@ -103,23 +106,17 @@ function UIMachine:replaceMachine()
   if self.ui.hospital.balance < cost then
     -- give visual warning that player doesn't have enough $ to buy
     self.ui.adviser:say(_A.warnings.cannot_afford_2, false, true)
-    self.ui:playSound "wrong2.wav"
+    self.ui:playSound("wrong2.wav")
     return
   end
-  local strength = hosp.research.research_progress[machine.object_type].start_strength
   self.ui:addWindow(UIConfirmDialog(self.ui,
     _S.confirmation.replace_machine:format(machine.object_type.name, cost),
     --[[persistable:replace_machine_confirm_dialog]]function()
-      
+      -- Charge for new machine
       hosp:spendMoney(cost, _S.transactions.machine_replacement)
-      machine.total_usage = 0
-      machine.times_used = 0
-      self.machine.strength = strength
-    local index = machine.hospital:getIndexOfTask(machine.tile_x, machine.tile_y, "repairing")
-    if index ~= -1 then
-    machine.hospital:removeHandymanTask(index, "repairing")
-    end
-      machine:setRepairing(nil)
+
+      -- Tell the machine to pretend it's a shiny new one
+      machine:machineReplaced()
     end
   ))
 end

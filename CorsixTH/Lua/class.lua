@@ -24,6 +24,9 @@ SOFTWARE. --]]
 -- OR
 --  class "Name" (SuperclassName)
 --
+--  ---@type Name
+--  local Name = _G["Name"]
+--
 --  function Name:Name(arguments)
 --    self:SuperclassName(arguments) -- required when there is a superclass
 --    --(constructor)--
@@ -59,9 +62,7 @@ local setmetatable, getmetatable, type
 
 local function define_class(name, super, adopts_self)
   local mt = {}
-  local methods = {}
-  local methods_mt = {}
-  
+
   local function new_class(methods, ...)
     local constructor = methods[name]
     local self
@@ -74,7 +75,10 @@ local function define_class(name, super, adopts_self)
     end
     return self
   end
-  
+
+  local methods = {}
+  local methods_mt = {}
+
   mt.__index = methods
   setmetatable(methods, methods_mt)
   if super ~= nil then
@@ -82,7 +86,7 @@ local function define_class(name, super, adopts_self)
   end
   methods_mt.__call = new_class
   methods_mt.__class_name = name
-  
+
   _G[name] = methods
 end
 
@@ -91,7 +95,7 @@ class = destrict(function(_, name)
   define_class(name)
   local adopts_self = false
   local super = nil
-  
+
   local function extend(arg)
     if type(arg) == "table" and next(arg) == nil and not getmetatable(arg) then
       -- {} decorator
@@ -99,7 +103,7 @@ class = destrict(function(_, name)
     else
       -- (Superclass) decorator
       if arg == nil then
-        error "Superclass not defined at subclass definition"
+        error("Superclass not defined at subclass definition")
       end
       super = arg
     end

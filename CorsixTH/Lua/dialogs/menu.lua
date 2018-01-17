@@ -25,9 +25,12 @@ local TH = require "TH"
 --! The ingame menu bar which sits (nominally hidden) at the top of the screen.
 class "UIMenuBar" (Window)
 
-function UIMenuBar:UIMenuBar(ui)
+---@type UIMenuBar
+local UIMenuBar = _G["UIMenuBar"]
+
+function UIMenuBar:UIMenuBar(ui, map_editor)
   self:Window()
-  
+
   local app = ui.app
   self.ui = ui
   self.on_top = true
@@ -42,13 +45,17 @@ function UIMenuBar:UIMenuBar(ui)
   -- The list of top-level menus, from left to right
   self.menus = {}
   -- The menu which the cursor was most recently over
-  -- This should be present in self.open_menus, else it wont be drawn
+  -- This should be present in self.open_menus, else it won't be drawn
   self.active_menu = false
   -- The list of menus which should be displayed
   -- This list satifies: open_menus[x] == nil or open_menus[x].level == x
   self.open_menus = {}
-  
-  self:makeMenu(app)
+
+  if map_editor then
+    self:makeMapeditorMenu(app)
+  else
+    self:makeGameMenu(app)
+  end
 end
 
 function UIMenuBar:onTick()
@@ -58,9 +65,9 @@ function UIMenuBar:onTick()
     -- item in its parent corresponding to it.
     local deepest = self.open_menus[#self.open_menus]
     local parent = deepest.parent
-    if deepest == self.active_menu or (parent and parent == self.active_menu
-    and parent.items[parent.hover_index]
-    and parent.items[parent.hover_index].submenu == deepest) then
+    if deepest == self.active_menu or
+        (parent and parent == self.active_menu and parent.items[parent.hover_index] and
+        parent.items[parent.hover_index].submenu == deepest) then
       self.menu_disappear_counter = nil
     else
       if self.menu_disappear_counter == 0 then
@@ -120,9 +127,12 @@ local function assign_menu_levels(menu, level)
   end
 end
 
+--! Add a menu to the menu bar.
+--!param title Title of the menu (at the bar).
+--!param menu Menu to add.
 function UIMenuBar:addMenu(title, menu)
   assign_menu_levels(menu, 1)
-  local menu = {
+  local menu_item = {
     title = title,
     menu = menu,
     x = 0,
@@ -130,10 +140,10 @@ function UIMenuBar:addMenu(title, menu)
     height = 16,
   }
   if self.menus[1] then
-    menu.x = self.menus[#self.menus].x + self.menus[#self.menus].width
+    menu_item.x = self.menus[#self.menus].x + self.menus[#self.menus].width
   end
-  menu.width = self.white_font:sizeOf(title) + 32
-  self.menus[#self.menus + 1] = menu
+  menu_item.width = self.white_font:sizeOf(title) + 32
+  self.menus[#self.menus + 1] = menu_item
 end
 
 function UIMenuBar:draw(canvas)
@@ -160,20 +170,20 @@ function UIMenuBar:draw(canvas)
   panel_sprites_draw(panel_sprites, canvas, 3, x,  0)
   panel_sprites_draw(panel_sprites, canvas, 6, x,  6)
   panel_sprites_draw(panel_sprites, canvas, 9, x, 10)
-  
+
   for _, menu in ipairs(self.menus) do
     self.white_font:draw(canvas, menu.title, menu.x, menu.y, 0, menu.height)
   end
   for _, menu in ipairs(self.open_menus) do
     self:drawMenu(menu, canvas)
   end
-  
+
   -- Draw clock
-  if self.ui.app.config.twentyfour_hour_clock then  
+  if self.ui.app.config.twentyfour_hour_clock then
     self.white_font:draw(canvas, os.date("%H:%M"), self.width-45, 2,  0)
   else
     self.white_font:draw(canvas, os.date("%I:%M %p"), self.width-65, 2,  0)
-  end  
+  end
 end
 
 function UIMenuBar:drawMenu(menu, canvas)
@@ -184,12 +194,12 @@ function UIMenuBar:drawMenu(menu, canvas)
   menu.render_list:draw(canvas, x, y)
   canvas:nonOverlapping(false)
   local btmy = y + h - 6
-  panel_sprites_draw(panel_sprites, canvas, 3, x + w - 10, y)  
-  for y = y + 6, y + h - 6, 4 do
-    panel_sprites_draw(panel_sprites, canvas, 6, x + w - 10, y)
+  panel_sprites_draw(panel_sprites, canvas, 3, x + w - 10, y)
+  for ypos = y + 6, y + h - 6, 4 do
+    panel_sprites_draw(panel_sprites, canvas, 6, x + w - 10, ypos)
   end
   panel_sprites_draw(panel_sprites, canvas, 9, x + w - 10, btmy)
-  
+
   x = menu.x
   y = menu.y + 4
   for i, item in ipairs(menu.items) do
@@ -350,7 +360,7 @@ function UIMenuBar:onMouseDown(button, x, y)
     self.open_menus = {new_active}
     self.active_menu = new_active
     repaint = true
-    self.ui:playSound "selectx.wav"
+    self.ui:playSound("selectx.wav")
   end
   return repaint
 end
@@ -402,7 +412,7 @@ function UIMenuBar:onMouseUp(button, x, y)
         end
         self.active_menu = false
       end
-      self.ui:playSound "selectx.wav"
+      self.ui:playSound("selectx.wav")
       repaint = true
       break
     end
@@ -433,7 +443,7 @@ function UIMenuBar:calculateMenuSize(menu)
     local render_list = TH.spriteList()
     menu.render_list = render_list
     render_list:setSheet(self.panel_sprites)
-    
+
     render_list:append(1, 0, 0)
     for x = 10, w - 10, 10 do
       render_list:append(2, x, 0)
@@ -448,12 +458,15 @@ function UIMenuBar:calculateMenuSize(menu)
     render_list:append(7, 0, btmy)
     for x = 10, w - 10, 10 do
       render_list:append(8, x, btmy)
-    end    
-    
+    end
+
   end
 end
 
 class "UIMenu"
+
+---@type UIMenu
+local UIMenu = _G["UIMenu"]
 
 function UIMenu:UIMenu()
   self.items = {}
@@ -466,8 +479,8 @@ function UIMenu:hitTest(x, y, padding)
   -- number -> hit that item
   -- true   -> hit menu, but not an item
   -- false  -> no hit
-  if self.x - padding <= x and x < self.x + self.width + padding
-  and self.y - padding <= y and y < self.y + self.height + padding then
+  if self.x - padding <= x and x < self.x + self.width + padding and
+      self.y - padding <= y and y < self.y + self.height + padding then
     if self.x <= x and x < self.x + self.width then
       local index = math_floor((y - self.y + 12) / 14)
       if 1 <= index and index <= #self.items then
@@ -512,14 +525,33 @@ function UIMenu:appendMenu(text, menu)
   }
 end
 
-function UIMenuBar:makeMenu(app)
+--! Make a menu for the map editor.
+--!param app Application.
+function UIMenuBar:makeMapeditorMenu(app)
+  local menu = UIMenu()
+  menu:appendItem(_S.menu_file.load, function() self.ui:addWindow(UILoadMap(self.ui, "map")) end)
+    :appendItem(_S.menu_file.save, function() self.ui:addWindow(UISaveMap(self.ui)) end)
+    :appendItem(_S.menu_file.quit, function() self.ui:quit() end)
+  self:addMenu(_S.menu.file, menu)
+
+  menu = UIMenu()
+  menu:appendItem(_S.menu_player_count.players_1, function() self.ui.map_editor:setPlayerCount(1) end)
+    :appendItem(_S.menu_player_count.players_2, function() self.ui.map_editor:setPlayerCount(2) end)
+    :appendItem(_S.menu_player_count.players_3, function() self.ui.map_editor:setPlayerCount(3) end)
+    :appendItem(_S.menu_player_count.players_4, function() self.ui.map_editor:setPlayerCount(4) end)
+  self:addMenu(_S.menu.player_count, menu)
+end
+
+--! Make a menu for the game.
+--!param app Application.
+function UIMenuBar:makeGameMenu(app)
   local menu = UIMenu()
   menu:appendItem(_S.menu_file.load, function() self.ui:addWindow(UILoadGame(self.ui, "game")) end)
     :appendItem(_S.menu_file.save, function() self.ui:addWindow(UISaveGame(self.ui)) end)
     :appendItem(_S.menu_file.restart, function() app:restart() end)
     :appendItem(_S.menu_file.quit, function() self.ui:quit() end)
   self:addMenu(_S.menu.file, menu)
-  
+
   local options = UIMenu()
   if app.audio.has_bg_music then
     local function vol(level, setting)
@@ -546,61 +578,57 @@ function UIMenuBar:makeMenu(app)
           ""
       end
     end
-    
+
     local function appendVolume(setting)
-      local menu = UIMenu() -- The three Volume menus
+      local volume_menu = UIMenu() -- The three Volume menus
       for level = 10, 100, 10 do
-        menu:appendCheckItem(_S.menu_options_volume[level],  vol(level / 100, setting))
+        volume_menu:appendCheckItem(_S.menu_options_volume[level], vol(level / 100, setting))
       end
-      return menu
+      return volume_menu
     end
-    
+
   options:appendCheckItem(_S.menu_options.sound,
     app.config.play_sounds,
-    function(item) 
-      app.audio:playSoundEffects(item.checked) 
+    function(item)
+      app.audio:playSoundEffects(item.checked)
       app:saveConfig()
     end,
     nil,
-    function() 
-      return app.config.play_sounds 
+    function()
+      return app.config.play_sounds
     end)
-     
-    
+
+
   options:appendCheckItem(_S.menu_options.announcements,
-    app.config.play_announcements, 
-    function(item)  
-      app.config.play_announcements = item.checked 
-      app:saveConfig()   
+    app.config.play_announcements,
+    function(item)
+      app.config.play_announcements = item.checked
+      app:saveConfig()
     end,
     nil,
-    function() 
-      return app.config.play_announcements 
+    function()
+      return app.config.play_announcements
     end)
-    
-  local function musicStatus(item)
-    return not not app.audio.background_music and not app.audio.background_paused
-  end 
-    
+
  options:appendCheckItem(_S.menu_options.music,
-    app.config.play_music, 
+    app.config.play_music,
     function(item)
       app.config.play_music = item.checked
       self.ui:togglePlayMusic(item)
-      app:saveConfig()    
+      app:saveConfig()
     end,
     nil,
-    function(musicStatus) 
-      return app.config.play_music 
-    end) 
-    
-    options    
+    function(musicStatus)
+      return app.config.play_music
+    end)
+
+  options
     :appendMenu(_S.menu_options.sound_vol,         appendVolume("sound"))
     :appendMenu(_S.menu_options.announcements_vol, appendVolume("announcement"))
-    :appendMenu(_S.menu_options.music_vol,         appendVolume("music"))    
+    :appendMenu(_S.menu_options.music_vol,         appendVolume("music"))
     :appendItem(_S.menu_options.jukebox, function() self.ui:addWindow(UIJukebox(app)) end)
   end
-  
+
   local function boolean_runtime_config(option)
     return not not app.runtime_config[option], function(item)
       app.runtime_config[option] = item.checked
@@ -613,35 +641,35 @@ function UIMenuBar:makeMenu(app)
     function(item) app.config.prevent_edge_scrolling = not item.checked end,
     nil,
     function() return not app.config.prevent_edge_scrolling end)
-       
-  options:appendCheckItem(_S.menu_options.adviser_disabled, 
+
+  options:appendCheckItem(_S.menu_options.adviser_disabled,
     not app.config.adviser_disabled,
-    function(item) 
+    function(item)
       app.config.adviser_disabled = not item.checked
-      app:saveConfig() 
+      app:saveConfig()
     end,
     nil,
-    function() 
+    function()
       return not app.config.adviser_disabled
     end)
 
-  options:appendCheckItem(_S.menu_options.twentyfour_hour_clock, 
+  options:appendCheckItem(_S.menu_options.twentyfour_hour_clock,
     app.config.twentyfour_hour_clock,
     function(item)
       app.config.twentyfour_hour_clock = item.checked
       app:saveConfig()
     end)
-    
+
   local function temperatureDisplay(method)
     return method == 1, function()
       app.world.map:setTemperatureDisplayMethod(method)
-    end, "", function () 
+    end, "", function ()
       return app.world.map.temperature_display_method == method
-    end      
+    end
   end
 
   local function wageIncreaseRequests(grant)
-    return grant, function() 
+    return grant, function()
       app.world:getLocalPlayerHospital().policies.grant_wage_increase = grant
     end, "", function ()
       if app.world:getLocalPlayerHospital().policies.grant_wage_increase == nil then
@@ -650,18 +678,18 @@ function UIMenuBar:makeMenu(app)
       return app.world:getLocalPlayerHospital().policies.grant_wage_increase == grant
     end
   end
-   
+
   options:appendMenu(_S.menu_options.wage_increase, UIMenu()
     :appendCheckItem(_S.menu_options_wage_increase.grant, wageIncreaseRequests(true))
     :appendCheckItem(_S.menu_options_wage_increase.deny, wageIncreaseRequests(false))
   )
-    
+
   options:appendMenu(_S.menu_options.warmth_colors, UIMenu()
     :appendCheckItem(_S.menu_options_warmth_colors.choice_1, temperatureDisplay(1))
     :appendCheckItem(_S.menu_options_warmth_colors.choice_2, temperatureDisplay(2))
     :appendCheckItem(_S.menu_options_warmth_colors.choice_3, temperatureDisplay(3))
   )
-  
+
   local function rate(speed)
     return speed == "Normal", function()
       app.world:setSpeed(speed)
@@ -669,7 +697,7 @@ function UIMenuBar:makeMenu(app)
       return app.world:isCurrentSpeed(speed)
     end
   end
-  
+
   options:appendMenu(_S.menu_options.game_speed, UIMenu()
     :appendCheckItem(_S.menu_options_game_speed.pause,              rate("Pause"))
     :appendCheckItem(_S.menu_options_game_speed.slowest,            rate("Slowest"))
@@ -700,7 +728,7 @@ function UIMenuBar:makeMenu(app)
   end
   local function overlay(...)
     local args = {n = select('#', ...), ...}
-    return function(item, menu)
+    return function(item, m)
       if args.n > 0 then
         app.map:loadDebugText(unpack(args, 1, args.n))
       else
@@ -722,20 +750,22 @@ function UIMenuBar:makeMenu(app)
   if self.ui.app.config.debug then
     self:addMenu(_S.menu.debug, UIMenu() -- Debug
       :appendMenu(_S.menu_debug.jump_to_level, levels_menu)
+      :appendItem(_S.menu_debug.connect_debugger, function() self.ui:connectDebugger() end)
       :appendCheckItem(_S.menu_debug.limit_camera,         true, limit_camera, nil, function() return self.ui.limit_to_visible_diamond end)
       :appendCheckItem(_S.menu_debug.disable_salary_raise, false, disable_salary_raise, nil, function() return self.ui.app.world.debug_disable_salary_raise end)
       :appendItem(_S.menu_debug.make_debug_fax,     function() self.ui:makeDebugFax() end)
       :appendItem(_S.menu_debug.make_debug_patient, function() self.ui:addWindow(UIMakeDebugPatient(self.ui)) end)
       :appendItem(_S.menu_debug.cheats,             function() self.ui:addWindow(UICheats(self.ui)) end)
       :appendItem(_S.menu_debug.lua_console,        function() self.ui:addWindow(UILuaConsole(self.ui)) end)
+      :appendItem(_S.menu_debug.debug_script,       function() self.ui:runDebugScript() end)
       :appendItem(_S.menu_debug.calls_dispatcher,   function() self.ui:addWindow(UICallsDispatcher(self.ui)) end)
       :appendItem(_S.menu_debug.dump_strings,       function() self.ui.app:dumpStrings() end)
       :appendItem(_S.menu_debug.dump_gamelog,       function() self.ui.app.world:dumpGameLog() end)
       :appendMenu(_S.menu_debug.map_overlay,        UIMenu()
         :appendCheckItem(_S.menu_debug_overlay.none,         true, overlay(), "")
-        :appendCheckItem(_S.menu_debug_overlay.flags,       false, overlay"flags", "")
-        :appendCheckItem(_S.menu_debug_overlay.positions,   false, overlay"positions", "")
-        :appendCheckItem(_S.menu_debug_overlay.heat,        false, overlay"heat", "")
+        :appendCheckItem(_S.menu_debug_overlay.flags,       false, overlay("flags"), "")
+        :appendCheckItem(_S.menu_debug_overlay.positions,   false, overlay("positions"), "")
+        :appendCheckItem(_S.menu_debug_overlay.heat,        false, overlay("heat"), "")
         :appendCheckItem(_S.menu_debug_overlay.byte_0_1,    false, overlay(35, 8, 0, 1, false), "")
         :appendCheckItem(_S.menu_debug_overlay.byte_floor,  false, overlay(35, 8, 2, 2, false), "")
         :appendCheckItem(_S.menu_debug_overlay.byte_n_wall, false, overlay(35, 8, 3, 3, false), "")
@@ -743,7 +773,7 @@ function UIMenuBar:makeMenu(app)
         :appendCheckItem(_S.menu_debug_overlay.byte_5,      false, overlay(35, 8, 5, 5, true), "")
         :appendCheckItem(_S.menu_debug_overlay.byte_6,      false, overlay(35, 8, 6, 6, true), "")
         :appendCheckItem(_S.menu_debug_overlay.byte_7,      false, overlay(35, 8, 7, 7, true), "")
-        :appendCheckItem(_S.menu_debug_overlay.parcel,      false, overlay(131107, 2, 0, 0, false), "")
+        :appendCheckItem(_S.menu_debug_overlay.parcel,      false, overlay("parcel"), "")
       )
       :appendItem(_S.menu_debug.sprite_viewer, function() dofile "sprite_viewer" end)
     )

@@ -19,11 +19,14 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE. --]]
 
 local math_floor = math.floor
-    
+
 --! Staff management screen
 class "UIStaffManagement" (UIFullscreen)
 
-function UIStaffManagement:UIStaffManagement(ui, disease_selection)
+---@type UIStaffManagement
+local UIStaffManagement = _G["UIStaffManagement"]
+
+function UIStaffManagement:UIStaffManagement(ui)
   self:UIFullscreen(ui)
   local gfx = ui.app.gfx
   if not pcall(function()
@@ -38,19 +41,19 @@ function UIStaffManagement:UIStaffManagement(ui, disease_selection)
     self:close()
     return
   end
-  
+
   local hosp = ui.hospital
   self.ui = ui
   self.hospital = hosp
-  
+
   -- Order the staff
   self:updateStaffList()
-  
+
   self.default_button_sound = "selectx.wav"
-  
+
   -- Close button
   self:addPanel(0, 603, 443):makeButton(0, 0, 26, 26, 10, self.close):setTooltip(_S.tooltip.staff_list.close)
-  
+
   -- Top categories
   local --[[persistable:staff_management_category]] function category(name, state, btn)
     self:setCategory(name)
@@ -67,16 +70,16 @@ function UIStaffManagement:UIStaffManagement(ui, disease_selection)
   self:addPanel(0, 319, 372):makeButton(0, 0, 112, 39, 7, self.payBonus):setTooltip(_S.tooltip.staff_list.bonus)
   self:addPanel(0, 319, 418):makeButton(0, 0, 112, 39, 8, self.increaseSalary):setTooltip(_S.tooltip.staff_list.pay_rise)
   self:addPanel(0, 438, 372):makeButton(0, 0, 45, 85, 9, self.fire):setTooltip(_S.tooltip.staff_list.sack)
-  
+
   -- "Arrow" to show title of doctors
   self.arrow = self:addPanel(12, 259, 397)
   self.arrow_position = 259
   self.arrow.visible = false
-  
+
   -- Scroll bar dot
   self.scroll_dot = self:addPanel(11, 21, 168)
   self.scroll_dot.visible = false
-  
+
   -- Doctors' skills or progress towards them
   self.progress_surgeon = self:addPanel(17, 188, 408)
   self.progress_surgeon.visible = false
@@ -90,30 +93,29 @@ function UIStaffManagement:UIStaffManagement(ui, disease_selection)
   self.progress_researcher.visible = false
   self.qualified_researcher = self:addPanel(22, 268, 408):setTooltip(_S.tooltip.staff_list.researcher)
   self.qualified_researcher.visible = false
-  
+
   -- Blankers for each row
   local row_blankers = {}
-  local i
   for i = 1, 10 do
     row_blankers[i] = self:addColourPanel(50, 55 + i*27, 580, 27, 60, 174, 203)
   end
   self.row_blankers = row_blankers
-  
+
   -- Extra background for the portrait
   self.portrait_back = self:addColourPanel(65, 374, 71, 81, 210, 255, 255)
   self.portrait_back.visible = false
-  
+
   -- Doctor skill blankers
   self.title_blanker = self:addColourPanel(225, 365, 90, 39, 57, 166, 198)
   self.skill_blanker = self:addColourPanel(142, 406, 168, 54, 57, 166, 198)
-  
+
   -- Tooltip regions
   self:makeTooltip(_S.tooltip.staff_list.happiness,  321, 51, 421, 75)
   self:makeTooltip(_S.tooltip.staff_list.tiredness,  426, 51, 526, 75)
   self:makeTooltip(_S.tooltip.staff_list.ability,    530, 51, 629, 75)
   self:makeTooltip(_S.tooltip.staff_list.detail,     146, 367, 226, 407)
   self:makeTooltip(_S.tooltip.staff_list.view_staff, 495, 371, 583, 458)
-  
+
   self.row_tooltips = {}
   for line_num = 1, 10 do
     self.row_tooltips[line_num] = {
@@ -123,13 +125,19 @@ function UIStaffManagement:UIStaffManagement(ui, disease_selection)
       self:makeTooltip(_S.tooltip.staff_list.ability_2,   529, 84 + 27 * (line_num - 1), 628, 108 + 27 * (line_num - 1)),
     }
   end
-  
+
   self.seniority_tooltip =
     self:makeTooltip(_S.tooltip.staff_list.doctor_seniority, 230, 367, 310, 407)
   self.skills_tooltip =
     self:makeTooltip(_S.tooltip.staff_list.skills, 146, 406, 186, 460)
 
   self:setCategory("Doctor")
+
+  -- Hotkeys.
+  self:addKeyHandler("left", self.previousCategory)
+  self:addKeyHandler("right", self.nextCategory)
+  self:addKeyHandler("up", self.previousStaff)
+  self:addKeyHandler("down", self.nextStaff)
 end
 
 function UIStaffManagement:updateTooltips()
@@ -154,7 +162,7 @@ function UIStaffManagement:updateStaffList(staff_member_removed)
       selected_staff = nil
     end
   end
-  
+
   local hosp = self.hospital
   local staff_members = {
     Doctor = {},
@@ -174,6 +182,11 @@ function UIStaffManagement:updateStaffList(staff_member_removed)
   self.staff_members = staff_members
   if staff_member_removed then
     self:updateTooltips()
+    -- If we're viewing a page that no longer exists, go back a page
+    if self.page > math.ceil(#self.staff_members[self.category] / 10) then
+      self:scrollUp()
+    end
+    self:updateScrollDotVisibility()
   end
 end
 
@@ -182,7 +195,7 @@ function UIStaffManagement:setCategory(name)
   self.skill_blanker.visible = name ~= "Doctor"
   self.title_blanker.visible = name ~= "Doctor"
   self.category = name
-  for i, btn in ipairs(self.categories) do
+  for _, btn in ipairs(self.categories) do
     local should_be_toggled = btn.on_click_self == name
     if btn.toggled ~= should_be_toggled then
       btn:toggle()
@@ -190,19 +203,17 @@ function UIStaffManagement:setCategory(name)
   end
   self.selected_staff = nil
   self.page = 1
-  if #self.staff_members[self.category] > 10 then
-    self.scroll_dot.visible = true
-    self.scroll_dot.y = 168
-  else
-    self.scroll_dot.visible = false
-  end
-  
+  self:updateScrollDotVisibility()
+
   self:updateTooltips()
 end
 
 -- Function to select given list index in the current category.
 -- Includes jumping to correct page.
 function UIStaffManagement:selectIndex(idx)
+  if idx > #self.staff_members[self.category] or idx <= 0 then
+    return
+  end
   self.page = math.floor((idx - 1) / 10) + 1
   self.selected_staff = idx
 end
@@ -224,18 +235,18 @@ function UIStaffManagement:draw(canvas, x, y)
   UIFullscreen.draw(self, canvas, x, y)
   x, y = self.x + x, self.y + y
   local titles = self.title_font
-  
+
   -- Titles
   titles:draw(canvas, _S.staff_list.morale,      x + 323, y + 31, 95, 0)
   titles:draw(canvas, _S.staff_list.tiredness,   x + 427, y + 31, 95, 0)
   titles:draw(canvas, _S.staff_list.skill,       x + 530, y + 31, 95, 0)
-  
+
   -- Number of employees
   titles:draw(canvas, #self.staff_members["Doctor"], x + 79, y + 57)
   titles:draw(canvas, #self.staff_members["Nurse"], x + 145, y + 57)
   titles:draw(canvas, #self.staff_members["Handyman"], x + 211, y + 57)
   titles:draw(canvas, #self.staff_members["Receptionist"], x + 277, y + 57)
-  
+
   local total_happiness = 0
   local total_fatigue = 0
   local total_skill = 0
@@ -265,7 +276,7 @@ function UIStaffManagement:draw(canvas, x, y)
       titles:draw(canvas, row_no + 10*(self.page-1), x + 58, y + 63 + row_no*27)
       titles:draw(canvas, staff.profile.name,        x + 88, y + 63 + row_no*27)
       titles:draw(canvas, "$" .. staff.profile.wage, x + 230, y + 63 + row_no*27, 80, 0)
-    
+
       -- Draw the morale, tiredness and skill for this staff member
       if happiness_bar_width ~= 0 then
         for dx = 0, happiness_bar_width - 1 do
@@ -296,7 +307,7 @@ function UIStaffManagement:draw(canvas, x, y)
         self.panel_sprites:draw(canvas, 16, x + 351 + dx, y + 59)
       end
     end
-    
+
     local fatigue_bar_width = math_floor((1 - (total_fatigue/#staff_list)) * 40 + 0.5)
     if fatigue_bar_width ~= 0 then
       for dx = 0, fatigue_bar_width - 1 do
@@ -336,11 +347,11 @@ function UIStaffManagement:draw(canvas, x, y)
     -- Portrait
     self.portrait_back.visible = true
     profile:drawFace(canvas, x + 68, y + 377, self.face_parts)
-    
+
     -- 10 % increase in salary or a bonus:
     titles:draw(canvas, "$" .. math_floor(profile.wage*0.1), x + 377, y + 387, 45, 0)
     titles:draw(canvas, "$" .. math_floor(profile.wage*0.1 + profile.wage), x + 377, y + 432, 45, 0)
-    
+
     -- Attention to detail
     local attention_bar_width = math_floor(profile.attention_to_detail * 40 + 0.5)
     if attention_bar_width ~= 0 then
@@ -419,14 +430,13 @@ function UIStaffManagement:onMouseDown(code, x, y)
   return UIFullscreen.onMouseDown(self, code, x, y)
 end
 
-function UIStaffManagement:onMouseUp(code, x, y)
-  if not UIFullscreen.onMouseUp(self, code, x, y) then
-    if self:hitTest(x, y) then
-      if code == 4 then
-        -- Mouse wheel, scroll.
+function UIStaffManagement:onMouseWheel(x, y)
+  if not UIFullscreen.onMouseWheel(self, x, y) then
+    if self:hitTest(self.cursor_x, self.cursor_y) then
+      if y > 0 then
         self:scrollUp()
         return true
-      elseif code == 5 then
+      else
         self:scrollDown()
         return true
       end
@@ -444,11 +454,49 @@ function UIFullscreen:getStaffPosition(dx, dy)
   return x + px - (dx or 0), y + py - (dy or 0)
 end
 
+function UIStaffManagement:previousCategory()
+  if self.category == "Nurse" then
+    self:setCategory("Doctor")
+  elseif self.category == "Handyman" then
+    self:setCategory("Nurse")
+  elseif self.category == "Receptionist" then
+    self:setCategory("Handyman")
+  end
+end
+
+function UIStaffManagement:nextCategory()
+  if self.category == "Doctor" then
+    self:setCategory("Nurse")
+  elseif self.category == "Nurse" then
+    self:setCategory("Handyman")
+  elseif self.category == "Handyman" then
+    self:setCategory("Receptionist")
+  end
+end
+
+function UIStaffManagement:previousStaff()
+  -- If nothing currently selected, select the last one, otherwise the previous.
+  if self.selected_staff == nil then
+    self:selectIndex(#self.staff_members[self.category])
+  else
+    self:selectIndex(self.selected_staff - 1)
+  end
+end
+
+function UIStaffManagement:nextStaff()
+  -- If nothing currently selected, select the first one, otherwise the next.
+  if self.selected_staff == nil then
+    self:selectIndex(1)
+  else
+    self:selectIndex(self.selected_staff + 1)
+  end
+end
+
 function UIStaffManagement:scrollUp()
   if self.scroll_dot.visible and self.page > 1 then
     self.selected_staff = nil
     self.page = self.page - 1
-    self.scroll_dot.y = 168 + 83*((self.page - 1)/math.floor((#self.staff_members[self.category]-1)/10))
+    self:updateScrollDot()
   end
   self:updateTooltips()
 end
@@ -457,9 +505,26 @@ function UIStaffManagement:scrollDown()
   if self.scroll_dot.visible and self.page*10 < #self.staff_members[self.category] then
     self.selected_staff = nil
     self.page = self.page + 1
-    self.scroll_dot.y = 168 + 83*((self.page - 1)/math.floor((#self.staff_members[self.category]-1)/10))
+    self:updateScrollDot()
   end
   self:updateTooltips()
+end
+
+--! Updates the position of the paging scroll indicator
+function UIStaffManagement:updateScrollDot()
+  local numPages = math.ceil(#self.staff_members[self.category] / 10)
+  local yOffset = math_floor(83 * ((self.page - 1) / (numPages - 1)))
+  self.scroll_dot.y = 168 + yOffset
+end
+
+--! Updates whether the paging scroll indicator is visible and its position if visible
+function UIStaffManagement:updateScrollDotVisibility()
+  if #self.staff_members[self.category] > 10 then
+    self.scroll_dot.visible = true
+    self:updateScrollDot()
+  else
+    self.scroll_dot.visible = false
+  end
 end
 
 function UIStaffManagement:payBonus()

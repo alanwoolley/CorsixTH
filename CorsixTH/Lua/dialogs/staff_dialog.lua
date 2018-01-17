@@ -18,10 +18,6 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE. --]]
 
-local TH = require "TH"
-local math_floor
-    = math.floor
-
 -- Test for hit within the view circle
 local --[[persistable:staff_dialog_is_in_view_circle]] function is_in_view_circle(x, y, is_handyman)
   local circle_center_y = is_handyman and 276 or 248
@@ -31,6 +27,10 @@ end
 --! Individual staff information dialog
 class "UIStaff" (Window)
 
+---@type UIStaff
+local UIStaff = _G["UIStaff"]
+
+--! Callback function for handyman to change his parcel.
 function UIStaff:changeParcel()
   local index = 0
   for i, v in ipairs(self.staff.hospital.ownedPlots) do
@@ -42,7 +42,7 @@ function UIStaff:changeParcel()
   if not self.staff.hospital.ownedPlots[index + 1] then
     self.staff.parcelNr = 0
   else
-    self.staff.parcelNr = self.staff.hospital.ownedPlots[index + 1] 
+    self.staff.parcelNr = self.staff.hospital.ownedPlots[index + 1]
   end
 end
 
@@ -59,7 +59,7 @@ end
 
 function UIStaff:UIStaff(ui, staff)
   self:Window()
-  
+
   local app = ui.app
   local profile = staff.profile
   self.esc_closes = true
@@ -76,7 +76,7 @@ function UIStaff:UIStaff(ui, staff)
   self.panel_sprites = app.gfx:loadSpriteTable("QData", "Req01V", true)
   self.white_font = app.gfx:loadFont("QData", "Font01V")
   self.face_parts = app.gfx:loadRaw("Face01V", 65, 1350, nil, "Data", "MPalette.dat")
-  
+
   self:addPanel(297,   15,   0) -- Dialog header
   for y = 51, 121, 10 do
     self:addPanel(298, 15,   y) -- Dialog background
@@ -85,7 +85,7 @@ function UIStaff:UIStaff(ui, staff)
   self:addPanel(300,  105,  82) -- Tiredness
   self:addPanel(301,   15, 114) -- Skills/Abilities
   self:addColourPanel(35, 51, 71, 81, 208, 252, 252):makeButton(0, 0, 71, 81, nil, self.openStaffManagement):setTooltip(_S.tooltip.staff_window.face) -- Portrait background
-  
+
   if profile.humanoid_class == "Handyman" then
     self:addPanel(311,  15, 131) -- Tasks top
     for y = 149, 184, 5 do
@@ -93,9 +93,9 @@ function UIStaff:UIStaff(ui, staff)
     end
     self:addPanel(302,   5, 205) -- View circle top/Wage
     self:addPanel(313,  15, 189) -- Tasks bottom
-    self:addPanel(314,  37, 145):makeButton(0, 0, 49, 48, 315, self.doMoreCleaning):setTooltip(_S.tooltip.handyman_window.prio_litter)
-    self:addPanel(316,  92, 145):makeButton(0, 0, 49, 48, 317, self.doMoreWatering):setTooltip(_S.tooltip.handyman_window.prio_plants)
-    self:addPanel(318, 148, 145):makeButton(0, 0, 49, 48, 319, self.doMoreRepairing):setTooltip(_S.tooltip.handyman_window.prio_machines)
+    self:addPanel(314,  37, 145):makeRepeatButton(0, 0, 49, 48, 315, self.doMoreCleaning):setTooltip(_S.tooltip.handyman_window.prio_litter)
+    self:addPanel(316,  92, 145):makeRepeatButton(0, 0, 49, 48, 317, self.doMoreWatering):setTooltip(_S.tooltip.handyman_window.prio_plants)
+    self:addPanel(318, 148, 145):makeRepeatButton(0, 0, 49, 48, 319, self.doMoreRepairing):setTooltip(_S.tooltip.handyman_window.prio_machines)
     self:addPanel(240,  21, 210):makeButton(0, 0, 73, 30, 240, self.changeParcel):setTooltip(_S.tooltip.handyman_window.parcel_select)
   self:addPanel(303,   0, 253) -- View circle midpiece
     self:addPanel(304,   6, 302) -- View circle bottom
@@ -113,16 +113,16 @@ function UIStaff:UIStaff(ui, staff)
   end
 
   self:addPanel(305, 178,  18):makeButton(0, 0, 24, 24, 306, self.close):setTooltip(_S.tooltip.staff_window.close)
-  
+
   self:makeTooltip(_S.tooltip.staff_window.name, 33, 19, 172, 42)
   self:makeTooltip(_S.tooltip.staff_window.happiness, 113,  49, 204,  74)
   self:makeTooltip(_S.tooltip.staff_window.tiredness, 113,  74, 204, 109)
   self:makeTooltip(_S.tooltip.staff_window.ability,   113, 109, 204, 134)
-  
+
   if profile.humanoid_class == "Doctor" then
     self:makeTooltip(_S.tooltip.staff_window.doctor_seniority, 30, 141, 111, 182)
     self:makeTooltip(_S.tooltip.staff_window.skills, 111, 146, 141, 179)
-    
+
     local skill_to_string = {
       is_surgeon = _S.tooltip.staff_window.surgeon,
       is_psychiatrist = _S.tooltip.staff_window.psychiatrist,
@@ -135,15 +135,15 @@ function UIStaff:UIStaff(ui, staff)
         end
       end
     end
-    
+
     self:makeDynamicTooltip(skill_tooltip("is_surgeon"),      143, 148, 155, 177)
     self:makeDynamicTooltip(skill_tooltip("is_psychiatrist"), 155, 148, 177, 177)
     self:makeDynamicTooltip(skill_tooltip("is_researcher"),   177, 148, 202, 177)
   end
-  
+
   -- window for handyman is slightly different
   local offset = profile.humanoid_class == "Handyman" and 27 or 0
-  
+
   self:makeTooltip(_S.tooltip.staff_window.salary, 90, 191 + offset, 204, 214 + offset)
   -- Non-rectangular tooltip has to be realized with dynamic tooltip at the moment
   self:makeDynamicTooltip(--[[persistable:staff_dialog_center_tooltip]]function(x, y)
@@ -151,7 +151,7 @@ function UIStaff:UIStaff(ui, staff)
       return _S.tooltip.staff_window.center_view
     end
   end, 17, 211 + offset, 92, 286 + offset)
-  
+
 end
 
 function UIStaff:getStaffPosition(dx, dy)
@@ -167,7 +167,7 @@ function UIStaff:draw(canvas, x_, y_)
   local px, py = self:getStaffPosition(37, 61)
   self.ui.app.map:draw(canvas, px, py, 75, 75, x + 17, y + self.height - 93)
   Window.draw(self, canvas, x_, y_)
-  
+
   local profile = self.staff.profile
   local font = self.white_font
 
@@ -176,11 +176,10 @@ function UIStaff:draw(canvas, x_, y_)
     font:draw(canvas, "$" .. profile.wage, x + 135, y + 226) -- Wage
     font:draw(canvas, self:getParcelText(), x + 35, y + 215, 50, 0)
     -- The concentration areas
-    local cleaning_width, watering_width, repairing_width = 0, 0, 0
     if self.staff.attributes["cleaning"] then -- Backwards compatibility
-      cleaning_width = math_floor(self.staff.attributes["cleaning"] * 40 + 0.5)
-      watering_width = math_floor(self.staff.attributes["watering"] * 40 + 0.5)
-      repairing_width = math_floor(self.staff.attributes["repairing"] * 40 + 0.5)
+      local cleaning_width = math.floor(self.staff.attributes["cleaning"] * 40 + 0.5)
+      local watering_width = math.floor(self.staff.attributes["watering"] * 40 + 0.5)
+      local repairing_width = math.floor(self.staff.attributes["repairing"] * 40 + 0.5)
       if cleaning_width ~= 0 then
         for dx = 0, cleaning_width - 1 do
           self.panel_sprites:draw(canvas, 351, x + 43 + dx, y + 200)
@@ -200,33 +199,33 @@ function UIStaff:draw(canvas, x_, y_)
   else
     font:draw(canvas, "$" .. profile.wage, x + 135, y + 199) -- Wage
   end
-  
+
   if self.staff.attributes["happiness"] then
-    local happiness_bar_width = math_floor(self.staff.attributes["happiness"] * 40 + 0.5)
+    local happiness_bar_width = math.floor(self.staff.attributes["happiness"] * 40 + 0.5)
     if happiness_bar_width ~= 0 then
       for dx = 0, happiness_bar_width - 1 do
         self.panel_sprites:draw(canvas, 348, x + 139 + dx, y + 56)
       end
     end
   end
-  
+
   local fatigue_bar_width = 40.5
   if self.staff.attributes["fatigue"] then
-    fatigue_bar_width = math_floor((1 - self.staff.attributes["fatigue"]) * 40 + 0.5)
+    fatigue_bar_width = math.floor((1 - self.staff.attributes["fatigue"]) * 40 + 0.5)
   end
   if fatigue_bar_width ~= 0 then
     for dx = 0, fatigue_bar_width - 1 do
       self.panel_sprites:draw(canvas, 349, x + 139 + dx, y + 89)
     end
   end
-  
-  local skill_bar_width = math_floor(profile.skill * 40 + 0.5)
+
+  local skill_bar_width = math.floor(profile.skill * 40 + 0.5)
   if skill_bar_width ~= 0 then
     for dx = 0, skill_bar_width - 1 do
       self.panel_sprites:draw(canvas, 350, x + 139 + dx, y + 120)
     end
   end
-  
+
   if profile.humanoid_class == "Doctor" then
     -- Junior / Doctor / Consultant marker
     if profile.is_junior then
@@ -247,7 +246,7 @@ function UIStaff:draw(canvas, x_, y_)
       self.panel_sprites:draw(canvas, 346, x + 178, y + 153)
     end
   end
-  
+
   profile:drawFace(canvas, x + 38, y + 54, self.face_parts) -- Portrait
 end
 
@@ -256,7 +255,7 @@ function UIStaff:onMouseDown(button, x, y)
   return Window.onMouseDown(self, button, x, y)
 end
 
--- Helper function to faciliate humanoid_class comparison wrt. Surgeons
+-- Helper function to facilitate humanoid_class comparison wrt. Surgeons
 local function surg_compat(class)
   return class == "Surgeon" and "Doctor" or class
 end
@@ -310,12 +309,7 @@ end
 
 function UIStaff:placeStaff()
   self.staff.pickup = true
-  self.staff:setNextAction({
-    name = "pickup",
-    ui = self.ui,
-    todo_close = self,
-    must_happen = true,
-  }, true)
+  self.staff:setNextAction(PickupAction(self.ui):setTodoClose(self), true)
 end
 
 function UIStaff:fireStaff()
@@ -324,62 +318,57 @@ function UIStaff:fireStaff()
   end))
 end
 
-local attributes = {"cleaning", "watering", "repairing"}
 
+--! Function to balance 'cleaning','watering', and 'repairing', where
+--! one of them is increased, and the other two are decreased.
+--!param increased Attribute to increase.
 function UIStaff:changeHandymanAttributes(increased)
-  self.staff:changeAttribute(increased, 0.1)
-  local extra_decrease = 0
-  for no, attr in ipairs(attributes) do
-    if attr ~= increased then
-      if self.staff.attributes[attr] < 0.05 then
-        extra_decrease = 0.05 - self.staff.attributes[attr]
+  if not self.staff.attributes[increased] then
+    return
+  end
+
+  local incr_value = 0.1  -- Increase of 'increased'
+  local smallest_decr = 0.05 -- Smallest decrement that can be performed.
+  local decr_attrs = {}
+
+  local attributes = {"cleaning", "watering", "repairing"}
+  for _, attr in ipairs(attributes) do
+    if attr == increased then
+      -- Adding too much is not a problem, it gets clipped to 1.
+      self.staff:changeAttribute(attr, incr_value)
+      if self.staff.attributes[attr] == 1 then
+        incr_value = 2.0 -- Doing 'increased' 100%, set other attributes to 0.
       end
-      self.staff:changeAttribute(attr, -0.05)
+    else
+      decr_attrs[#decr_attrs + 1] = attr
+      smallest_decr = math.min(smallest_decr, self.staff.attributes[attr])
     end
   end
-  if extra_decrease ~= 0 then
-    for no, attr in ipairs(attributes) do
-    if attr ~= increased then
-      self.staff:changeAttribute(attr, -extra_decrease)
-    end
-  end
+  assert(#decr_attrs == 2)
+
+  -- The decreasing attributes should together decrease '-incr_value', but one
+  -- or both may be smaller than '-incr_value / 2'.
+  -- Compensate by subtracting the biggest value from both.
+  local decr_value = incr_value - smallest_decr
+  for _, attr in ipairs(decr_attrs) do
+    -- Subtracting too much is not a problem, it gets clipped to 0.
+    self.staff:changeAttribute(attr, -decr_value)
   end
 end
 
+--! UI callback function to increase 'cleaning' (wiping litter).
 function UIStaff:doMoreCleaning()
-  if self.staff.attributes["cleaning"] then
-    if self.staff.attributes["cleaning"] < 0.9 then
-      self:changeHandymanAttributes("cleaning")
-    else
-      self.staff.attributes["cleaning"] = 1.0
-      self.staff.attributes["watering"] = 0.0
-      self.staff.attributes["repairing"] = 0.0
-    end
-  end
+  self:changeHandymanAttributes("cleaning")
 end
 
+--! UI callback function to increase 'watering' (plants).
 function UIStaff:doMoreWatering()
-  if self.staff.attributes["watering"] then
-    if self.staff.attributes["watering"] < 0.9 then
-      self:changeHandymanAttributes("watering")
-    else
-      self.staff.attributes["cleaning"] = 0.0
-      self.staff.attributes["watering"] = 1.0
-      self.staff.attributes["repairing"] = 0.0
-    end
-  end
+  self:changeHandymanAttributes("watering")
 end
 
+--! UI callback function to increase 'repairing' (machines).
 function UIStaff:doMoreRepairing()
-  if self.staff.attributes["repairing"] then
-    if self.staff.attributes["repairing"] < 0.9 then
-      self:changeHandymanAttributes("repairing")
-    else
-      self.staff.attributes["cleaning"] = 0.0
-      self.staff.attributes["watering"] = 0.0
-      self.staff.attributes["repairing"] = 1.0
-    end
-  end
+  self:changeHandymanAttributes("repairing")
 end
 
 function UIStaff:openStaffManagement()

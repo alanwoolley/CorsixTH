@@ -20,6 +20,9 @@ SOFTWARE. --]]
 
 class "UIHireStaff" (Window)
 
+---@type UIHireStaff
+local UIHireStaff = _G["UIHireStaff"]
+
 function UIHireStaff:UIHireStaff(ui)
   self:Window()
   self.modal_class = "main"
@@ -32,23 +35,24 @@ function UIHireStaff:UIHireStaff(ui)
   self.panel_sprites = ui.app.gfx:loadSpriteTable("QData", "Req11V", true)
   self.white_font = ui.app.gfx:loadFont("QData", "Font01V")
   self.face_parts = ui.app.gfx:loadRaw("Face01V", 65, 1350, nil, "Data", "MPalette.dat")
-  self:addKeyHandler("Enter", self.hire)
-  
+  self:addKeyHandler("return", self.hire)
+  self:addKeyHandler("keypad enter", self.hire)
+
   -- Left hand side tab backgrounds
   self:addPanel(253, 0,   0)
   self:addPanel(254, 0,  83)
   self:addPanel(254, 0, 162)
   self:addPanel(255, 0, 241)
-  
+
   -- Left hand side tabs
   local --[[persistable:hire_staff_category]] function category(name, state, btn)
     if #self.world.available_staff[name] == 0 then
-      self.ui:playSound "wrong2.wav"
+      self.ui:playSound("wrong2.wav")
       if state then
         btn:toggle()
       end
     else
-      self.ui:playSound "selectx.wav"
+      self.ui:playSound("selectx.wav")
       self:setCategory(state and name or nil)
     end
   end
@@ -58,15 +62,15 @@ function UIHireStaff:UIHireStaff(ui)
     self:addPanel(268, 8, 166):makeToggleButton(0, 0, 40, 69, 269, category, "Handyman"):setTooltip(_S.tooltip.hire_staff_window.handymen),
     self:addPanel(270, 8, 245):makeToggleButton(0, 0, 40, 69, 271, category, "Receptionist"):setTooltip(_S.tooltip.hire_staff_window.receptionists),
   }
-  
+
   -- Right hand side
   self:addPanel(256,  56,   0) -- Dialog header
   for y = 49, 113, 11 do
     self:addPanel(257,56,   y) -- Dialog background
   end
-  self.ability_bg_panel = 
+  self.ability_bg_panel =
   self:addPanel(260,  55, 114) -- Abilities background
-  self.skill_bg_panel = 
+  self.skill_bg_panel =
   self:addPanel(259,  68,  95):setTooltip(_S.tooltip.hire_staff_window.staff_ability, 109, 95) -- Skill background
   self.skill_bg_panel.visible = false
   self:addPanel(261,  55, 160) -- Wage background
@@ -83,7 +87,7 @@ function UIHireStaff:UIHireStaff(ui)
   self:addPanel(274, 106, 277):makeButton(0, 10, 58, 27, 275, self.hire):setTooltip(_S.tooltip.hire_staff_window.hire)
   self:addPanel(276, 163, 277):makeButton(0, 10, 28, 27, 277, self.close):setTooltip(_S.tooltip.hire_staff_window.cancel)
   self:addPanel(278, 190, 277):makeButton(0, 10, 44, 27, 279, self.moveNext):setTooltip(_S.tooltip.hire_staff_window.next_person)
-  
+
   self:makeTooltip(_S.tooltip.hire_staff_window.salary, 68, 173, 227, 194)
   self:makeTooltip(_S.tooltip.hire_staff_window.doctor_seniority, 68, 44, 151, 95)
   self:makeTooltip(_S.tooltip.hire_staff_window.qualifications, 68, 134, 107, 167)
@@ -91,14 +95,14 @@ function UIHireStaff:UIHireStaff(ui)
   self:makeTooltip(_S.tooltip.hire_staff_window.surgeon, 120, 136, 137, 167)
   self:makeTooltip(_S.tooltip.hire_staff_window.psychiatrist, 137, 136, 164, 167)
   self:makeTooltip(_S.tooltip.hire_staff_window.researcher, 164, 136, 191, 167)
-  
+
   self:updateTooltips()
 end
 
 function UIHireStaff:updateTooltips()
   local cond = not not self.category
   self.tooltip_regions[1].enabled = cond
-  
+
   cond = cond and self.category == "Doctor"
   self.tooltip_regions[2].enabled = cond
   self.tooltip_regions[3].enabled = cond
@@ -124,15 +128,15 @@ function UIHireStaff:hire()
     profile = profile and profile[self.current_index]
   end
   if not profile then
-    self.ui:playSound "wrong2.wav"
-    return
-  end  
-  if self.ui.hospital.balance < profile.wage then  
-    self:cannotAfford()
-    self.ui:playSound "wrong2.wav"
+    self.ui:playSound("wrong2.wav")
     return
   end
-  self.ui:playSound "YesX.wav"
+  if self.ui.hospital.balance < profile.wage then
+    self:cannotAfford()
+    self.ui:playSound("wrong2.wav")
+    return
+  end
+  self.ui:playSound("YesX.wav")
   table.remove(self.world.available_staff[self.category], self.current_index)
   self.ui:addWindow(UIPlaceStaff(self.ui, profile, self.mouse_up_x, self.mouse_up_y))
 end
@@ -143,12 +147,12 @@ function UIHireStaff:cannotAfford()
   }
   if msg then
     self.world.ui.adviser:say(msg[math.random(1, #msg)])
-  end  
+  end
 end
 function UIHireStaff:draw(canvas, x, y)
   Window.draw(self, canvas, x, y)
   x, y = self.x + x, self.y + y
-  
+
   local font = self.white_font
   local staff = self.world.available_staff
   font:draw(canvas, #staff.Doctor      , x + 16, y +  58, 26, 0)
@@ -172,8 +176,8 @@ function UIHireStaff:draw(canvas, x, y)
         local px, py = self.skill_bg_panel.x, self.skill_bg_panel.y
         px = px + x
         py = py + y
-        for x = 0, skill_bar_width - 1 do
-          self.panel_sprites:draw(canvas, 3, px + 22 + x, py + 9)
+        for dx = 0, skill_bar_width - 1 do
+          self.panel_sprites:draw(canvas, 3, px + 22 + dx, py + 9)
         end
       end
     end
@@ -223,12 +227,12 @@ function UIHireStaff:moveBy(n)
     elseif self.current_index > #category then
       self.current_index = #category
     else
-      self.ui:playSound "selectx.wav"
+      self.ui:playSound("selectx.wav")
       self:updateTooltips()
       return true
     end
   end
-  self.ui:playSound "wrong2.wav"
+  self.ui:playSound("wrong2.wav")
   return false
 end
 
@@ -247,7 +251,7 @@ function UIHireStaff:setCategory(name)
   self.complete_blanker.visible = not name
   self.abilities_blanker.visible = name ~= "Doctor"
   self.category = name
-  for i, btn in ipairs(self.tabs) do
+  for _, btn in ipairs(self.tabs) do
     local should_be_toggled = btn.on_click_self == name
     if btn.toggled ~= should_be_toggled then
       btn:toggle()
@@ -261,4 +265,14 @@ function UIHireStaff:close()
   self.ui:tutorialStep(2, {2, 3, 4, 5}, 1)
   self.ui:tutorialStep(4, {2, 3}, 1)
   return Window.close(self)
+end
+
+function UIHireStaff:afterLoad(old, new)
+  if old < 101 then
+    self:removeKeyHandler("enter")
+    self:addKeyHandler("return", self.hire)
+  end
+  if old < 104 then
+    self:addKeyHandler("keypad enter", self.hire)
+  end
 end

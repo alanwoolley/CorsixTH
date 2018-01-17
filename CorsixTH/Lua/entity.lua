@@ -21,6 +21,9 @@ SOFTWARE. --]]
 --! Abstraction for visible gameplay things which sit somewhere on the map.
 class "Entity"
 
+---@type Entity
+local Entity = _G["Entity"]
+
 local TH = require "TH"
 
 function Entity:Entity(animation)
@@ -28,18 +31,52 @@ function Entity:Entity(animation)
   self.layers = {}
   animation:setHitTestResult(self)
   self.ticks = true
-  self.dynamic_info = nil;
+  self.playing_sounds_in_random_sequence = false
+  self.waiting_for_sound_effects_to_be_turned_on = false
+  self.random_sound_sequence_parameters = nil
+  self.dynamic_info = nil
 end
 
--- This plays a sound "at" the entity, meaning the sound will not be played
--- if the entity is off-screen, and the volume will be quieter the further
--- the entity is from the center of the screen. If this is not what you want
--- then use UI:playSound instead.
--- !param name (string, integer) The filename or ordinal of the sound to play.
-function Entity:playSound(name)
+--[[
+This plays a sound "at" the entity, meaning the sound will not be played
+if the entity is off-screen, and the volume will be quieter the further
+the entity is from the center of the screen. If this is not what you want
+then use UI:playSound instead.
+!param name (string, integer) The filename or ordinal of the sound to play.
+!param played_callback (function) a optional parameter.
+!param played_callback_delay (integer) a optional milliseconds parameter.
+--]]
+function Entity:playSound(name, played_callback, played_callback_delay)
   if TheApp.config.play_sounds then
-    TheApp.audio:playSound(name, self)
+    TheApp.audio:playSound(name, self, false, played_callback, played_callback_delay)
   end
+end
+
+function Entity:setWaitingForSoundEffectsToBeTurnedOn(state)
+  self.waiting_for_sound_effects_to_be_turned_on = true
+end
+
+--[[
+Plays a sequence of related sounds at an entity while entity.playing_sounds_in_random_sequence = true.
+
+The silences between these sounds can either have randomly generated lengths between the min and max length parameters or
+they can all be a specified length by providing min and max tables with one value for the desired pause duration.
+
+!param name_pattern (String) example: LAVA00*.WAV
+!param min_silence_lengths (table) the desired mininum silences length for the different tick rates, [3] = Normal
+!param max_silence_lengths (table) the desired maximum silences length for the different tick rates, [3] = Normal
+!param num_silences (integer) how many different silence lengths should be used, this can be a nil parameter.
+-]]
+function Entity:playEntitySounds(name_pattern, min_silence_lengths, max_silence_lengths, num_silences)
+  self.playing_sounds_in_random_sequence = true
+  self.random_sound_sequence_parameters = {}
+  self.random_sound_sequence_parameters["namePattern"] = name_pattern
+  self.random_sound_sequence_parameters["minSilence"] = min_silence_lengths
+  self.random_sound_sequence_parameters["maxSilence"] = max_silence_lengths
+  self.random_sound_sequence_parameters["numSilences"] = num_silences
+
+  TheApp.audio:playEntitySounds(name_pattern, self,
+      min_silence_lengths, max_silence_lengths, num_silences)
 end
 
 --[[ Set which animation is used to give the entity a visual appearance.
@@ -73,6 +110,12 @@ function Entity:setTile(x, y)
   if self.user_of then
     print("Warning: Entity tile changed while marked as using an object")
   end
+  local entity_map = self.world.entity_map
+  -- Remove the reference to the entity at it's previous coordinates
+  if entity_map then
+    entity_map:removeEntity(self.tile_x,self.tile_y, self)
+  end
+
   self.tile_x = x
   self.tile_y = y
   self.th:setDrawingLayer(self:getDrawingLayer())
@@ -81,6 +124,12 @@ function Entity:setTile(x, y)
   if self.mood_info then
     self.mood_info:setParent(self.th)
   end
+
+  -- Update the entity map for the new position
+  if entity_map then
+    entity_map:addEntity(x,y,self)
+  end
+
   return self
 end
 
@@ -143,7 +192,7 @@ end
 -- recurring or long-duration tasks.
 function Entity:tick()
   if self.num_animation_ticks then
-    for i = 1, self.num_animation_ticks do
+    for _ = 1, self.num_animation_ticks do
       self:_tick()
     end
     if self.num_animation_ticks == 1 then
@@ -152,10 +201,11 @@ function Entity:tick()
   else
     self:_tick()
   end
+  -- Tick any mood animation
   if self.mood_info then
     self.mood_info:tick()
   end
-  
+
   local timer = self.timer_time
   if timer then
     timer = timer - 1
@@ -187,7 +237,7 @@ end
 --[[ Register a function (related to the entity) to be called at a later time.
 ! Each `Entity` can have a single timer associated with it, and due to this
 limit of one, it is almost always the case that the currently active humanoid
-action is the only thing wich calls `setTimer`.
+action is the only thing which calls `setTimer`.
 If self.slow_animation is set then all timers will be doubled as animation
 length will be doubled.
 !param tick_count (integer) If 0, then `f` will be called during the entity's
@@ -223,6 +273,8 @@ end
 -- Function which is called when the entity is to be permanently removed from
 -- the world.
 function Entity:onDestroy()
+  -- Clear any mood
+  self:setMoodInfo()
   self:setTile(nil)
   self.world.dispatcher:dropFromQueue(self)
   -- Debug aid to check that there are no hanging references after the entity
@@ -232,6 +284,9 @@ function Entity:onDestroy()
   getmetatable(self.gc_dummy).__gc = function()
     print("Entity " .. tostring(self) .. " has been garbage collected.")
   end --]]
+  if self.waiting_for_sound_effects_to_be_turned_on then
+    TheApp.audio:entityNoLongerWaitingForSoundsToBeTurnedOn(self)
+  end
 end
 
 -- Function which is called at the end of each ingame day. Should be used to
@@ -240,7 +295,16 @@ end
 function Entity:tickDay()
 end
 
+--! Notify the entity of a new object.
+--!param id Name of the new object.
+-- TODO Currently only used for benches placed nearby.
+-- TODO Maybe also pass the object tile coordinates?
 function Entity:notifyNewObject(id)
+end
+
+--! Notify the entity that a new room was built.
+--!param room (Room) The new room.
+function Entity:notifyNewRoom(room)
 end
 
 function Entity:setMood(mood_name, activate)
@@ -273,6 +337,21 @@ end
 function Entity:afterLoad(old, new)
 end
 
+function Entity:playAfterLoadSound()
+  if self.random_sound_sequence_parameters then
+    self.playing_sounds_in_random_sequence = true
+    self:playEntitySounds(self.random_sound_sequence_parameters["namePattern"],
+                          self.random_sound_sequence_parameters["minSilence"],
+                          self.random_sound_sequence_parameters["maxSilence"],
+                          self.random_sound_sequence_parameters["numSilences"])
+  end
+end
+
+--! Stub to be extended in subclasses, if needed.
+function Entity:eraseObject()
+  -- Give entity the chance to clear itself from the map before resetAnimation gets called.
+end
+
 function Entity:resetAnimation()
   self.th:setDrawingLayer(self:getDrawingLayer())
   local x, y = self.tile_x, self.tile_y
@@ -280,11 +359,11 @@ function Entity:resetAnimation()
 end
 
 --[[
-  Returns the drawing layer for this particular entity. Should be overriden in derived classes. The drawing layer 
+  Returns the drawing layer for this particular entity. Should be overriden in derived classes. The drawing layer
   specifies the order in which object are drawn in a tile (the object with the smallest layer is drawn first).
   Litter should have layer 0, side objects to the north layer 1, side objects to the west layer 2,
-  normal objects should have layers between 3 and 7, east side object should have layer 8 and south side 
-  objects layer 9.  
+  normal objects should have layers between 3 and 7, east side object should have layer 8 and south side
+  objects layer 9.
 ]]
 function Entity:getDrawingLayer()
   return 4

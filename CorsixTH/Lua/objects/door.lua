@@ -34,6 +34,9 @@ dofile "queue"
 
 class "Door" (Object)
 
+---@type Door
+local Door = _G["Door"]
+
 function Door:Door(...)
   self:Object(...)
   self.queue = Queue()
@@ -59,9 +62,9 @@ function Door:updateDynamicInfo()
       })
     else
       self:setDynamicInfo('text', {
-        self.room.room_info.name, 
-        _S.dynamic_info.object.queue_size:format(self.queue:reportedSize()), 
-        _S.dynamic_info.object.queue_expected:format(self.queue.expected_count)
+        self.room.room_info.name,
+        _S.dynamic_info.object.queue_size:format(self.queue:reportedSize()),
+        _S.dynamic_info.object.queue_expected:format(self.queue:expectedSize())
       })
     end
   end
@@ -125,7 +128,7 @@ function Door:getWalkableTiles()
     x = x - 1
   else
     y = y - 1
-  end  
+  end
   return { {self.tile_x, self.tile_y}, {x, y} }
 end
 
@@ -142,7 +145,7 @@ end
 
 function Door:closeDoor()
   if self.queue then
-    self.queue:rerouteAllPatients({name = "seek_room", room_type = self:getRoom().room_info.id})
+    self.queue:rerouteAllPatients(SeekRoomAction(self:getRoom().room_info.id))
     self.queue = nil
   end
   self:clearDynamicInfo(nil)

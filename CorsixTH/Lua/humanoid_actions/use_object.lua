@@ -20,6 +20,41 @@ SOFTWARE. --]]
 
 local TH = require "TH"
 
+
+class "UseObjectAction" (HumanoidAction)
+
+---@type UseObjectAction
+local UseObjectAction = _G["UseObjectAction"]
+
+--! Construct a 'use object' action.
+--!param object (Object) Object to use.
+function UseObjectAction:UseObjectAction(object)
+  assert(class.is(object, Object), "Invalid value for parameter 'object'")
+
+  self:HumanoidAction("use_object")
+  self.object = object
+  self.watering_plant = false -- Whether the action is watering the plant.
+  self.prolonged_usage = nil -- If true, the usage is prolonged.
+end
+
+--! Set the 'watering plant' flag.
+--!return (action) self, for daisy chaining.
+function UseObjectAction:enableWateringPlant()
+  self.watering_plant = true
+  return self
+end
+
+--! Set prolonged usage of the object.
+--!param prolonged (bool or nil) If set, enable prolonged usage of the object.
+--!return (action) self, for daisy-chaining.
+function UseObjectAction:setProlongedUsage(prolonged)
+  assert(prolonged == nil or type(prolonged) == "boolean",
+      "Invalid value for parameter 'prolonged'")
+
+  self.prolonged_usage = prolonged
+  return self
+end
+
 local orient_mirror = {
   north = "west",
   west = "north",
@@ -68,7 +103,7 @@ local function action_use_next_phase(action, phase)
     if phase == 5 and not action.anims.finish_use_5 then
     phase = phase + 1
   end
-  if phase == 6 and not action.do_walk then
+  if phase == 6 and not action.do_walk or phase == 6 and action.destroy_user_after_use then
     phase = phase + 1
   end
   if phase > 6 then
@@ -133,19 +168,19 @@ local function action_use_phase(action, humanoid, phase)
         phase)
     end
   end
-  
+
   local anim_length = 1
   if type(anim) == "table" and anim.length then
     anim_length = anim.length
   end
-  
+
   if type(anim) == "table" and anim[1] ~= "morph" and #anim > 1 then
     -- If an animation list is provided rather than a single animation, then
     -- choose an animation from the list at random.
     is_list = true
     anim = anim[math.random(1, #anim)]
   end
-  
+
   local flags = action.mirror_flags
   if type(anim) == "table" then
     if anim.mirror then
@@ -164,7 +199,7 @@ local function action_use_phase(action, humanoid, phase)
   else
     object.th:makeInvisible()
   end
-  
+
   if object.split_anims then
     flags = flags + DrawFlags.Crop
     local anims = humanoid.world.anims
@@ -198,7 +233,7 @@ local function action_use_phase(action, humanoid, phase)
   else
     humanoid:setAnimation(anim, flags)
   end
-  
+
   local offset = object.object_type.orientations
   if offset then
     local tx, ty
@@ -208,7 +243,7 @@ local function action_use_phase(action, humanoid, phase)
     else
       tx, ty = object:getRenderAttachTile()
     end
-    if humanoid.humanoid_class == "Handyman" and 
+    if humanoid.humanoid_class == "Handyman" and
       offset.added_handyman_animate_offset_while_in_use then
       tx = tx + offset.added_handyman_animate_offset_while_in_use[1]
       ty = ty + offset.added_handyman_animate_offset_while_in_use[2]
@@ -219,23 +254,23 @@ local function action_use_phase(action, humanoid, phase)
     end
     offset = offset.animation_offset
     if added_offset then
-      humanoid:setTilePositionSpeed(tx, ty, offset[1] + added_offset[1], 
+      humanoid:setTilePositionSpeed(tx, ty, offset[1] + added_offset[1],
         offset[2] + added_offset[2])
     else
       humanoid:setTilePositionSpeed(tx, ty, offset[1], offset[2])
-    end 
+    end
   else
     humanoid:setTilePositionSpeed(object.tile_x, object.tile_y, 0, 0)
   end
   humanoid.user_of = object
   local length = anim_length * humanoid.world:getAnimLength(anim)
   if action.min_length and phase == 0 and action.min_length > length then
-    -- A certain length is desired. 
+    -- A certain length is desired.
     -- Even it out so that an integer number of animation sequences are done.
     length = action.min_length + action.min_length % length
   end
-  if phase == 0 and (not is_list) and length == 1 and action.prolonged_usage
-  and action.on_interrupt and not action.loop_callback then
+  if phase == 0 and (not is_list) and length == 1 and action.prolonged_usage and
+      action.on_interrupt and not action.loop_callback then
     -- a timer would be redundant, so do not set one
   else
     humanoid:setTimer(length, action_use_object_tick)
@@ -279,6 +314,9 @@ action_use_object_tick = permanent"action_use_object_tick"( function(humanoid)
     object:setUser(humanoid)
     humanoid.user_of = object
     init_split_anims(object, humanoid)
+    if action.after_walk_in then
+      action:after_walk_in()
+    end
   end
   if phase ~= 0 or not action.prolonged_usage or not action.on_interrupt then
     phase = action_use_next_phase(action, phase)
@@ -296,7 +334,7 @@ action_use_object_tick = permanent"action_use_object_tick"( function(humanoid)
   end
   if phase == 100 then
     humanoid:setTilePositionSpeed(action.old_tile_x, action.old_tile_y)
-    
+
     -- Check if the room is about to be destroyed
     local room_destroyed = false
     if object.strength then
@@ -314,7 +352,13 @@ action_use_object_tick = permanent"action_use_object_tick"( function(humanoid)
       if action.after_use then
         action.after_use()
       end
-      humanoid:finishAction(action)
+
+      if action.destroy_user_after_use then
+        humanoid:despawn()
+        humanoid.world:destroyEntity(humanoid)
+      else
+        humanoid:finishAction(action)
+      end
     end
   else
     action_use_phase(action, humanoid, phase)
@@ -334,6 +378,10 @@ local action_use_object_interrupt = permanent"action_use_object_interrupt"( func
     humanoid:finishAction()
   elseif not humanoid.timer_function then
     humanoid:setTimer(1, action_use_object_tick)
+  end
+  -- Only patients can be vaccination candidates so no need to check
+  if humanoid.vaccination_candidate then
+    humanoid:removeVaccinationCandidateStatus()
   end
 end)
 
@@ -369,7 +417,7 @@ local function action_use_object_start(action, humanoid)
   local anims = object.object_type.usage_animations[orient]
   action.anims = anims
   action.mirror_flags = flags
-  if action.prolonged_usage == nil and anims.begin_use and 
+  if action.prolonged_usage == nil and anims.begin_use and
     anims.in_use and anims.finish_use then
     action.prolonged_usage = true
   end

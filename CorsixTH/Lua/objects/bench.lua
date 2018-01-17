@@ -145,6 +145,9 @@ object.orientations = {
 
 class "Bench" (Object)
 
+---@type Bench
+local Bench = _G["Bench"]
+
 function Bench:Bench(...)
   self:Object(...)
 end
@@ -154,7 +157,7 @@ end
 function Bench:removeUser(user)
   if user then
     local has_idle = false
-    for i, action in pairs(user.action_queue) do
+    for _, action in pairs(user.action_queue) do
       if action.name == "idle" then
         has_idle = true
       end
@@ -181,13 +184,13 @@ function Bench:onDestroy()
   end
 
   -- if patient is heading for the destroyed bench then do the same
-  -- things as if they were sitting on it 
+  -- things as if they were sitting on it
   if self.reserved_for ~= nil then
     self.reserved_for:handleRemovedObject(self)
     self:removeUser(self.reserved_for)
   end
 
-  
+
   Object.onDestroy(self)
 end
 

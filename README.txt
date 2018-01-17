@@ -1,5 +1,5 @@
 ------------------------------------------------------------------------------
--- CorsixTH - Trunk
+-- CorsixTH
 ------------------------------------------------------------------------------
 
 CorsixTH aims to reimplement the game engine of Theme Hospital, and be able to
@@ -29,7 +29,7 @@ Briefly:
     Linux and OS X users simply run the game and set the location of the 
     original game files when requested.
 4b) If you have a source code distribution, compile it.
-    See http://code.google.com/p/corsix-th/wiki/HowToCompile for details.
+    See https://github.com/CorsixTH/CorsixTH/wiki/How-To-Compile for details.
     Start the game for the first time. You will be asked for the location of
     the Theme Hospital data files. Select the directory you chose in step 3.
 5)  Go play! If this doesn't go smoothly, then consult:
@@ -37,7 +37,17 @@ Briefly:
     http://forums.corsixth.com/
     http://groups.google.com/group/corsix-th-dev
     #corsix-th on FreeNode (IRC)
-   
+
+------------------------------------------------------------------------------
+-- CorsixTH.exe Optional Startup Arguments
+------------------------------------------------------------------------------
+
+--connect-lua-dbgp : Before App.lua is executed connect a Lua DBGp client & to a Lua DBGp server.
+--interpreter=... : loadfile(...) instead of CorsixTH.lua.
+--config-file=... : Makes CorsixTH use the specified config file.
+--bitmap-dir=... : Makes CorsixTH use the specified bitmap directory.
+--lua-dir= : Makes CorsixTH use the specified Lua scripts directory.
+
 ------------------------------------------------------------------------------
 -- Contact Details
 ------------------------------------------------------------------------------

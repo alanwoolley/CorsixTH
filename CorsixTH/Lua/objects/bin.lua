@@ -24,6 +24,7 @@ object.thob = 50
 object.name = _S.object.bin
 object.tooltip = _S.tooltip.objects.bin
 object.ticks = false
+object.corridor_object = 6
 object.class = "SideObject"
 object.build_preview_animation = 5096
 object.idle_animations = {
@@ -41,6 +42,9 @@ object.orientations = {
 
 class "SideObject" (Object)
 
+---@type SideObject
+local SideObject = _G["SideObject"]
+
 function SideObject:SideObject(...)
   self:Object(...)
 end
@@ -55,14 +59,14 @@ function SideObject:getDrawingLayer()
       if self.object_type.thob == 50 then
       --[[ bins have two orientations north and east by they are displayed in
         the north and west part of the tile respectively which could lead to
-        a graphical glitch in which a bin in the west part of the tile is 
+        a graphical glitch in which a bin in the west part of the tile is
         displayed over a doctor in the middle of the tile ]]
         return 2
       else
         return 8
       end
     else --south
-      return 9;
+      return 9
     end
   end
 end
