@@ -99,6 +99,7 @@ menu_options = {
   jukebox = "  (J) JUKEBOX  ",
   lock_windows = "  LOCK WINDOWS  ",
   edge_scrolling = "  EDGE SCROLLING  ",
+  capture_mouse = "  CAPTURE MOUSE  ",
   adviser_disabled = "  (SHIFT+A) ADVISER  ",
   warmth_colors = "  WARMTH COLOURS  ",
   wage_increase = "  WAGE REQUESTS",
@@ -356,6 +357,7 @@ options_window = {
   option_off = "Off",
   fullscreen = "Fullscreen",
   resolution = "Resolution",
+  capture_mouse = "Capture Mouse",
   custom_resolution = "Custom...",
   width = "Width",
   height = "Height",
@@ -373,6 +375,7 @@ tooltip.options_window = {
   fullscreen_button = "Click to toggle fullscreen mode",
   resolution = "The resolution the game should run in",
   select_resolution = "Select a new resolution",
+  capture_mouse = "Click to toggle capturing the cursor in the game window",
   width = "Enter desired screen width",
   height = "Enter desired screen height",
   apply = "Apply the entered resolution",
@@ -546,7 +549,7 @@ tooltip.information = {
 totd_window = {
   tips = {
     "Every hospital needs a reception desk and a GP's office to get going. After that, it depends on what kind of patients are visiting your hospital. A pharmacy is always a good choice, though.",
-    "Machines such as the Inflation need maintenance. Employ a handyman or two to repair your machines, or you'll risk your staff and patients getting hurt.",
+    "Machines such as the Inflator need maintenance. Employ a handyman or two to repair your machines, or you'll risk your staff and patients getting hurt.",
     "After a while, your staff will get tired. Be sure to build a staff room, so they can relax.",
     "Place enough radiators to keep your staff and patients warm, or they will become unhappy. Use the town map to locate any spots in your hospital that need more heating.",
     "A doctor's skill level greatly influences the quality and speed of his diagnoses. Place a skilled doctor in your GP's office, and you won't need as many additional diagnosis rooms.",
