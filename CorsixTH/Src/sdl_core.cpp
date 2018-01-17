@@ -270,7 +270,7 @@ static int l_mainloop(lua_State *L) {
                 nargs = 6;
                 break;
             case SDL_MULTIGESTURE:
-                lua_pushliteral(dispatcher, "gesture");
+                lua_pushliteral(dispatcher, "multigesture");
                 lua_pushinteger(dispatcher, e.mgesture.numFingers);
                 lua_pushinteger(dispatcher, e.mgesture.dTheta);
                 lua_pushinteger(dispatcher, e.mgesture.dDist);

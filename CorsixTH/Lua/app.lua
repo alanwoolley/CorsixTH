@@ -28,7 +28,7 @@ local runDebugger = dofile "run_debugger"
 -- Increment each time a savegame break would occur
 -- and add compatibility code in afterLoad functions
 
-local SAVEGAME_VERSION = 117
+local SAVEGAME_VERSION = 122
 
 class "App"
 
@@ -57,13 +57,13 @@ function App:App()
     touchup = self.onTouchUp,
     touchdown = self.onTouchDown,
     touchmove = self.onTouchMove,
-    gesture = self.onGesture,
     active = self.onWindowActive,
     window_resize = self.onWindowResize,
     music_over = self.onMusicOver,
     movie_over = self.onMovieOver,
     sound_over = self.onSoundOver,
     restart = self.restart,
+    multigesture = self.onMultiGesture,
     save = self.save,
     load = self.load,
     gamespeed = self.gamespeed,
@@ -163,6 +163,8 @@ function App:init()
   self.video = assert(TH.surface(self.config.width, self.config.height, unpack(modes)))
   self.video:setBlueFilterActive(false)
   SDL.wm.setIconWin32()
+
+  self.video:setCaptureMouse(self.config.capture_mouse)
 
   local caption_descs = {self.video:getRendererDetails()}
   if compile_opts.jit then
@@ -1121,6 +1123,10 @@ function App:onSoundOver(...)
   return self.audio:onSoundPlayed(...)
 end
 
+function App:onMultiGesture(...)
+  return self.ui:onMultiGesture(...)
+end
+
 function App:checkInstallFolder()
   self.fs = FileSystem()
   local status, _
@@ -1312,8 +1318,10 @@ end
 -- a specific savegame verion is from.
 function App:getVersion(version)
   local ver = version or self.savegame_version
-  if ver > 111 then
+  if ver > 122 then
     return "Trunk"
+  elseif ver > 111 then
+    return "v0.61"
   elseif ver > 105 then
     return "v0.60"
   elseif ver > 91 then
@@ -1338,8 +1346,7 @@ function App:getVersion(version)
 end
 
 function App:save(filename)
-  print ("saving : " .. filename)
-  return SaveGameFile(self.savegame_dir .. filename)
+  return SaveGameFile(filename)
 end
 -- Omit the usual file extension so this file cannot be seen from the normal load and save screen and cannot be overwritten
 function App:quickSave()
