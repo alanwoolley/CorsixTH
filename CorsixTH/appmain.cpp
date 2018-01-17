@@ -96,11 +96,15 @@ static int showsettingsdialog(lua_State *L) {
 
 static int startvibration(lua_State *L) {
     LOG_INFO("Starting Vibration");
+    LOG_INFO("Really");
     if (masterConfig.vibrate == 1) {
+		LOG_INFO("Vibration enabled");
         int arg = lua_gettop(L);
         int vibrationCode = lua_tointeger(L, arg);
+		LOG_INFO("Sending command");
         return sendCommandInt(jvm, COMMAND_START_VIBRATION, vibrationCode);
     }
+    return 0;
 }
 
 static int stopvibration(lua_State *L) {
@@ -108,6 +112,7 @@ static int stopvibration(lua_State *L) {
     if (masterConfig.vibrate == 1) {
         return sendCommand(jvm, COMMAND_STOP_VIBRATION);
     }
+    return 0;
 }
 static int gamespeedupdated(lua_State *L) {
 	LOG_INFO("Game speed updated");
@@ -151,6 +156,7 @@ static int gamesaveupdated(lua_State *L) {
   jEnv->SetObjectField(saveObj, jEnv->GetFieldID(cls, "screenshotPath", "Ljava/lang/String;"), ssString);
 
   sendCommandObj(jvm, COMMAND_GAME_SAVE_UPDATED, saveObj);
+    return 0;
 
 }
 
