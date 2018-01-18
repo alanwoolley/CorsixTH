@@ -1097,9 +1097,6 @@ function App:onTouchMove(...)
   return self.ui:onTouchMove(...)
 end
 
-function App:onGesture(...)
-  return self.ui:onGesture(...)
-end
 
 function App:onWindowActive(...)
   return self.ui:onWindowActive(...)

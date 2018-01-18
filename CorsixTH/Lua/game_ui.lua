@@ -33,10 +33,10 @@ local TH = require "TH"
 local shake_screen_max_movement = 50 --pixels
 
 -- 0.002 is about 5 pixels on a 1920 pixel display
-local multigesture_pinch_sensitivity_factor = 0.002
+local multigesture_pinch_sensitivity_factor = 1
 -- combined with the above, multiplying by 100 means minimum current_momentum.z for any detected pinch
 -- will result in a call to adjustZoom in the onTick method
-local multigesture_pinch_amplification_factor = 100
+local multigesture_pinch_amplification_factor = 0.05
 
 --! Game UI constructor.
 --!param app (Application) Application object.
@@ -137,6 +137,9 @@ end
 --! makeVisibleDiamond. This function calculates the minimum zoom_factor that
 --! would be allowed.
 function GameUI:calculateMinimumZoom()
+  -- This needs to be changed for Android because we don't have as much memory
+  -- and going too high too quickly will kill the game!
+
   local scr_w = self.app.config.width
   local scr_h = self.app.config.height
   local map_h = self.app.map.height
@@ -144,7 +147,7 @@ function GameUI:calculateMinimumZoom()
   -- Minimum width:  0 = 32 * map_h - (scr_h/factor) - (scr_w/factor) / 2,
   -- Minimum height: 0 = 16 * map_h - (scr_h/factor) / 2 - (scr_w/factor) / 4
   -- Both rearrange to:
-  local factor = (scr_w + 2 * scr_h) / (64 * map_h)
+  local factor = (scr_w + scr_h) / (1 * map_h)
 
   -- Due to precision issues a tolerance is needed otherwise setZoom might fail
   factor = factor + 0.001
@@ -153,7 +156,7 @@ function GameUI:calculateMinimumZoom()
 end
 
 function GameUI:setZoom(factor)
-  if factor <= 0 then
+  if factor <= 0.5 then
     return false
   end
   if not factor or math.abs(factor - 1) < 0.001 then
@@ -465,10 +468,10 @@ function GameUI:onWindowActive(gain)
   end
 end
 
-function GameUI:allowDragScroll()
-  local edit_window = self.app.ui:getWindow(UIEditRoom)
-  return not edit_window
-end
+--function GameUI:allowDragScroll()
+--  local edit_window = self.app.ui:getWindow(UIEditRoom)
+--  return not edit_window
+--end
 
 -- TODO: try to remove duplication with UI:onMouseMove
 function GameUI:onMouseMove(x, y, dx, dy)
@@ -482,7 +485,7 @@ function GameUI:onMouseMove(x, y, dx, dy)
   if self:onCursorWorldPositionChange() or self.simulated_cursor then
     repaint = true
   end
-  if self.buttons_down.mouse_middle or self.buttons_down.mouse_left and self:allowDragScroll() then
+  if self.buttons_down.mouse_middle then
     local zoom = self.zoom_factor
     self.current_momentum.x = -dx/zoom
     self.current_momentum.y = -dy/zoom
@@ -631,11 +634,14 @@ function GameUI:onMultiGesture(numfingers, dTheta, dDist, x, y)
   if numfingers == 2 then
     -- calculate magnitude of pinch
     local mag = math.abs(dDist)
-    if mag > multigesture_pinch_sensitivity_factor then
+    if mag > multigesture_pinch_sensitivity_factor and self.current_momentum.x < 1 and self.current_momentum.y < 1 then
       -- pinch action - constant needs to be tweaked
       self.current_momentum.z = self.current_momentum.z + dDist * multigesture_pinch_amplification_factor
       return true
     else
+      if self.current_momentum.z > 0.5 then
+        return
+      end
       -- scroll map
       local normx = self.app.config.width * x
       local normy = self.app.config.height * y
@@ -646,8 +652,8 @@ function GameUI:onMultiGesture(numfingers, dTheta, dDist, x, y)
       else
         local dx = normx - self.multigesturemove.x
         local dy = normy - self.multigesturemove.y
-        self.current_momentum.x = self.current_momentum.x - dx
-        self.current_momentum.y = self.current_momentum.y - dy
+        self.current_momentum.x = self.current_momentum.x - dx/1000
+        self.current_momentum.y = self.current_momentum.y - dy/1000
         self.multigesturemove.x = normx
         self.multigesturemove.y = normy
       end

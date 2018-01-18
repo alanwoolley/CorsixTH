@@ -670,7 +670,6 @@ function UI:onMouseWheel(x, y)
 end
 
 -- Touch controls
-local gesturing = false
 local fingersdown = 0
 local touchtick = -1
 local downdelayticks = 15
@@ -686,12 +685,7 @@ function UI:onTouchUp(finger, x, y)
     return
   end
 
-  if gesturing and fingersdown == 0 then
-    gesturing = false
-    return
-  end
-
-  if finger > 0 or gesturing then
+  if finger > 0 then
     -- Ignore for now
     return
   end
@@ -711,7 +705,6 @@ function UI:onTouchDown(finger, x, y)
   print ("touch down finger: " .. finger .. " x: " .. x .. " y: " .. y)
 
   if finger > 0 and touchtick > -1 then
-    gesturing = true
     touchtick = -1
     -- Ignore for now
     return
@@ -738,7 +731,7 @@ function UI:delayedTouchDown(button)
 end
 
 function UI:onTouchMove(finger, x, y, dx, dy)
-  if finger > 0 or gesturing then
+  if finger > 0 or fingersdown > 1 then
     -- Ignore for now
     return
   end
@@ -750,25 +743,22 @@ function UI:onTouchMove(finger, x, y, dx, dy)
   end
 
   self:onMouseMove(x, y, dx, dy)
-
-
-
 end
 
-function UI:onGesture(num_fingers, d_theta, d_dist, x, y)
-  if not gesturing then
-    return
-  end
-
-
-  print ("gesture. Fingers: " .. num_fingers .. " angle: " .. d_theta .. " dist: " .. d_dist)
-
-  self:onMouseMove(x,y,0,0)
-  --self:onMouseWheel(0, d_dist)
-  if self.app.world then
-    self.app.world:adjustZoom(d_dist)
-  end
-end
+--function UI:onGesture(num_fingers, d_theta, d_dist, x, y)
+--  if not gesturing then
+--    return
+--  end
+--
+--
+--  print ("gesture. Fingers: " .. num_fingers .. " angle: " .. d_theta .. " dist: " .. d_dist)
+--
+--  self:onMouseMove(x,y,0,0)
+--  --self:onMouseWheel(0, d_dist)
+--  if self.app.world then
+--    self.app.world:adjustZoom(d_dist)
+--  end
+--end
 
 --[[ Determines if a cursor entity can be clicked
 @param entity (Entity,nil) cursor entity clicked on if any
@@ -827,6 +817,11 @@ function UI:onWindowResize(width, height)
 end
 
 function UI:onMouseMove(x, y, dx, dy)
+  -- Don't move the mouse if we have 2 fingers down
+  if fingersdown > 1 then
+    return true
+  end
+
   local repaint = UpdateCursorPosition(self.app.video, x, y)
 
   self.cursor_x = x
