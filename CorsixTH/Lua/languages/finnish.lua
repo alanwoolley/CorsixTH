@@ -81,16 +81,16 @@ fax = {
 -- 3. Menu
 menu_debug = {
   jump_to_level         = "  SIIRRY TASOLLE  ",
-  transparent_walls     = "  (X) LÄPINÄKYVÄT SEINÄT  ",
+  transparent_walls     = "  (%1%) LÄPINÄKYVÄT SEINÄT  ",
   limit_camera          = "  RAJOITETTU KAMERA  ",
   disable_salary_raise  = "  ESTÄ PALKAN KOROTTAMINEN  ",
   make_debug_fax        = "  LUO DEBUG-FAKSI  ",
   make_debug_patient    = "  LISÄÄ DEBUG-POTILAS  ",
-  cheats                = "  (F11) HUIJAUKSET  ",
-  lua_console           = "  (F12) LUA-KOMENTORIVI  ",
+  cheats                = "  (%1%) HUIJAUKSET  ",
+  lua_console           = "  (%1%) LUA-KOMENTORIVI  ",
   calls_dispatcher      = "  TEHTÄVIEN VÄLITYS  ",
-  dump_strings          = "  DUMPPAA TEKSTIT  ",
-  dump_gamelog          = "  (CTRL+D) DUMPPAA PELILOGI  ",
+  dump_strings          = "  (%1%) DUMPPAA TEKSTIT  ",
+  dump_gamelog          = "  (%1%) DUMPPAA PELILOGI  ",
   map_overlay           = "  KARTTAKERROKSET  ",
   sprite_viewer         = "  SPRITE-KATSELIN  ",
 }
@@ -111,12 +111,12 @@ menu_debug_overlay = {
 }
 
 menu_options_game_speed = {
-  slowest               = "  (1) HITAIN  ",
-  slower                = "  (2) HITAAMPI  ",
-  normal                = "  (3) NORMAALI  ",
-  max_speed             = "  (4) MAKSIMINOPEUS  ",
-  and_then_some_more    = "  (5) JA VÄHÄN PÄÄLLE  ",
-  pause                 = "  (P) PYSÄYTÄ  "
+  slowest               = "  (%1%) HITAIN  ",
+  slower                = "  (%1%) HITAAMPI  ",
+  normal                = "  (%1%) NORMAALI  ",
+  max_speed             = "  (%1%) MAKSIMINOPEUS  ",
+  and_then_some_more    = "  (%1%) JA VÄHÄN PÄÄLLE  ",
+  pause                 = "  (%1%) PYSÄYTÄ  "
 }
 
 menu_options_volume = {
@@ -383,11 +383,11 @@ install = {
 -- 9. Level introductions
 introduction_texts = {
   demo =
-    "Tervetuloa demosairaalaan!" ..
-    "Valitettavasti demoversio sisältää ainoastaan tämän tason. Täällä on kuitenkin enemmän kuin tarpeeksi tekemistä!" ..
-    "Kohtaat erilaisia sairauksia, joiden hoitaminen vaatii erilaisia huoneita. Hätätilanteita saattaa tapahtua ajoittain. Lisäksi sinun pitää kehittää lisää huoneita tutkimusosaston avulla." ..
-    "Tavoitteesi on ansaita 100 000$, nostaa sairaalan arvo yli 70 000$:n ja maineesi yli 700:n parantaen samalla vähintään 75% potilaistasi." ..
-    "Pidä huoli, ettei maineesi putoa alle 300:n ja ettei yli 40 prosenttia potilaistasi pääse kuolemaan, tai häviät tason." ..
+    "Tervetuloa demosairaalaan!//" ..
+    "Valitettavasti demoversio sisältää ainoastaan tämän tason. Täällä on kuitenkin enemmän kuin tarpeeksi tekemistä! " ..
+    "Kohtaat erilaisia sairauksia, joiden hoitaminen vaatii erilaisia huoneita. Hätätilanteita saattaa tapahtua ajoittain. Lisäksi sinun pitää kehittää lisää huoneita tutkimusosaston avulla. " ..
+    "Tavoitteesi on ansaita 100 000$, nostaa sairaalan arvo yli 70 000$:n ja maineesi yli 700:n parantaen samalla vähintään 75% potilaistasi. " ..
+    "Pidä huoli, ettei maineesi putoa alle 300:n ja ettei yli 40 prosenttia potilaistasi pääse kuolemaan, tai häviät tason.//" ..
     "Onnea!",
   level1 =
     "Tervetuloa ensimmäiseen sairaalaasi!//" ..
@@ -1170,10 +1170,10 @@ menu = {
 
 -- Menu File
 menu_file = {
-  load          = "  LATAA  ",
-  save          = "  TALLENNA  ",
-  restart       = "  ALOITA ALUSTA  ",
-  quit          = "  LOPETA  ",
+  load          = "  (%1%) LATAA  ",
+  save          = "  (%1%) TALLENNA  ",
+  restart       = "  (%1%) ALOITA ALUSTA  ",
+  quit          = "  (%1%) LOPETA  ",
 }
 menu_file_load = {
   [1] = "  PELI 1  ",
@@ -1188,18 +1188,18 @@ menu_file_load = {
 
 -- Menu Options
 menu_options = {
-  adviser_disabled  = "  AVUSTAJA  ",
-  announcements     = "  KUULUTUKSET  ",
+  adviser_disabled  = "  (%1%) AVUSTAJA  ",
+  announcements     = "  (%1%) KUULUTUKSET  ",
   announcements_vol = "  KUULUTUSTEN VOIMAKKUUS  ",
   autosave          = "  AUTOMAATTITALLENNUS  ",
   edge_scrolling    = "  REUNAVIERITYS  ",
   game_speed        = "  PELINOPEUS  ",
-  jukebox           = "  JUKEBOKSI  ",
+  jukebox           = "  (%1%) JUKEBOKSI  ",
   lock_windows      = "  LUKITSE IKKUNAT  ",
-  music             = "  MUSIIKKI  ",
+  music             = "  (%1%) MUSIIKKI  ",
   music_vol         = "  MUSIIKIN VOIMAKKUUS  ",
   settings          = "  ASETUKSET  ",
-  sound             = "  ÄÄNI  ",
+  sound             = "  (%1%) ÄÄNI  ",
   sound_vol         = "  ÄÄNENVOIMAKKUUS  ",
 }
 
@@ -1212,14 +1212,14 @@ menu_display = {
 
 -- Menu Charts
 menu_charts = {
-  statement     = "  TILIOTE  ",
-  casebook      = "  TAPAUSKIRJA  ",
-  policy        = "  KÄYTÄNNÖT  ",
-  research      = "  TUTKIMUS  ",
-  graphs        = "  GRAAFIT  ",
-  staff_listing = "  TYÖNTEKIJÄT  ",
-  bank_manager  = "  PANKINJOHTAJA  ",
-  status        = "  TILANNE  ",
+  statement     = "  (%1%) TILIOTE  ",
+  casebook      = "  (%1%) TAPAUSKIRJA  ",
+  policy        = "  (%1%) KÄYTÄNNÖT  ",
+  research      = "  (%1%) TUTKIMUS  ",
+  graphs        = "  (%1%) GRAAFIT  ",
+  staff_listing = "  (%1%) TYÖNTEKIJÄT  ",
+  bank_manager  = "  (%1%) PANKINJOHTAJA  ",
+  status        = "  (%1%) TILANNE  ",
   briefing      = "  TIIVISTELMÄ  ",
 }
 
@@ -2693,31 +2693,21 @@ fax = {
     rep_loss            = "Sairaalasi maine on huonontunut.",
 
     remarks = {
-      super = {
-        "Mikä mahtava sairaala. Seuraavan kerran, kun olen sairas, haluan sinne hoitoon.",
-        "No tuota voi jo kutsua sairaalaksi.",
-        "Uskomaton sairaala. Ja minun pitäisi tietää; olen käynyt aika monessa.",
-      },
-      good = {
-        "Hyvin johdettu laitos. Kiitos, että kutsuit minut sinne.",
-        "Hmm. Ei totisesti yhtään hullumpi sairaala.",
-        "Nautin käynnistä mukavassa sairaalassasi. Tekeekö kenenkään mieli intialaista?",
-      },
-      mediocre = {
-        "No, olen nähnyt huonompiakin, mutta voisit kyllä tehdä hieman parannuksia.",
-        "Voi että. Ei mikään mukava paikka, jos tuntee olonsa kurjaksi.",
-        "Rehellisesti sanoen se oli ihan perussairaala. Odotin vähän enemmän.",
-      },
-      bad = {
-        "Miksi vaivauduin? Se oli kauheampaa kuin nelituntinen ooppera!",
-        "Inhottava paikka. Kutsutaanko tuota sairaalaksi? Sikolättihän tuo oli!",
-        "Olen kyllästynyt käymään tuollaisissa haisevissa koloissa julkisuuden henkilönä. Minä eroan!",
-      },
-      very_bad = {
-        "Mikä läävä! Yritän saada sen lakkautettua.",
-        "En ole koskaan nähnyt noin kamalaa sairaalaa. Mikä häpeätahra!",
-        "Olen järkyttynyt. Ei tuota voi kutsua sairaalaksi! Minä tarvitsen juotavaa.",
-      },
+      [1] = "Mikä mahtava sairaala. Seuraavan kerran, kun olen sairas, haluan sinne hoitoon.",
+      [2] = "No tuota voi jo kutsua sairaalaksi.",
+      [3] = "Uskomaton sairaala. Ja minun pitäisi tietää; olen käynyt aika monessa.",
+      [4] = "Hyvin johdettu laitos. Kiitos, että kutsuit minut sinne.",
+      [5] = "Hmm. Ei totisesti yhtään hullumpi sairaala.",
+      [6] = "Nautin käynnistä mukavassa sairaalassasi. Tekeekö kenenkään mieli intialaista?",
+      [7] = "No, olen nähnyt huonompiakin, mutta voisit kyllä tehdä hieman parannuksia.",
+      [8] = "Voi että. Ei mikään mukava paikka, jos tuntee olonsa kurjaksi.",
+      [9] = "Rehellisesti sanoen se oli ihan perussairaala. Odotin vähän enemmän.",
+      [10] = "Miksi vaivauduin? Se oli kauheampaa kuin nelituntinen ooppera!",
+      [11] = "Inhottava paikka. Kutsutaanko tuota sairaalaksi? Sikolättihän tuo oli!",
+      [12] = "Olen kyllästynyt käymään tuollaisissa haisevissa koloissa julkisuuden henkilönä. Minä eroan!",
+      [13] = "Mikä läävä! Yritän saada sen lakkautettua.",
+      [14] = "En ole koskaan nähnyt noin kamalaa sairaalaa. Mikä häpeätahra!",
+      [15] = "Olen järkyttynyt. Ei tuota voi kutsua sairaalaksi! Minä tarvitsen juotavaa.",
     },
   },
 

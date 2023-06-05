@@ -31,10 +31,11 @@ local function meander_action_start(action, humanoid)
   local room = humanoid:getRoom()
   -- Answering call queue
   if class.is(humanoid, Staff) and humanoid:isIdle() and not room then
-  if humanoid.humanoid_class == "Handyman" then
-    if humanoid:searchForHandymanTask() == true then
-      return
-    end
+    if humanoid.humanoid_class == "Handyman" then
+      if humanoid:searchForHandymanTask() == true then
+        return
+      end
+
     -- If staff starts wandering around in Idle mode,
     -- he's effectively not in any room and need not to comeback after
     -- staff room visit
@@ -43,6 +44,7 @@ local function meander_action_start(action, humanoid)
         humanoid:finishAction()
       end
       return
+
     else
       -- Nowhere to go, start going to the old room if it's still in
       -- need of staff.
@@ -65,8 +67,17 @@ local function meander_action_start(action, humanoid)
       humanoid:setDynamicInfoText(_S.dynamic_info.staff.actions.wandering)
     end
   end
+
+  -- Handymen may have an assigned parcel, but they are free to visit any staff
+  -- room to rest, or wait inside a room to repair
+  local meander_parcel
+  if humanoid.humanoid_class == "Handyman" and humanoid.parcelNr > 0 and
+      not humanoid:getRoom() then
+    meander_parcel = humanoid.parcelNr
+  end
+
   local x, y = humanoid.world.pathfinder:findIdleTile(humanoid.tile_x,
-      humanoid.tile_y, math.random(1, 24))
+      humanoid.tile_y, math.random(1, 24), meander_parcel)
 
   if x == humanoid.tile_x and y == humanoid.tile_y then
     -- Nowhere to walk to - go idle instead, or go onto the next action
@@ -89,14 +100,15 @@ local function meander_action_start(action, humanoid)
     end
   elseif action.loop_callback then
     action.loop_callback()
-    if action ~= humanoid.action_queue[1] then
+    if action ~= humanoid:getCurrentAction() then
       return
     end
   end
 
   local procrastination
-  if action.can_idle and math.random(1, 3) == 1 then
-    procrastination = IdleAction():setCount(math.random(25, 40)):setMustHappen(action.must_happen)
+  if action.can_idle then
+    action.can_idle = false
+    procrastination = IdleAction():setCount(math.random(5, 40)):setMustHappen(action.must_happen)
   else
     action.can_idle = true
     procrastination = WalkAction(x, y):setMustHappen(action.must_happen)

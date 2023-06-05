@@ -145,7 +145,7 @@ local function action_queue_finish_standing(action, humanoid)
     if index == -1 then
       -- Attempt to recover by assuming the person is sitting down.
       print("Warning: Idle not in action_queue")
-      if humanoid.action_queue[1].name == "use_object" then
+      if humanoid:getCurrentAction().name == "use_object" then
         -- It is likely that the person is sitting down.
         return action_queue_leave_bench(action, humanoid)
       else
@@ -203,12 +203,12 @@ local action_queue_on_change_position = permanent"action_queue_on_change_positio
   end
 
   -- Find out if we have to be standing up - considering humanoid_class covers both health inspector and VIP
-  local must_stand = class.is(humanoid, Staff) or humanoid.humanoid_class == "Inspector" or
-    humanoid.humanoid_class == "VIP" or (humanoid.disease and humanoid.disease.must_stand)
+  local must_stand = not class.is(humanoid, Patient) or action.is_leaving or
+    (humanoid.disease and humanoid.disease.must_stand)
   local queue = action.queue
   if not must_stand then
     for i = 1, queue.bench_threshold do
-      if queue[i] == humanoid then
+      if queue:reportedHumanoid(i) == humanoid then
         must_stand = true
         break
       end
@@ -275,7 +275,7 @@ local action_queue_on_change_position = permanent"action_queue_on_change_positio
       end
     end
     humanoid.action_queue[idle_index].direction = idle_direction
-    humanoid:queueAction(WalkAction(ix, iy):setMustHappen(true), idle_index - 1)
+    humanoid:queueAction(WalkAction(ix, iy):setMustHappen(true):setIsLeaving(humanoid:isLeaving()), idle_index - 1)
   else
     action.current_bench_distance = nil
     local num_actions_prior = action_queue_leave_bench(action, humanoid)
@@ -319,7 +319,7 @@ function(action, humanoid, machine, mx, my, fun_after_use)
     -- If the patient is still in the queue, insert an idle action so that
     -- change_position can do its work.
     -- Note that it is inserted after the currently executing use_object action.
-    if action.is_in_queue then
+    if action.is_in_queue and not humanoid.going_home then
       humanoid:queueAction(IdleAction():setMustHappen(true), 1)
       action_queue_on_change_position(action, humanoid)
     end

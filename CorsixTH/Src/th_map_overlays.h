@@ -26,91 +26,87 @@ SOFTWARE.
 #include <cstddef>
 #include <string>
 
-class THFont;
-class THMap;
-class THRenderTarget;
-class THSpriteSheet;
+class font;
+class level_map;
+class render_target;
+class sprite_sheet;
 
-class THMapOverlay
-{
-public:
-    virtual ~THMapOverlay() = default;
+class map_overlay {
+ public:
+  virtual ~map_overlay() = default;
 
-    virtual void drawCell(THRenderTarget* pCanvas, int iCanvasX, int iCanvasY,
-                          const THMap* pMap, int iNodeX, int iNodeY) = 0;
+  virtual void draw_cell(render_target* pCanvas, int iCanvasX, int iCanvasY,
+                         const level_map* pMap, int iNodeX, int iNodeY) = 0;
 };
 
-class THMapOverlayPair : public THMapOverlay
-{
-public:
-    THMapOverlayPair();
-    virtual ~THMapOverlayPair();
+class map_overlay_pair : public map_overlay {
+ public:
+  map_overlay_pair();
+  ~map_overlay_pair() override;
 
-    void setFirst(THMapOverlay* pOverlay, bool bTakeOwnership);
-    void setSecond(THMapOverlay* pOverlay, bool bTakeOwnership);
+  void set_first(map_overlay* pOverlay, bool bTakeOwnership);
+  void set_second(map_overlay* pOverlay, bool bTakeOwnership);
 
-    void drawCell(THRenderTarget* pCanvas, int iCanvasX, int iCanvasY,
-                  const THMap* pMap, int iNodeX, int iNodeY) override;
+  void draw_cell(render_target* pCanvas, int iCanvasX, int iCanvasY,
+                 const level_map* pMap, int iNodeX, int iNodeY) override;
 
-private:
-    THMapOverlay *m_pFirst, *m_pSecond;
-    bool m_bOwnFirst, m_bOwnSecond;
+ private:
+  map_overlay *first, *second;
+  bool owns_first, owns_second;
 };
 
-class THMapTypicalOverlay : public THMapOverlay
-{
-public:
-    THMapTypicalOverlay();
-    virtual ~THMapTypicalOverlay();
+class map_typical_overlay : public map_overlay {
+ public:
+  map_typical_overlay();
+  ~map_typical_overlay() override;
 
-    void setSprites(THSpriteSheet* pSheet, bool bTakeOwnership);
-    void setFont(THFont* pFont, bool bTakeOwnership);
+  void set_sprites(sprite_sheet* pSheet, bool bTakeOwnership);
+  void set_font(::font* font, bool take_ownership);
 
-protected:
-    void _drawText(THRenderTarget* pCanvas, int iX, int iY, std::string str);
+ protected:
+  void draw_text(render_target* pCanvas, int iX, int iY,
+                 const std::string& str);
 
-    THSpriteSheet* m_pSprites;
-    THFont* m_pFont;
+  sprite_sheet* sprites;
+  ::font* font;
 
-private:
-    bool m_bOwnsSprites;
-    bool m_bOwnsFont;
+ private:
+  bool owns_sprites;
+  bool owns_font;
 };
 
-class THMapTextOverlay : public THMapTypicalOverlay
-{
-public:
-    THMapTextOverlay();
-    virtual ~THMapTextOverlay() = default;
+class map_text_overlay : public map_typical_overlay {
+ public:
+  map_text_overlay();
+  ~map_text_overlay() override = default;
 
-    virtual void drawCell(THRenderTarget* pCanvas, int iCanvasX, int iCanvasY,
-        const THMap* pMap, int iNodeX, int iNodeY);
+  void draw_cell(render_target* pCanvas, int iCanvasX, int iCanvasY,
+                 const level_map* pMap, int iNodeX, int iNodeY) override;
 
-    void setBackgroundSprite(size_t iSprite);
-    virtual const std::string getText(const THMap* pMap, int iNodeX, int iNodeY) = 0;
+  void set_background_sprite(size_t iSprite);
+  virtual const std::string get_text(const level_map* pMap, int iNodeX,
+                                     int iNodeY) = 0;
 
-private:
-    size_t m_iBackgroundSprite;
+ private:
+  size_t background_sprite;
 };
 
-class THMapPositionsOverlay final : public THMapTextOverlay
-{
-public:
-    const std::string getText(const THMap* pMap, int iNodeX, int iNodeY) override;
+class map_positions_overlay final : public map_text_overlay {
+ public:
+  const std::string get_text(const level_map* pMap, int iNodeX,
+                             int iNodeY) override;
 };
 
-class THMapFlagsOverlay final : public THMapTypicalOverlay
-{
-public:
-    void drawCell(THRenderTarget* pCanvas, int iCanvasX, int iCanvasY,
-                  const THMap* pMap, int iNodeX, int iNodeY) override;
+class map_flags_overlay final : public map_typical_overlay {
+ public:
+  void draw_cell(render_target* pCanvas, int iCanvasX, int iCanvasY,
+                 const level_map* pMap, int iNodeX, int iNodeY) override;
 };
 
-class THMapParcelsOverlay final : public THMapTypicalOverlay
-{
-public:
-    void drawCell(THRenderTarget* pCanvas, int iCanvasX, int iCanvasY,
-                  const THMap* pMap, int iNodeX, int iNodeY) override;
+class map_parcels_overlay final : public map_typical_overlay {
+ public:
+  void draw_cell(render_target* pCanvas, int iCanvasX, int iCanvasY,
+                 const level_map* pMap, int iNodeX, int iNodeY) override;
 };
 
 #endif

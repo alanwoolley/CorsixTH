@@ -44,7 +44,7 @@ function UIMessage:UIMessage(ui, x, stop_x, onClose, type, message, owner, timeo
       owner:message_callback(true) -- There can be only one message per owner, just remove any existing one
     end
     assert(owner.message_callback == nil)
-    owner.message_callback = --[[persistable:owner_of_message_callback]] function(humanoid, do_remove)
+    owner.message_callback = --[[persistable:owner_of_message_callback]] function(_, do_remove)
       if do_remove then
         self:removeMessage()
       else
@@ -84,10 +84,9 @@ function UIMessage:draw(canvas, x, y)
   if self.on_top then
     Window.draw(self, canvas, x, y)
   else
-    local x_, y_, w, h = canvas:getClip()
-    canvas:setClip(x_, y + self.stop_y, w, self.height, true)
+    canvas:pushClip(0, y + self.stop_y, canvas:getWidth(), self.height, true)
     Window.draw(self, canvas, x, y)
-    canvas:setClip(x_, y_, w, h)
+    canvas:popClip()
   end
 end
 
@@ -104,12 +103,15 @@ function UIMessage:adjustToggle()
   end
 end
 
+--! Displays the fax/strike message to the player when opened from the bottom_panel.
 function UIMessage:openMessage()
+  if TheApp.world:isUserActionProhibited() and not self.ui:checkForMustPauseWindows() then
+    self.ui:playSound("wrong2.wav")
+    self:adjustToggle()
+    return
+  end
   if TheApp.world:isCurrentSpeed("Speed Up") then
     TheApp.world:previousSpeed()
-  end
-  if not TheApp.world:isCurrentSpeed("Pause") then
-    TheApp.world:setSpeed("Pause")
   end
   if self.type == "strike" then -- strikes are special cases, as they are not faxes
     self.ui:addWindow(UIStaffRise(self.ui, self.owner, self.message))
@@ -144,8 +146,10 @@ function UIMessage:removeMessage(choice_number)
       self.owner.message = nil
       self.owner.message_callback = nil
     end
-    self:onClose(false)
-    self.onClose = nil
+    if self.onClose then
+      self:onClose(false)
+      self.onClose = nil
+    end
     self:close()
   end
 end

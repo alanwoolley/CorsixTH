@@ -20,6 +20,7 @@ SOFTWARE. --]]
 
 local room = {}
 room.id = "research"
+room.vip_must_visit = true
 room.level_config_id = 28
 room.class = "ResearchRoom"
 room.name = _S.rooms_short.research_room
@@ -103,7 +104,7 @@ function ResearchRoom:doStaffUseCycle(staff, previous_object)
   end
 
   local num_meanders = math.random(2, 4)
-  local loop_callback_meander = --[[persistable:research_meander_loop_callback]] function(action)
+  local loop_callback_meander = --[[persistable:research_meander_loop_callback]] function()
     num_meanders = num_meanders - 1
     if num_meanders == 0 then
       self:doStaffUseCycle(staff)
@@ -130,12 +131,12 @@ function ResearchRoom:roomFinished()
   -- Is this the first research department built?
   if not self.hospital.research_dep_built and not TheApp.using_demo_files then
     self.hospital.research_dep_built = true
-    self.world.ui.adviser:say(_A.information.initial_general_advice
-    .research_now_available)
+    self.hospital:giveAdvice({_A.information.initial_general_advice
+      .research_now_available})
   end
   -- Also check if it would be good to hire a researcher.
-  if not self.hospital:hasStaffOfCategory("Researcher") then
-    self.world.ui.adviser:say(_A.room_requirements.research_room_need_researcher)
+  if self.hospital:countStaffOfCategory("Researcher", 1) == 0 then
+    self.hospital:giveAdvice({_A.room_requirements.research_room_need_researcher})
   end
   return Room.roomFinished(self)
 end
@@ -151,7 +152,7 @@ function ResearchRoom:commandEnteringStaff(staff)
 end
 
 function ResearchRoom:commandEnteringPatient(patient)
-  local staff = next(self.staff_member_set)
+  local staff = self:getStaffMember()
   local autopsy, stf_x, stf_y = self.world:findObjectNear(patient, "autopsy")
   local pat_x, pat_y = autopsy:getSecondaryUsageTile()
   patient:walkTo(pat_x, pat_y)
@@ -165,16 +166,19 @@ function ResearchRoom:commandEnteringPatient(patient)
     -- Some research is done. :) Might trigger a loss of reputation though.
     local hosp = self.hospital
     local patient_room = patient.disease.treatment_rooms[#patient.disease.treatment_rooms]
-    hosp.research:addResearchPoints("dummy", patient_room)
-    if not hosp.autopsy_discovered and hosp.discover_autopsy_risk > math.random(1, 100) then
-      -- Can only be discovered once.
-      hosp.autopsy_discovered = true
-      hosp:changeReputation("autopsy_discovered")
-      hosp.world.ui.adviser:say(_A.research.autopsy_discovered_rep_loss)
+    hosp.research:addResearchPointsForAutopsy(patient_room)
+    -- average morale of all staff affects chances
+    local avg_happiness = hosp:getAverageStaffAttribute("happiness", nil)
+    local autopsy_discovered
+    -- low morale - more likely to discover
+    if avg_happiness < 0.25 then
+      autopsy_discovered = math.random(1,3) ~= 1
     else
-      -- The risk increases after each use.
-      -- TODO: Should it ever become 100%?
-      self.hospital.discover_autopsy_risk = self.hospital.discover_autopsy_risk + 10
+      autopsy_discovered = math.random(1,3) == 1
+    end
+    if autopsy_discovered then
+      hosp:changeReputation("autopsy_discovered")
+      hosp:giveAdvice({_A.research.autopsy_discovered_rep_loss})
     end
     if patient.hospital then
       hosp:removePatient(patient)
@@ -184,21 +188,6 @@ function ResearchRoom:commandEnteringPatient(patient)
 
   staff:queueAction(MultiUseObjectAction(autopsy, patient):setAfterUse(after_use_autopsy))
   return Room.commandEnteringPatient(self, patient)
-end
-
--- Returns the staff member with the minimum amount of skill.
-function ResearchRoom:getStaffMember()
-  local staff
-  for staff_member, _ in pairs(self.staff_member_set) do
-    if staff and not staff.fired then
-      if staff.profile.skill > staff_member.profile.skill then
-        staff = staff_member
-      end
-    else
-      staff = staff_member
-    end
-  end
-  return staff
 end
 
 function ResearchRoom:setStaffMember(staff)
@@ -220,5 +209,6 @@ function ResearchRoom:afterLoad(old, new)
   if old < 56 then
     self.hospital.research_dep_built = true
   end
+  Room.afterLoad(self, old, new)
 end
 return room

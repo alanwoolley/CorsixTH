@@ -18,7 +18,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE. --]]
 
-local lfs = require "lfs"
+local lfs = require("lfs")
 
 --! A tree node representing a file (or directory) in the physical file-system
 --  that meets a given file extension criterion.
@@ -88,12 +88,16 @@ function FilteredTreeControl:FilteredTreeControl(root, x, y, width, height, col_
 
   self.num_rows = (self.tree_rect.h - self.y_offset) / self.row_height
 
+  -- Magic numbers used to find a static position across different screen resolutions.
+  local button1x = math.floor(TheApp.ui.app.config.width / 2 - 90)
+  local button2x = button1x + 210
+  local buttony = math.floor(TheApp.ui.app.config.height / 4 - 95)
   -- Add the two column headers and make buttons on them.
   if show_dates then
     self:addBevelPanel(1, 1, width - 170, 13, col_bg):setLabel(_S.menu_list_window.name)
-    :makeButton(0, 0, width - 170, 13, nil, self.sortByName):setTooltip(_S.tooltip.menu_list_window.name)
+    :makeButton(0, 0, width - 170, 13, nil, self.sortByName):setTooltip(_S.tooltip.menu_list_window.name, button1x, buttony)
     self:addBevelPanel(width - 169, 1, 150, 13, col_bg):setLabel(_S.menu_list_window.save_date)
-    :makeButton(0, 0, 150, 13, nil, self.sortByDate):setTooltip(_S.tooltip.menu_list_window.save_date)
+    :makeButton(0, 0, 150, 13, nil, self.sortByDate):setTooltip(_S.tooltip.menu_list_window.save_date, button2x, buttony)
   end
   self.show_dates = show_dates
 end
@@ -193,23 +197,49 @@ function UIFileBrowser:UIFileBrowser(ui, mode, title, vertical_size, root, show_
   -- Initialize the tree control
   self.control = FilteredTreeControl(root, 5, 35, h_size - 10, vertical_size, self.col_bg, self.col_scrollbar, true, show_dates)
     :setSelectCallback(--[[persistable:file_browser_select_callback]] function(node)
-      if node.is_valid_file and (lfs.attributes(node.path, "mode") ~= "directory") then
-        self:choiceMade(node.path)
-      end
+      if self:checkChoice(node) then self:choiceMade(node.path) end
+    end)
+    :setValueChangeCallback(--[[persistable:file_browser_textbox_callback]] function(node, label)
+      -- Update any user input
+      if self:checkChoice(node) then self:setInputValue(label) end
     end)
   self:addWindow(self.control)
 
-  -- Create the back button.
-  self:addBevelPanel((h_size - 160) / 2, 340, 160, 30, self.col_bg):setLabel(_S.menu_list_window.back)
-    :makeButton(0, 0, 160, 40, nil, self.buttonBack):setTooltip(_S.tooltip.menu_list_window.back)
+  -- Create the back and ok buttons.
+  local button_size = 135
+  local indent = math.floor((h_size - (2*button_size))/3)
+  self:addBevelPanel(indent, 340, button_size, 30, self.col_bg):setLabel(_S.menu_list_window.back)
+    :makeButton(0, 0, button_size, 40, nil, self.buttonBack):setTooltip(_S.tooltip.menu_list_window.back)
+
+  self:addBevelPanel(h_size - button_size - indent, 340, button_size, 30,
+  self.col_bg):setLabel(_S.menu_list_window.ok)
+    :makeButton(0, 0, button_size, 40, nil, (--[[persistable:filebrowser_ok_callback]] function()
+      if self.confirmName then
+        self:confirmName()
+      elseif self.control.selected_node then
+        local sel_node = self.control.selected_node
+        if self:checkChoice(sel_node) then self:choiceMade(sel_node.path) end
+      end
+    end)):setTooltip(_S.tooltip.menu_list_window.ok)
 end
 
--- Function stub for dialogs to override. This function is called each time a file is chosen.
+--! Function stub for dialogs to override. This function is called each time a file is chosen.
 --!param name (string) Name of the file chosen.
-function UIFileBrowser:choiceMade(name)
+function UIFileBrowser:choiceMade(name) -- luacheck: ignore 212 keep args from parent class
+end
+
+--! Function stub for dialogs with user input option. This will be called for
+--! updating inputs, override it for a proper implementation in the derived class.
+--!param label (string) Name of the file chosen
+function UIFileBrowser:setInputValue(label) -- luacheck: ignore 212 keep args from parent class
+end
+
+--! Check selection is a valid file, and not a directory
+--!param node (table) user selected element
+function UIFileBrowser:checkChoice(node)
+  return node.is_valid_file and (lfs.attributes(node.path, "mode") ~= "directory")
 end
 
 function UIFileBrowser:buttonBack()
   self:close()
 end
-

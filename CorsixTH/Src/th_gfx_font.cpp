@@ -20,800 +20,668 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-#include "config.h"
 #include "th_gfx_font.h"
+
+#include "config.h"
+
+#include "th_strings.h"
 #ifdef CORSIX_TH_USE_FREETYPE2
 #include FT_GLYPH_H
-#include <vector>
 #include <map>
+#include <vector>
 #endif
+#include <algorithm>
 #include <cstdio>
 #include <cstring>
-#include <algorithm>
+#include <stdexcept>
 
-static unsigned int utf8next(const char*& sString)
-{
-    unsigned int iCode = *reinterpret_cast<const uint8_t*>(sString++);
-    unsigned int iContinuation;
-    if(iCode & 0x80)
-    {
-        if((iCode & 0x40) == 0)
-        {
-            // Invalid encoding: character should not start with a continuation
-            // byte. Hence return the Unicode replacement character.
-            return 0xFFFD;
-        }
-        else
-        {
-#define CONTINUATION_CHAR \
-    iContinuation = *reinterpret_cast<const uint8_t*>(sString); \
-    if((iContinuation & 0xC0) != 0x80) \
-        /* Invalid encoding: not enough continuation characters. */ \
-        return 0xFFFD; \
-    iCode = (iCode << 6) | (iContinuation & 0x3F); \
-    ++sString
+bitmap_font::bitmap_font() {
+  sheet = nullptr;
+  letter_spacing = 0;
+  line_spacing = 0;
+}
 
-            iCode &= 0x3F;
-            if(iCode & 0x20)
-            {
-                iCode &= 0x1F;
-                if(iCode & 0x10)
-                {
-                    iCode &= 0x0F;
-                    if(iCode & 0x08)
-                    {
-                        // Invalid encoding: too-long byte sequence. Hence
-                        // return the Unicode replacement character.
-                        return 0xFFFD;
-                    }
-                    CONTINUATION_CHAR;
-                }
-                CONTINUATION_CHAR;
-            }
-            CONTINUATION_CHAR;
-        }
+void bitmap_font::set_sprite_sheet(sprite_sheet* pSpriteSheet) {
+  sheet = pSpriteSheet;
+}
 
-#undef CONTINUATION_CHAR
+void bitmap_font::set_separation(int iCharSep, int iLineSep) {
+  letter_spacing = iCharSep;
+  line_spacing = iLineSep;
+}
+
+text_layout bitmap_font::get_text_dimensions(const char* sMessage,
+                                             size_t iMessageLength,
+                                             int iMaxWidth) const {
+  return draw_text_wrapped(nullptr, sMessage, iMessageLength, 0, 0, iMaxWidth,
+                           INT_MAX, 0);
+}
+
+void bitmap_font::draw_text(render_target* pCanvas, const char* sMessage,
+                            size_t iMessageLength, int iX, int iY) const {
+  pCanvas->start_nonoverlapping_draws();
+  if (iMessageLength != 0 && sheet != nullptr) {
+    const unsigned int iFirstASCII = 31;
+    unsigned int iLastASCII =
+        static_cast<unsigned int>(sheet->get_sprite_count()) + iFirstASCII;
+    const char* sMessageEnd = sMessage + iMessageLength;
+
+    while (sMessage != sMessageEnd) {
+      unsigned int iChar =
+          unicode_to_codepage_437(next_utf8_codepoint(sMessage, sMessageEnd));
+      if (iFirstASCII <= iChar && iChar <= iLastASCII) {
+        iChar -= iFirstASCII;
+        int iWidth;
+        int iHeight;
+        sheet->draw_sprite(pCanvas, iChar, iX, iY, 0);
+        sheet->get_sprite_size_unchecked(iChar, &iWidth, &iHeight);
+        iX += iWidth + letter_spacing;
+      }
     }
-    return iCode;
+  }
+  pCanvas->finish_nonoverlapping_draws();
+}
+
+text_layout bitmap_font::draw_text_wrapped(render_target* pCanvas,
+                                           const char* sMessage,
+                                           size_t iMessageLength, int iX,
+                                           int iY, int iWidth, int iMaxRows,
+                                           int iSkipRows,
+                                           text_alignment eAlign) const {
+  text_layout oDrawArea = {};
+  int iSkippedRows = 0;
+  if (iMessageLength != 0 && sheet != nullptr) {
+    const unsigned int iFirstASCII = 31;
+    unsigned int iLastASCII =
+        static_cast<unsigned int>(sheet->get_sprite_count()) + iFirstASCII;
+    const char* sMessageEnd = sMessage + iMessageLength;
+
+    while (sMessage != sMessageEnd && oDrawArea.row_count < iMaxRows) {
+      const char* sBreakPosition = sMessageEnd;
+      const char* sLastGoodBreakPosition = sBreakPosition;
+      int iMsgWidth = -letter_spacing;
+      int iMsgBreakWidth = iMsgWidth;
+      int iTallest = 0;
+      const char* s;
+      bool foundNewLine = false;
+      unsigned int iNextChar = 0;
+
+      for (s = sMessage; s != sMessageEnd;) {
+        const char* sOld = s;
+        unsigned int iChar =
+            unicode_to_codepage_437(next_utf8_codepoint(s, sMessageEnd));
+        iNextChar = unicode_to_codepage_437(static_cast<unsigned char>(*s));
+        if ((iChar == '\n' && iNextChar == '\n') ||
+            (iChar == '/' && iNextChar == '/')) {
+          foundNewLine = true;
+          iMsgBreakWidth = iMsgWidth;
+          sBreakPosition = sOld;
+          break;
+        }
+        int iCharWidth = 0;
+        int iCharHeight = 0;
+        if (iFirstASCII <= iChar && iChar <= iLastASCII) {
+          sheet->get_sprite_size_unchecked(iChar - iFirstASCII, &iCharWidth,
+                                           &iCharHeight);
+        }
+        iMsgWidth += letter_spacing + iCharWidth;
+        if (iChar == ' ') {
+          sLastGoodBreakPosition = sOld;
+          iMsgBreakWidth = iMsgWidth - iCharWidth;
+        }
+
+        if (iMsgWidth > iWidth) {
+          sBreakPosition = sLastGoodBreakPosition;
+          break;
+        }
+        if (iCharHeight > iTallest) iTallest = iCharHeight;
+      }
+
+      if (s == sMessageEnd) iMsgBreakWidth = iMsgWidth;
+      if (iMsgBreakWidth > oDrawArea.width) oDrawArea.width = iMsgBreakWidth;
+
+      if (iSkippedRows >= iSkipRows) {
+        if (pCanvas) {
+          int iXOffset = 0;
+          if (iMsgBreakWidth < iWidth)
+            iXOffset = (iWidth - iMsgBreakWidth) * static_cast<int>(eAlign) / 2;
+          draw_text(pCanvas, sMessage, sBreakPosition - sMessage, iX + iXOffset,
+                    iY);
+        }
+        iY += static_cast<int>(iTallest) + line_spacing;
+        oDrawArea.end_x = iMsgWidth;
+        oDrawArea.row_count++;
+        if (foundNewLine) {
+          iY += static_cast<int>(iTallest) + line_spacing;
+          oDrawArea.row_count++;
+        }
+      } else {
+        iSkippedRows++;
+        if (foundNewLine) {
+          if (iSkippedRows == iSkipRows) {
+            iY += static_cast<int>(iTallest) + line_spacing;
+            oDrawArea.row_count++;
+          }
+          iSkippedRows++;
+        }
+      }
+      sMessage = sBreakPosition;
+      if (sMessage != sMessageEnd) {
+        next_utf8_codepoint(sMessage, sMessageEnd);
+        if (foundNewLine) {
+          next_utf8_codepoint(sMessage, sMessageEnd);
+        }
+      }
+    }
+  }
+  oDrawArea.end_x = iX + oDrawArea.end_x;
+  oDrawArea.end_y = iY;
+  return oDrawArea;
 }
 
 #ifdef CORSIX_TH_USE_FREETYPE2
-// Since these functions are only used when we use freetype2, this silences
-// warnings about defined and not used.
+FT_Library freetype_font::freetype_library = nullptr;
+int freetype_font::freetype_init_count = 0;
 
-static unsigned int utf8decode(const char* sString)
-{
-    return utf8next(sString);
+freetype_font::freetype_font() {
+  font_face = nullptr;
+  is_done_freetype_init = false;
+  for (cached_text* pEntry = cache; pEntry != cache + (1 << cache_size_log2);
+       ++pEntry) {
+    pEntry->message = nullptr;
+    pEntry->message_length = 0;
+    pEntry->message_buffer_length = 0;
+    pEntry->alignment = text_alignment::left;
+    pEntry->width = 0;
+    pEntry->height = 0;
+    pEntry->widest_line_width = 0;
+    pEntry->last_x = 0;
+    pEntry->data = nullptr;
+    pEntry->is_valid = false;
+    pEntry->texture = nullptr;
+  }
 }
 
-static const char* utf8prev(const char* sString)
-{
-    do
-    {
-        --sString;
-    } while(((*sString) & 0xC0) == 0x80);
-    return sString;
-}
-#endif
-
-THBitmapFont::THBitmapFont()
-{
-    m_pSpriteSheet = nullptr;
-    m_iCharSep = 0;
-    m_iLineSep = 0;
-}
-
-void THBitmapFont::setSpriteSheet(THSpriteSheet* pSpriteSheet)
-{
-    m_pSpriteSheet = pSpriteSheet;
+freetype_font::~freetype_font() {
+  for (cached_text* pEntry = cache; pEntry != cache + (1 << cache_size_log2);
+       ++pEntry) {
+    delete[] pEntry->message;
+    delete[] pEntry->data;
+    free_texture(pEntry);
+  }
+  if (font_face != nullptr) FT_Done_Face(font_face);
+  if (is_done_freetype_init) {
+    if (--freetype_init_count == 0) {
+      FT_Done_FreeType(freetype_library);
+      freetype_library = nullptr;
+    }
+  }
 }
 
-void THBitmapFont::setSeparation(int iCharSep, int iLineSep)
-{
-    m_iCharSep = iCharSep;
-    m_iLineSep = iLineSep;
+const char* freetype_font::get_copyright_notice() {
+  return "Portions of this software are copyright \xC2\xA9 2010 "
+         "The FreeType Project (www.freetype.org).  All rights reserved.";
 }
 
-static const uint16_t g_aUnicodeToCP437[0x60] = {
-    0xFF, 0xAD, 0x9B, 0x9C, 0x3F, 0x9D, 0x3F, 0x3F, 0x3F, 0x3F, 0xA6, 0xAE,
-    0xAA, 0x3F, 0x3F, 0x3F, 0xF8, 0xF1, 0xFD, 0x3F, 0x3F, 0x3F, 0x3F, 0xFA,
-    0x3F, 0x3F, 0xA7, 0xAF, 0xAC, 0xAB, 0x3F, 0xA8, 0x3F, 0x3F, 0x3F, 0x3F,
-    0x8E, 0x8F, 0x3F, 0x80, 0x3F, 0x90, 0x3F, 0x3F, 0x3F, 0x3F, 0x3F, 0x3F,
-    0x3F, 0xA5, 0x3F, 0x3F, 0x3F, 0x3F, 0x99, 0x3F, 0x3F, 0x3F, 0x3F, 0x3F,
-    0x9A, 0x3F, 0x3F, 0xE1, 0x85, 0xA0, 0x83, 0x3F, 0x84, 0x86, 0x91, 0x87,
-    0x8A, 0x82, 0x88, 0x89, 0x8D, 0xA1, 0x8C, 0x8B, 0x3F, 0xA4, 0x95, 0xA2,
-    0x93, 0x3F, 0x94, 0xF6, 0x3F, 0x97, 0xA3, 0x96, 0x81, 0x3F, 0x3F, 0x98
+FT_Error freetype_font::initialise() {
+  if (is_done_freetype_init) return FT_Err_Ok;
+  if (freetype_init_count == 0) {
+    int iError = FT_Init_FreeType(&freetype_library);
+    if (iError != FT_Err_Ok) return iError;
+  }
+  ++freetype_init_count;
+  is_done_freetype_init = true;
+  return FT_Err_Ok;
+}
+
+void freetype_font::clear_cache() {
+  for (cached_text* pEntry = cache; pEntry != cache + (1 << cache_size_log2);
+       ++pEntry) {
+    pEntry->is_valid = false;
+    free_texture(pEntry);
+  }
+}
+
+FT_Error freetype_font::set_face(const uint8_t* pData, size_t iLength) {
+  int iError;
+  if (freetype_library == nullptr) {
+    iError = initialise();
+    if (iError != FT_Err_Ok) return iError;
+  }
+  if (font_face) {
+    iError = FT_Done_Face(font_face);
+    if (iError != FT_Err_Ok) return iError;
+    font_face = nullptr;
+  }
+  iError = FT_New_Memory_Face(freetype_library, pData,
+                              static_cast<FT_Long>(iLength), 0, &font_face);
+  return iError;
+}
+
+FT_Error freetype_font::match_bitmap_font(
+    sprite_sheet* pBitmapFontSpriteSheet) {
+  if (pBitmapFontSpriteSheet == nullptr) return FT_Err_Invalid_Argument;
+
+  // Try to take the size and colour of a standard character (em is generally
+  // the standard font character, but for fonts which only have numbers, zero
+  // seems like the next best choice).
+  for (const char* sCharToTry = "M0"; *sCharToTry; ++sCharToTry) {
+    int iWidth;
+    int iHeight;
+    unsigned int iSprite = *sCharToTry - 31;
+    if (pBitmapFontSpriteSheet->get_sprite_size(iSprite, &iWidth, &iHeight) &&
+        pBitmapFontSpriteSheet->get_sprite_average_colour(iSprite, &colour) &&
+        iWidth > 1 && iHeight > 1) {
+      return set_ideal_character_size(iWidth, iHeight);
+    }
+  }
+
+  // Take the average size of all characters, and the colour of one of them.
+  int iWidthSum = 0;
+  int iHeightSum = 0;
+  int iAverageNum = 0;
+  for (size_t i = 0; i < pBitmapFontSpriteSheet->get_sprite_count(); ++i) {
+    int iWidth;
+    int iHeight;
+    pBitmapFontSpriteSheet->get_sprite_size_unchecked(i, &iWidth, &iHeight);
+    if (iWidth <= 1 || iHeight <= 1) continue;
+    if (!pBitmapFontSpriteSheet->get_sprite_average_colour(i, &colour))
+      continue;
+    iWidthSum += iWidth;
+    iHeightSum += iHeight;
+    ++iAverageNum;
+  }
+  if (iAverageNum == 0) return FT_Err_Divide_By_Zero;
+
+  return set_ideal_character_size((iWidthSum + iAverageNum / 2) / iAverageNum,
+                                  (iHeightSum + iAverageNum / 2) / iAverageNum);
+}
+
+FT_Error freetype_font::set_ideal_character_size(int iWidth, int iHeight) {
+  if (font_face == nullptr) return FT_Err_Invalid_Face_Handle;
+
+  if (is_monochrome() || iHeight <= 14 || iWidth <= 9) {
+    // Look for a bitmap strike of a similar size
+    int iBestBitmapScore = 50;
+    FT_Int iBestBitmapIndex = -1;
+    for (FT_Int i = 0; i < font_face->num_fixed_sizes; ++i) {
+      if (font_face->available_sizes[i].height > iHeight) continue;
+      int iDeltaH = iHeight - font_face->available_sizes[i].height;
+      int iDeltaW = font_face->available_sizes[i].width - iWidth;
+      int iScore = iDeltaH * iDeltaH * 3 + iDeltaW * iDeltaW;
+      if (iScore < iBestBitmapScore) {
+        iBestBitmapScore = iScore;
+        iBestBitmapIndex = i;
+      }
+    }
+
+    // Select the bitmap strike, if there was one
+    if (iBestBitmapIndex != -1)
+      return FT_Select_Size(font_face, iBestBitmapIndex);
+  }
+
+  // Go with the original size request if there was no bitmap strike, unless
+  // the size was very small, in which case scale things up, as vector fonts
+  // look rather poor at small sizes.
+  if (iHeight < 14) {
+    iWidth = iWidth * 14 / iHeight;
+    iHeight = 14;
+  }
+  if (iWidth < 9) {
+    iHeight = iHeight * 9 / iWidth;
+    iWidth = 9;
+  }
+  return FT_Set_Pixel_Sizes(font_face, iWidth, iHeight);
+}
+
+text_layout freetype_font::get_text_dimensions(const char* sMessage,
+                                               size_t iMessageLength,
+                                               int iMaxWidth) const {
+  return draw_text_wrapped(nullptr, sMessage, iMessageLength, 0, 0, iMaxWidth,
+                           INT_MAX, 0);
+}
+
+void freetype_font::draw_text(render_target* pCanvas, const char* sMessage,
+                              size_t iMessageLength, int iX, int iY) const {
+  draw_text_wrapped(pCanvas, sMessage, iMessageLength, iX, iY, INT_MAX);
+}
+
+namespace {
+
+struct codepoint_glyph {
+  FT_Glyph_Metrics metrics;
+  FT_Glyph glyph;
+  FT_UInt index;
 };
 
-static unsigned int unicodeToCodepage437(unsigned int iCodePoint)
-{
-    if(iCodePoint < 0x80)
-        return iCodePoint;
-    if(iCodePoint < 0xA0)
-        return '?';
-    if(iCodePoint < 0x100)
-        return g_aUnicodeToCP437[iCodePoint - 0xA0];
-    switch(iCodePoint)
-    {
-        case 0x0192: return 0x9F;
-        case 0x0393: return 0xE2;
-        case 0x0398: return 0xE9;
-        case 0x03A3: return 0xE4;
-        case 0x03A6: return 0xE8;
-        case 0x03A9: return 0xEA;
-        case 0x03B1: return 0xE0;
-        case 0x03B4: return 0xEB;
-        case 0x03B5: return 0xEE;
-        case 0x03BC: return 0xE6;
-        case 0x03C0: return 0xE3;
-        case 0x03C3: return 0xE5;
-        case 0x03C4: return 0xE7;
-        case 0x03C6: return 0xED;
-        case 0x207F: return 0xFC;
-        case 0x20A7: return 0x9E;
-        case 0x2219: return 0xF9;
-        case 0x221A: return 0xFB;
-        case 0x221E: return 0xEC;
-        case 0x2229: return 0xEF;
-        case 0x2248: return 0xF7;
-        case 0x2261: return 0xF0;
-        case 0x2264: return 0xF3;
-        case 0x2265: return 0xF2;
-        case 0x2310: return 0xA9;
-        case 0x2320: return 0xF4;
-        case 0x2321: return 0xF5;
-        case 0x25A0: return 0xFE;
+enum class CJK_breakable { nonbreakable = 0, break_after, break_before };
+
+// Determine if the character code is a suitable Chinese/Japanese/Korean
+// character for a line break.
+CJK_breakable isCjkBreakCharacter(unsigned int charcode) {
+  if (charcode == ideographic_space_codepoint ||
+      charcode == 0x3001 ||  // Ideographic comma
+      charcode == 0x3002 ||  // Ideographic full stop
+      charcode == 0x301e ||  // Double prime quotation mark
+      charcode == 0xff09 ||  // Fullwidth right parenthesis
+      charcode == 0xff0c ||  // Fullwidth comma
+      charcode == 0xff0d ||  // Fullwidth hyphen-minus
+      charcode == 0xff1a ||  // Fullwidth Colon
+      charcode == 0xff1b ||  // Fullwidth semicolon
+      charcode == 0xff1f)    // Fullwidth question mark
+    return CJK_breakable::break_after;
+  if (charcode == 0x301d ||  // Reversed double prime quotation mark
+      charcode == 0xff08)    // Fullwidth left parenthesis
+    return CJK_breakable::break_before;
+  return CJK_breakable::nonbreakable;
+}
+
+FT_Pos pixel_align(FT_Pos position) { return ((position + 63) >> 6) << 6; }
+
+}  // namespace
+
+text_layout freetype_font::draw_text_wrapped(render_target* pCanvas,
+                                             const char* sMessage,
+                                             size_t iMessageLength, int iX,
+                                             int iY, int iWidth, int iMaxRows,
+                                             int iSkipRows,
+                                             text_alignment eAlign) const {
+  text_layout oDrawArea = {};
+  int iNumRows = 0;
+  int iHandledRows = 0;
+
+  // Calculate an index into the cache to use for this piece of text.
+  size_t iHash = iMessageLength +
+                 (static_cast<size_t>(iMaxRows) << (cache_size_log2 / 8)) +
+                 (static_cast<size_t>(iSkipRows) << (cache_size_log2 / 4)) +
+                 (static_cast<size_t>(iWidth) << (cache_size_log2 / 2)) +
+                 (static_cast<size_t>(eAlign) << cache_size_log2);
+  for (size_t i = 0; i < iMessageLength; ++i)
+    iHash ^= (iHash << 5) + (iHash >> 2) + static_cast<size_t>(sMessage[i]);
+  iHash &= (1 << cache_size_log2) - 1;
+
+  cached_text* pEntry = cache + iHash;
+  if (pEntry->message_length != iMessageLength || pEntry->width > iWidth ||
+      (iWidth != INT_MAX && pEntry->width < iWidth) ||
+      pEntry->alignment != eAlign || !pEntry->is_valid ||
+      std::memcmp(pEntry->message, sMessage, iMessageLength) != 0) {
+    // Cache entry does not match the message being drawn, so discard the
+    // cache entry.
+    free_texture(pEntry);
+    delete[] pEntry->data;
+    pEntry->data = nullptr;
+    pEntry->is_valid = false;
+
+    // Set the entry metadata to that of the new message.
+    if (iMessageLength > pEntry->message_buffer_length) {
+      delete[] pEntry->message;
+      pEntry->message = new char[iMessageLength];
+      pEntry->message_buffer_length = iMessageLength;
     }
-    return 0x3F;
-}
+    std::memcpy(pEntry->message, sMessage, iMessageLength);
+    pEntry->message_length = iMessageLength;
+    pEntry->width = iWidth;
+    pEntry->alignment = eAlign;
 
-THFontDrawArea THBitmapFont::getTextSize(const char* sMessage, size_t iMessageLength,
-                               int iMaxWidth) const
-{
-    return drawTextWrapped(nullptr, sMessage, iMessageLength, 0, 0, iMaxWidth, INT_MAX, 0);
-}
+    // Split the message into lines, and determine the position within the
+    // line for each character.
+    std::vector<std::pair<const char*, const char*> > vLines;
+    std::vector<FT_Vector> vCharPositions(iMessageLength);
+    std::map<unsigned int, codepoint_glyph> mapGlyphs;
+    vLines.reserve(2);
 
-void THBitmapFont::drawText(THRenderTarget* pCanvas, const char* sMessage, size_t iMessageLength, int iX, int iY) const
-{
-    pCanvas->startNonOverlapping();
-    if(iMessageLength != 0 && m_pSpriteSheet != nullptr)
-    {
-        const unsigned int iFirstASCII = 31;
-        unsigned int iLastASCII = static_cast<unsigned int>(m_pSpriteSheet->getSpriteCount()) + iFirstASCII;
-        const char* sMessageEnd = sMessage + iMessageLength;
+    FT_Vector ftvPen = {0, 0};
+    FT_Bool bUseKerning = FT_HAS_KERNING(font_face);
+    FT_UInt iPreviousGlyphIndex = 0;
 
-        while(sMessage != sMessageEnd)
-        {
-            unsigned int iChar = unicodeToCodepage437(utf8next(sMessage));
-            if(iFirstASCII <= iChar && iChar <= iLastASCII)
-            {
-                iChar -= iFirstASCII;
-                unsigned int iWidth, iHeight;
-                m_pSpriteSheet->drawSprite(pCanvas, iChar, iX, iY, 0);
-                m_pSpriteSheet->getSpriteSizeUnchecked(iChar, &iWidth, &iHeight);
-                iX += iWidth + m_iCharSep;
-            }
+    const char* sMessageStart = sMessage;
+    const char* sMessageEnd = sMessage + iMessageLength;
+    const char* sLineStart = sMessageStart;
+    const char* sLineBreakPosition = sLineStart;
+
+    while (sMessage != sMessageEnd) {
+      const char* sOldMessage = sMessage;
+      unsigned int iCode = next_utf8_codepoint(sMessage, sMessageEnd);
+      unsigned int iNextCode =
+          *reinterpret_cast<const unsigned char*>(sMessage);
+      bool bIsNewLine = (iCode == '\n' && iNextCode == '\n') ||
+                        (iCode == '/' && iNextCode == '/');
+      // Just replace single line breaks with space.
+      if (!bIsNewLine && iCode == '\n') {
+        iCode = ' ';
+      }
+
+      codepoint_glyph& oGlyph = mapGlyphs[iCode];
+      if (oGlyph.glyph == nullptr) {
+        oGlyph.index = FT_Get_Char_Index(font_face, iCode);
+
+        /* FT_Error iError = */
+        FT_Load_Glyph(font_face, oGlyph.index, FT_LOAD_DEFAULT);
+        // TODO: iError != FT_Err_Ok
+
+        /* iError = */
+        FT_Get_Glyph(font_face->glyph, &oGlyph.glyph);
+        // TODO: iError != FT_Err_Ok
+
+        oGlyph.metrics = font_face->glyph->metrics;
+      }
+
+      // Apply kerning
+      if (bUseKerning && iPreviousGlyphIndex && oGlyph.index) {
+        FT_Vector ftvKerning;
+        FT_Get_Kerning(font_face, iPreviousGlyphIndex, oGlyph.index,
+                       FT_KERNING_DEFAULT, &ftvKerning);
+        ftvPen.x += ftvKerning.x;
+        ftvPen.y += ftvKerning.y;
+      }
+
+      // Make an automatic line break if one is needed.
+      long line_width_with_glyph =
+          (ftvPen.x + oGlyph.metrics.horiBearingX + oGlyph.metrics.width + 63) /
+          64;
+      if (line_width_with_glyph >= iWidth || bIsNewLine) {
+        if (bIsNewLine) {
+          sLineBreakPosition = sOldMessage;
         }
-    }
-    pCanvas->finishNonOverlapping();
-}
-
-THFontDrawArea THBitmapFont::drawTextWrapped(THRenderTarget* pCanvas, const char* sMessage,
-                        size_t iMessageLength, int iX, int iY, int iWidth,
-                        int iMaxRows, int iSkipRows, eTHAlign eAlign) const
-{
-    THFontDrawArea oDrawArea = {};
-    int iSkippedRows = 0;
-    if(iMessageLength != 0 && m_pSpriteSheet != nullptr)
-    {
-        const unsigned int iFirstASCII = 31;
-        unsigned int iLastASCII = static_cast<unsigned int>(m_pSpriteSheet->getSpriteCount()) + iFirstASCII;
-        const char* sMessageEnd = sMessage + iMessageLength;
-
-        while(sMessage != sMessageEnd && oDrawArea.iNumRows < iMaxRows)
-        {
-            const char* sBreakPosition = sMessageEnd;
-            const char* sLastGoodBreakPosition = sBreakPosition;
-            int iMsgWidth = -m_iCharSep;
-            int iMsgBreakWidth = iMsgWidth;
-            unsigned int iTallest = 0;
-            const char* s;
-            bool foundNewLine = false;
-            unsigned int iNextChar = 0;
-
-            for(s = sMessage; s != sMessageEnd; )
-            {
-                const char* sOld = s;
-                unsigned int iChar = unicodeToCodepage437(utf8next(s));
-                iNextChar = unicodeToCodepage437(static_cast<unsigned char>(*s));
-                if((iChar == '\n' && iNextChar == '\n') || (iChar == '/' && iNextChar == '/'))
-                {
-                    foundNewLine = true;
-                    iMsgBreakWidth = iMsgWidth;
-                    sBreakPosition = sOld;
-                    break;
-                }
-                unsigned int iCharWidth = 0, iCharHeight = 0;
-                if(iFirstASCII <= iChar && iChar <= iLastASCII)
-                {
-                    m_pSpriteSheet->getSpriteSizeUnchecked(iChar - iFirstASCII, &iCharWidth, &iCharHeight);
-                }
-                iMsgWidth += m_iCharSep + iCharWidth;
-                if(iChar == ' ')
-                {
-                    sLastGoodBreakPosition = sOld;
-                    iMsgBreakWidth = iMsgWidth - iCharWidth;
-                }
-
-                if(iMsgWidth > iWidth)
-                {
-                    sBreakPosition = sLastGoodBreakPosition;
-                    break;
-                }
-                if(iCharHeight > iTallest)
-                    iTallest = iCharHeight;
+        ftvPen.x = ftvPen.y = 0;
+        iPreviousGlyphIndex = 0;
+        if (sLineStart != sLineBreakPosition) {
+          // Only really save if we have skipped enough lines
+          if (iHandledRows >= iSkipRows) {
+            vLines.push_back(std::make_pair(sLineStart, sLineBreakPosition));
+          }
+          if (bIsNewLine) {
+            if (iHandledRows + 1 >= iSkipRows) {
+              vLines.push_back(
+                  std::make_pair(sLineBreakPosition, sLineBreakPosition));
             }
-
-            if(s == sMessageEnd)
-                iMsgBreakWidth = iMsgWidth;
-            if(iMsgBreakWidth > oDrawArea.iWidth)
-                oDrawArea.iWidth = iMsgBreakWidth;
-
-            if(iSkippedRows >= iSkipRows)
-            {
-                if(pCanvas)
-                {
-                    int iXOffset = 0;
-                    if(iMsgBreakWidth < iWidth)
-                        iXOffset = (iWidth - iMsgBreakWidth) * static_cast<int>(eAlign) / 2;
-                    drawText(pCanvas, sMessage, sBreakPosition - sMessage, iX + iXOffset, iY);
-                }
-                iY += static_cast<int>(iTallest) + m_iLineSep;
-                oDrawArea.iEndX = iMsgWidth;
-                oDrawArea.iNumRows++;
-                if (foundNewLine) {
-                    iY += static_cast<int>(iTallest) + m_iLineSep;
-                    oDrawArea.iNumRows++;
-                }
-            }
-            else
-            {
-              iSkippedRows++;
-              if(foundNewLine)
-              {
-                  if(iSkippedRows == iSkipRows)
-                  {
-                      iY += static_cast<int>(iTallest) + m_iLineSep;
-                      oDrawArea.iNumRows++;
-                  }
-                  iSkippedRows++;
-              }
-            }
-            sMessage = sBreakPosition;
-            if(sMessage != sMessageEnd)
-            {
-                utf8next(sMessage);
-                if(foundNewLine)
-                {
-                    utf8next(sMessage);
-                }
-            }
-            foundNewLine = 0;
+            // skip // or \n\n
+            next_utf8_codepoint(sLineBreakPosition, sMessageEnd);
+            next_utf8_codepoint(sLineBreakPosition, sMessageEnd);
+            iHandledRows++;
+          }
+          sMessage = sLineStart = sLineBreakPosition;
+          // Skip leading white space on a line
+          skip_utf8_whitespace(sMessage, sMessageEnd);
+        } else {
+          if (iHandledRows >= iSkipRows) {
+            vLines.push_back(std::make_pair(sLineStart, sOldMessage));
+          }
+          if (bIsNewLine) {
+            // skip // or \n\n
+            next_utf8_codepoint(sMessage, sMessageEnd);
+            next_utf8_codepoint(sMessage, sMessageEnd);
+            sLineStart = sLineBreakPosition = sMessage;
+          } else {
+            sMessage = sLineStart = sLineBreakPosition = sOldMessage;
+          }
         }
-    }
-    oDrawArea.iEndX = iX + oDrawArea.iEndX;
-    oDrawArea.iEndY = iY;
-    return oDrawArea;
-}
+        iHandledRows++;
+        continue;
+      }
 
-#ifdef CORSIX_TH_USE_FREETYPE2
-FT_Library THFreeTypeFont::ms_pFreeType = nullptr;
-int THFreeTypeFont::ms_iFreeTypeInitCount = 0;
-
-THFreeTypeFont::THFreeTypeFont()
-{
-    m_pFace = nullptr;
-    m_bDoneFreeTypeInit = false;
-    for(cached_text_t* pEntry = m_aCache;
-        pEntry != m_aCache + (1 << ms_CacheSizeLog2); ++pEntry)
-    {
-        pEntry->sMessage = nullptr;
-        pEntry->iMessageLength = 0;
-        pEntry->iMessageBufferLength = 0;
-        pEntry->eAlign = Align_Left;
-        pEntry->iWidth = 0;
-        pEntry->iHeight = 0;
-        pEntry->iWidestLine = 0;
-        pEntry->iLastX = 0;
-        pEntry->pData = nullptr;
-        pEntry->bIsValid = false;
-        pEntry->pTexture = nullptr;
-    }
-}
-
-THFreeTypeFont::~THFreeTypeFont()
-{
-    for(cached_text_t* pEntry = m_aCache;
-        pEntry != m_aCache + (1 << ms_CacheSizeLog2); ++pEntry)
-    {
-        _freeTexture(pEntry);
-    }
-    if(m_pFace != nullptr)
-        FT_Done_Face(m_pFace);
-    if(m_bDoneFreeTypeInit)
-    {
-        if(--ms_iFreeTypeInitCount == 0)
-        {
-            FT_Done_FreeType(ms_pFreeType);
-            ms_pFreeType = nullptr;
+      // Determine if a line can be broken at the current position.
+      if (iCode == ' ') {
+        sLineBreakPosition = sOldMessage;
+      } else {
+        switch (isCjkBreakCharacter(iCode)) {
+          case CJK_breakable::break_after:
+            // break after this codepoint (cjk codepoints are 3 bytes in
+            // utf-8)
+            sLineBreakPosition = sOldMessage + 3;
+            break;
+          case CJK_breakable::break_before:
+            // break before this codepoint
+            sLineBreakPosition = sOldMessage;
+            break;
+          default:
+            break;
         }
+      }
+
+      // Save (unless we are skipping lines) and advance the pen.
+      if (iHandledRows >= iSkipRows) {
+        vCharPositions[sOldMessage - sMessageStart] = ftvPen;
+      }
+
+      iPreviousGlyphIndex = oGlyph.index;
+      ftvPen.x += oGlyph.metrics.horiAdvance;
     }
-}
+    if (sLineStart != sMessageEnd)
+      vLines.push_back(std::make_pair(sLineStart, sMessageEnd));
+    sMessage = sMessageStart;
 
-const char* THFreeTypeFont::getCopyrightNotice()
-{
-    return "Portions of this software are copyright \xC2\xA9 2010 " \
-        "The FreeType Project (www.freetype.org).  All rights reserved.";
-}
+    // Finalise the position of each character (alignment might change X,
+    // and baseline / lines will change Y), and calculate overall height
+    // and widest line.
+    FT_Pos iPriorLinesHeight = 0;
+    FT_Pos iLineWidth = 0, iAlignDelta = 0, iWidestLine = 0;
+    const FT_Pos iLineSpacing = 2 << 6;
+    codepoint_glyph& oGlyph = mapGlyphs['l'];
+    FT_Pos iBearingY = oGlyph.metrics.horiBearingY;
+    FT_Pos iNormalLineHeight = oGlyph.metrics.height - iBearingY;
 
-FT_Error THFreeTypeFont::initialise()
-{
-    if(m_bDoneFreeTypeInit)
-        return FT_Err_Ok;
-    if(ms_iFreeTypeInitCount == 0)
-    {
-        int iError = FT_Init_FreeType(&ms_pFreeType);
-        if(iError != FT_Err_Ok)
-            return iError;
+    iBearingY = pixel_align(iBearingY);
+    iNormalLineHeight += iBearingY;
+    iNormalLineHeight += iLineSpacing;
+
+    iNormalLineHeight = pixel_align(iNormalLineHeight);
+
+    for (auto itr = vLines.begin(); itr != vLines.end() && iNumRows < iMaxRows;
+         ++itr) {
+      // Calculate the X change resulting from alignment.
+      const char* sLastChar = previous_utf8_codepoint(itr->second);
+      codepoint_glyph& oLastGlyph =
+          mapGlyphs[decode_utf8(sLastChar, sMessageEnd)];
+      iLineWidth = vCharPositions[sLastChar - sMessage].x +
+                   oLastGlyph.metrics.horiBearingX + oLastGlyph.metrics.width;
+      if ((iLineWidth >> 6) < iWidth) {
+        iAlignDelta =
+            ((iWidth * 64 - iLineWidth) * static_cast<int>(eAlign)) / 2;
+      }
+      if (iLineWidth > iWidestLine) iWidestLine = iLineWidth;
+
+      // Calculate the line height and baseline position.
+      FT_Pos iLineHeight = 0;
+      FT_Pos iBaselinePos = 0;
+      for (const char* s = itr->first; s < itr->second;) {
+        codepoint_glyph& oGlyph =
+            mapGlyphs[next_utf8_codepoint(s, sMessageEnd)];
+        FT_Pos iBearingY = oGlyph.metrics.horiBearingY;
+        FT_Pos iCoBearingY = oGlyph.metrics.height - iBearingY;
+        if (iBearingY > iBaselinePos) iBaselinePos = iBearingY;
+        if (iCoBearingY > iLineHeight) iLineHeight = iCoBearingY;
+      }
+
+      iBaselinePos = pixel_align(iBaselinePos);
+      iLineHeight += iBaselinePos;
+      iLineHeight += iLineSpacing;
+      iLineHeight = pixel_align(iLineHeight);
+
+      iNormalLineHeight = std::max(iNormalLineHeight, iLineHeight);
+
+      // Apply the character position changes.
+      for (const char* s = itr->first; s < itr->second;
+           next_utf8_codepoint(s, sMessageEnd)) {
+        FT_Vector& ftvPos = vCharPositions[s - sMessage];
+        ftvPos.x += iAlignDelta;
+        ftvPos.y += iBaselinePos + iPriorLinesHeight;
+      }
+      // Empty lines is a special case
+      if (itr->first == itr->second) {
+        iPriorLinesHeight += iNormalLineHeight;
+      } else {
+        iPriorLinesHeight += iLineHeight;
+      }
+      iNumRows++;
     }
-    ++ms_iFreeTypeInitCount;
-    m_bDoneFreeTypeInit = true;
-    return FT_Err_Ok;
-}
+    if (iPriorLinesHeight > 0) iPriorLinesHeight -= iLineSpacing;
+    pEntry->height = static_cast<int>(1 + (iPriorLinesHeight >> 6));
+    pEntry->widest_line_width = static_cast<int>(1 + (iWidestLine >> 6));
+    pEntry->row_count = iNumRows;
+    if (iWidth == INT_MAX) pEntry->width = pEntry->widest_line_width;
+    pEntry->last_x = 1 + (static_cast<int>(iLineWidth + iAlignDelta) >> 6);
 
-void THFreeTypeFont::clearCache()
-{
-    for(cached_text_t* pEntry = m_aCache;
-        pEntry != m_aCache + (1 << ms_CacheSizeLog2); ++pEntry)
-    {
-        pEntry->bIsValid = false;
-        _freeTexture(pEntry);
+    // Get a bitmap for each glyph.
+    bool bIsMonochrome = is_monochrome();
+    FT_Render_Mode eRenderMode =
+        bIsMonochrome ? FT_RENDER_MODE_MONO : FT_RENDER_MODE_NORMAL;
+    for (auto itr = mapGlyphs.begin(), itrEnd = mapGlyphs.end(); itr != itrEnd;
+         ++itr) {
+      FT_Glyph_To_Bitmap(&itr->second.glyph, eRenderMode, nullptr, 1);
     }
-}
 
-FT_Error THFreeTypeFont::setFace(const uint8_t* pData, size_t iLength)
-{
-    int iError;
-    if(ms_pFreeType == nullptr)
-    {
-        iError = initialise();
-        if(iError != FT_Err_Ok)
-            return iError;
-    }
-    if(m_pFace)
-    {
-        iError = FT_Done_Face(m_pFace);
-        if(iError != FT_Err_Ok)
-            return iError;
-        m_pFace = nullptr;
-    }
-    iError = FT_New_Memory_Face(ms_pFreeType, pData, static_cast<FT_Long>(iLength), 0, &m_pFace);
-    return iError;
-}
+    // Prepare a canvas for rendering.
+    pEntry->data = new uint8_t[pEntry->width * pEntry->height];
+    std::memset(pEntry->data, 0, pEntry->width * pEntry->height);
 
-FT_Error THFreeTypeFont::matchBitmapFont(THSpriteSheet* pBitmapFontSpriteSheet)
-{
-    if(pBitmapFontSpriteSheet == nullptr)
-        return FT_Err_Invalid_Argument;
-
-    // Try to take the size and colour of a standard character (em is generally
-    // the standard font character, but for fonts which only have numbers, zero
-    // seems like the next best choice).
-    for(const char* sCharToTry = "M0"; *sCharToTry; ++sCharToTry)
-    {
-        unsigned int iWidth, iHeight;
-        unsigned int iSprite = *sCharToTry - 31;
-        if(pBitmapFontSpriteSheet->getSpriteSize(iSprite, &iWidth, &iHeight)
-        && pBitmapFontSpriteSheet->getSpriteAverageColour(iSprite, &m_oColour)
-        && iWidth > 1 && iHeight > 1)
-        {
-            return setPixelSize(iWidth, iHeight);
+    int iDrawnLines = 0;
+    // Render each character to the canvas.
+    for (auto itr = vLines.begin();
+         itr != vLines.end() && iDrawnLines < iMaxRows + iSkipRows; ++itr) {
+      iDrawnLines++;
+      for (const char* s = itr->first; s < itr->second;) {
+        FT_Vector& ftvPos = vCharPositions[s - sMessage];
+        unsigned int iCode = next_utf8_codepoint(s, sMessageEnd);
+        if (iCode == '\n') {
+          iCode = ' ';
         }
+        FT_BitmapGlyph pGlyph =
+            reinterpret_cast<FT_BitmapGlyph>(mapGlyphs[iCode].glyph);
+        FT_Pos x = pGlyph->left + (ftvPos.x >> 6);
+        FT_Pos y = (ftvPos.y >> 6) - pGlyph->top;
+        // We may have asked for grayscale but been given monochrome,
+        // hence use the bitmap's pixel_mode rather than bIsMonochrome.
+        switch (pGlyph->bitmap.pixel_mode) {
+          case FT_PIXEL_MODE_GRAY:
+            render_gray(pEntry, &pGlyph->bitmap, x, y);
+            break;
+          case FT_PIXEL_MODE_MONO:
+            render_mono(pEntry, &pGlyph->bitmap, x, y);
+            break;
+        }
+      }
     }
 
-    // Take the average size of all characters, and the colour of one of them.
-    unsigned int iWidthSum = 0, iHeightSum = 0, iAverageNum = 0;
-    for(unsigned int i = 0; i < pBitmapFontSpriteSheet->getSpriteCount(); ++i)
-    {
-        unsigned int iWidth, iHeight;
-        pBitmapFontSpriteSheet->getSpriteSizeUnchecked(i, &iWidth, &iHeight);
-        if(iWidth <= 1 || iHeight <= 1)
-            continue;
-        if(!pBitmapFontSpriteSheet->getSpriteAverageColour(i, &m_oColour))
-            continue;
-        iWidthSum += iWidth;
-        iHeightSum += iHeight;
-        ++iAverageNum;
-    }
-    if(iAverageNum == 0)
-        return FT_Err_Divide_By_Zero;
-
-    return setPixelSize((iWidthSum + iAverageNum / 2) / iAverageNum,
-                        (iHeightSum + iAverageNum / 2) / iAverageNum);
-}
-
-FT_Error THFreeTypeFont::setPixelSize(int iWidth, int iHeight)
-{
-    if(m_pFace == nullptr)
-        return FT_Err_Invalid_Face_Handle;
-
-    if(_isMonochrome() || iHeight <= 14 || iWidth <= 9)
-    {
-        // Look for a bitmap strike of a similar size
-        int iBestBitmapScore = 50;
-        FT_Int iBestBitmapIndex = -1;
-        for(FT_Int i = 0; i < m_pFace->num_fixed_sizes; ++i)
-        {
-            if(m_pFace->available_sizes[i].height > iHeight)
-                continue;
-            int iDeltaH = iHeight - m_pFace->available_sizes[i].height;
-            int iDeltaW = m_pFace->available_sizes[i].width - iWidth;
-            int iScore = iDeltaH * iDeltaH * 3 + iDeltaW * iDeltaW;
-            if(iScore < iBestBitmapScore)
-            {
-                iBestBitmapScore = iScore;
-                iBestBitmapIndex = i;
-            }
-        }
-
-        // Select the bitmap strike, if there was one
-        if(iBestBitmapIndex != -1)
-            return FT_Select_Size(m_pFace, iBestBitmapIndex);
+    // Free all glyphs.
+    for (auto itr = mapGlyphs.begin(); itr != mapGlyphs.end(); ++itr) {
+      FT_Done_Glyph(itr->second.glyph);
     }
 
-    // Go with the original size request if there was no bitmap strike, unless
-    // the size was very small, in which case scale things up, as vector fonts
-    // look rather poor at small sizes.
-    if(iHeight < 14)
-    {
-        iWidth = iWidth * 14 / iHeight;
-        iHeight = 14;
+    pEntry->is_valid = true;
+  }
+
+  if (pCanvas != nullptr) {
+    if (pEntry->texture == nullptr) {
+      make_texture(pCanvas, pEntry);
     }
-    if(iWidth < 9)
-    {
-        iHeight = iHeight * 9 / iWidth;
-        iWidth = 9;
-    }
-    return FT_Set_Pixel_Sizes(m_pFace, iWidth, iHeight);
-}
-
-THFontDrawArea THFreeTypeFont::getTextSize(const char* sMessage, size_t iMessageLength, int iMaxWidth) const
-{
-    return drawTextWrapped(nullptr, sMessage, iMessageLength, 0, 0, iMaxWidth, INT_MAX, 0);
-}
-
-void THFreeTypeFont::drawText(THRenderTarget* pCanvas, const char* sMessage,
-                          size_t iMessageLength, int iX, int iY) const
-{
-    drawTextWrapped(pCanvas, sMessage, iMessageLength, iX, iY, INT_MAX);
-}
-
-struct codepoint_glyph_t
-{
-    FT_Glyph_Metrics oMetrics;
-    FT_Glyph pGlyph;
-    FT_UInt iGlyphIndex;
-};
-
-THFontDrawArea THFreeTypeFont::drawTextWrapped(THRenderTarget* pCanvas, const char* sMessage,
-                                size_t iMessageLength, int iX, int iY,
-                                int iWidth, int iMaxRows, int iSkipRows, eTHAlign eAlign) const
-{
-    THFontDrawArea oDrawArea = {};
-    int iNumRows = 0;
-    int iHandledRows = 0;
-
-    // Calculate an index into the cache to use for this piece of text.
-    size_t iHash = iMessageLength
-        + (static_cast<size_t>(iMaxRows) << (ms_CacheSizeLog2 / 8))
-        + (static_cast<size_t>(iSkipRows) << (ms_CacheSizeLog2 / 4))
-        + (static_cast<size_t>(iWidth) << (ms_CacheSizeLog2 / 2))
-        + (static_cast<size_t>(eAlign) << ms_CacheSizeLog2);
-    for(size_t i = 0; i < iMessageLength; ++i)
-        iHash ^= (iHash << 5) + (iHash >> 2) + static_cast<size_t>(sMessage[i]);
-    iHash &= (1 << ms_CacheSizeLog2) - 1;
-
-    cached_text_t* pEntry = m_aCache + iHash;
-    if(pEntry->iMessageLength != iMessageLength || pEntry->iWidth > iWidth
-        || (iWidth != INT_MAX && pEntry->iWidth < iWidth)
-        || pEntry->eAlign != eAlign || !pEntry->bIsValid
-        || std::memcmp(pEntry->sMessage, sMessage, iMessageLength) != 0)
-    {
-        // Cache entry does not match the message being drawn, so discard the
-        // cache entry.
-        _freeTexture(pEntry);
-        delete[] pEntry->pData;
-        pEntry->pData = nullptr;
-        pEntry->bIsValid = false;
-
-        // Set the entry metadata to that of the new message.
-        if(iMessageLength > pEntry->iMessageBufferLength)
-        {
-            delete[] pEntry->sMessage;
-            pEntry->sMessage = new char[iMessageLength];
-            pEntry->iMessageBufferLength = iMessageLength;
-        }
-        std::memcpy(pEntry->sMessage, sMessage, iMessageLength);
-        pEntry->iMessageLength = iMessageLength;
-        pEntry->iWidth = iWidth;
-        pEntry->eAlign = eAlign;
-
-        // Split the message into lines, and determine the position within the
-        // line for each character.
-        std::vector<std::pair<const char*, const char*> > vLines;
-        std::vector<FT_Vector> vCharPositions(iMessageLength);
-        std::map<unsigned int, codepoint_glyph_t> mapGlyphs;
-        vLines.reserve(2);
-
-        FT_Vector ftvPen = {0, 0};
-        FT_Bool bUseKerning = FT_HAS_KERNING(m_pFace);
-        FT_UInt iPreviousGlyphIndex = 0;
-
-        const char* sMessageStart = sMessage;
-        const char* sMessageEnd = sMessage + iMessageLength;
-        const char* sLineStart = sMessageStart;
-        const char* sLineBreakPosition = sLineStart;
-
-        while(sMessage != sMessageEnd)
-        {
-            const char* sOldMessage = sMessage;
-            unsigned int iCode = utf8next(sMessage);
-            unsigned int iNextCode = *reinterpret_cast<const unsigned char*>(sMessage);
-            bool bIsNewLine = (iCode == '\n' && iNextCode == '\n') || (iCode == '/' && iNextCode == '/');
-            // Just replace single line breaks with space.
-            if(!bIsNewLine && iCode == '\n')
-            {
-                iCode = ' ';
-            }
-
-            codepoint_glyph_t& oGlyph = mapGlyphs[iCode];
-            if(oGlyph.pGlyph == nullptr)
-            {
-                oGlyph.iGlyphIndex = FT_Get_Char_Index(m_pFace, iCode);
-
-                /* FT_Error iError = */
-                FT_Load_Glyph(m_pFace, oGlyph.iGlyphIndex, FT_LOAD_DEFAULT);
-                // TODO: iError != FT_Err_Ok
-
-                /* iError = */
-                FT_Get_Glyph(m_pFace->glyph, &oGlyph.pGlyph);
-                // TODO: iError != FT_Err_Ok
-
-                oGlyph.oMetrics = m_pFace->glyph->metrics;
-            }
-
-            // Apply kerning
-            if(bUseKerning && iPreviousGlyphIndex && oGlyph.iGlyphIndex)
-            {
-                FT_Vector ftvKerning;
-                FT_Get_Kerning(m_pFace, iPreviousGlyphIndex,
-                    oGlyph.iGlyphIndex, FT_KERNING_DEFAULT, &ftvKerning);
-                ftvPen.x += ftvKerning.x;
-                ftvPen.y += ftvKerning.y;
-            }
-
-            // Make an automatic line break if one is needed.
-            if((ftvPen.x + oGlyph.oMetrics.horiBearingX +
-                oGlyph.oMetrics.width + 63) / 64 >= iWidth || bIsNewLine)
-            {
-                if(bIsNewLine)
-                {
-                    sLineBreakPosition = sOldMessage;
-                }
-                ftvPen.x = ftvPen.y = 0;
-                iPreviousGlyphIndex = 0;
-                if(sLineStart != sLineBreakPosition)
-                {
-                    // Only really save if we have skipped enough lines
-                    if(iHandledRows >= iSkipRows)
-                    {
-                        vLines.push_back(std::make_pair(sLineStart, sLineBreakPosition));
-                    }
-                    if(bIsNewLine)
-                    {
-                        if(iHandledRows + 1 >= iSkipRows)
-                        {
-                            vLines.push_back(std::make_pair(sLineBreakPosition, sLineBreakPosition));
-                        }
-                        utf8next(sLineBreakPosition);
-                        iHandledRows++;
-                    }
-                    sMessage = sLineBreakPosition;
-                    utf8next(sMessage);
-                    sLineStart = sMessage;
-                }
-                else
-                {
-                    if(iHandledRows >= iSkipRows) {
-                        vLines.push_back(std::make_pair(sLineStart, sOldMessage));
-                    }
-                    if(bIsNewLine)
-                    {
-                        utf8next(sMessage);
-                        sLineStart = sLineBreakPosition = sMessage;
-                    }
-                    else
-                    {
-                        sMessage = sLineStart = sLineBreakPosition = sOldMessage;
-                    }
-                }
-                iHandledRows++;
-                continue;
-            }
-
-            // Determine if a line can be broken at the current position.
-            if(iCode == ' ')
-                sLineBreakPosition = sOldMessage;
-
-            // Save (unless we are skipping lines) and advance the pen.
-            if(iHandledRows >= iSkipRows)
-            {
-                vCharPositions[sOldMessage - sMessageStart] = ftvPen;
-            }
-
-            iPreviousGlyphIndex = oGlyph.iGlyphIndex;
-            ftvPen.x += oGlyph.oMetrics.horiAdvance;
-        }
-        if(sLineStart != sMessageEnd)
-            vLines.push_back(std::make_pair(sLineStart, sMessageEnd));
-        sMessage = sMessageStart;
-
-        // Finalise the position of each character (alignment might change X,
-        // and baseline / lines will change Y), and calculate overall height
-        // and widest line.
-        FT_Pos iPriorLinesHeight = 0;
-        FT_Pos iLineWidth = 0, iAlignDelta = 0, iWidestLine = 0;
-        const FT_Pos iLineSpacing = 2 << 6;
-        codepoint_glyph_t& oGlyph = mapGlyphs['l'];
-        FT_Pos iBearingY = oGlyph.oMetrics.horiBearingY;
-        FT_Pos iNormalLineHeight = oGlyph.oMetrics.height - iBearingY;
-        iBearingY = ((iBearingY + 63) >> 6) << 6; // Pixel-align
-        iNormalLineHeight += iBearingY;
-        iNormalLineHeight += iLineSpacing;
-        iNormalLineHeight = ((iNormalLineHeight + 63) >> 6) << 6; // Pixel-align
-        for(std::vector<std::pair<const char*, const char*> >::const_iterator
-            itr = vLines.begin(), itrEnd = vLines.end(); itr != itrEnd && iNumRows < iMaxRows; ++itr)
-        {
-            // Calculate the X change resulting from alignment.
-            const char* sLastChar = utf8prev(itr->second);
-            codepoint_glyph_t& oLastGlyph = mapGlyphs[utf8decode(sLastChar)];
-            iLineWidth = vCharPositions[sLastChar - sMessage].x
-                + oLastGlyph.oMetrics.horiBearingX
-                + oLastGlyph.oMetrics.width;
-            if((iLineWidth >> 6) < iWidth)
-            {
-                iAlignDelta = ((iWidth * 64 - iLineWidth) *
-                    static_cast<int>(eAlign)) / 2;
-            }
-            if(iLineWidth > iWidestLine)
-                iWidestLine = iLineWidth;
-
-            // Calculate the line height and baseline position.
-            FT_Pos iLineHeight = 0;
-            FT_Pos iBaselinePos = 0;
-            for(const char* s = itr->first; s != itr->second; )
-            {
-                codepoint_glyph_t& oGlyph = mapGlyphs[utf8next(s)];
-                FT_Pos iBearingY = oGlyph.oMetrics.horiBearingY;
-                FT_Pos iCoBearingY = oGlyph.oMetrics.height - iBearingY;
-                if(iBearingY > iBaselinePos)
-                    iBaselinePos = iBearingY;
-                if(iCoBearingY > iLineHeight)
-                    iLineHeight = iCoBearingY;
-            }
-            iBaselinePos = ((iBaselinePos + 63) >> 6) << 6; // Pixel-align
-            iLineHeight += iBaselinePos;
-            iLineHeight += iLineSpacing;
-            iLineHeight = ((iLineHeight + 63) >> 6) << 6; // Pixel-align
-
-            iNormalLineHeight = std::max(iNormalLineHeight, iLineHeight);
-
-            // Apply the character position changes.
-            for(const char* s = itr->first; s != itr->second; utf8next(s))
-            {
-                FT_Vector& ftvPos = vCharPositions[s - sMessage];
-                ftvPos.x += iAlignDelta;
-                ftvPos.y += iBaselinePos + iPriorLinesHeight;
-            }
-            // Empty lines is a special case
-            if(itr->first == itr->second)
-            {
-                iPriorLinesHeight += iNormalLineHeight;
-            }
-            else
-            {
-                iPriorLinesHeight += iLineHeight;
-            }
-            iNumRows++;
-        }
-        if(iPriorLinesHeight > 0)
-            iPriorLinesHeight -= iLineSpacing;
-        pEntry->iHeight = static_cast<int>(1 + (iPriorLinesHeight >> 6));
-        pEntry->iWidestLine = static_cast<int>(1 + (iWidestLine >> 6));
-        pEntry->iNumRows = iNumRows;
-        if(iWidth == INT_MAX)
-            pEntry->iWidth = pEntry->iWidestLine;
-        pEntry->iLastX = 1 + (static_cast<int>(iLineWidth + iAlignDelta) >> 6);
-
-        // Get a bitmap for each glyph.
-        bool bIsMonochrome = _isMonochrome();
-        FT_Render_Mode eRenderMode = bIsMonochrome ? FT_RENDER_MODE_MONO
-            : FT_RENDER_MODE_NORMAL;
-        for(std::map<unsigned int, codepoint_glyph_t>::iterator itr =
-            mapGlyphs.begin(), itrEnd = mapGlyphs.end(); itr != itrEnd; ++itr)
-        {
-            FT_Glyph_To_Bitmap(&itr->second.pGlyph, eRenderMode, nullptr, 1);
-        }
-
-        // Prepare a canvas for rendering.
-        pEntry->pData = new uint8_t[pEntry->iWidth * pEntry->iHeight];
-        std::memset(pEntry->pData, 0, pEntry->iWidth * pEntry->iHeight);
-
-        int iDrawnLines = 0;
-        // Render each character to the canvas.
-        for(std::vector<std::pair<const char*, const char*> >::const_iterator
-            itr = vLines.begin(), itrEnd = vLines.end();
-            itr != itrEnd && iDrawnLines < iMaxRows + iSkipRows; ++itr)
-        {
-            iDrawnLines++;
-            for(const char* s = itr->first; s != itr->second; )
-            {
-                FT_Vector& ftvPos = vCharPositions[s - sMessage];
-                unsigned int iCode = utf8next(s);
-                if(iCode == '\n')
-                {
-                    iCode = ' ';
-                }
-                FT_BitmapGlyph pGlyph = reinterpret_cast<FT_BitmapGlyph>(
-                    mapGlyphs[iCode].pGlyph);
-                FT_Pos x = pGlyph->left + (ftvPos.x >> 6);
-                FT_Pos y = (ftvPos.y >> 6) - pGlyph->top;
-                // We may have asked for grayscale but been given monochrome,
-                // hence use the bitmap's pixel_mode rather than bIsMonochrome.
-                switch(pGlyph->bitmap.pixel_mode)
-                {
-                case FT_PIXEL_MODE_GRAY:
-                    _renderGray(pEntry, &pGlyph->bitmap, x, y);
-                    break;
-                case FT_PIXEL_MODE_MONO:
-                    _renderMono(pEntry, &pGlyph->bitmap, x, y);
-                    break;
-                }
-            }
-        }
-
-        // Free all glyphs.
-        for(std::map<unsigned int, codepoint_glyph_t>::const_iterator itr =
-            mapGlyphs.begin(), itrEnd = mapGlyphs.end(); itr != itrEnd; ++itr)
-        {
-            FT_Done_Glyph(itr->second.pGlyph);
-        }
-
-        pEntry->bIsValid = true;
-    }
-
-    if (pCanvas != nullptr)
-    {
-        if (pEntry->pTexture == nullptr)
-            _makeTexture(pCanvas, pEntry);
-        _drawTexture(pCanvas, pEntry, iX, iY);
-    }
-    oDrawArea.iWidth = pEntry->iWidestLine;
-    oDrawArea.iEndX = iX + pEntry->iLastX;
-    oDrawArea.iEndY = iY + pEntry->iHeight;
-    oDrawArea.iNumRows = pEntry->iNumRows;
-    return oDrawArea;
+    draw_texture(pCanvas, pEntry, iX, iY);
+  }
+  oDrawArea.width = pEntry->widest_line_width;
+  oDrawArea.end_x = iX + pEntry->last_x;
+  oDrawArea.end_y = iY + pEntry->height;
+  oDrawArea.row_count = pEntry->row_count;
+  return oDrawArea;
 }
 
 // In theory, the renderers should only be invoked with coordinates which end
@@ -821,69 +689,59 @@ THFontDrawArea THFreeTypeFont::drawTextWrapped(THRenderTarget* pCanvas, const ch
 // at which point the following line can be removed.
 // #define TRUST_RENDER_COORDS
 
-void THFreeTypeFont::_renderMono(cached_text_t *pCacheEntry, FT_Bitmap* pBitmap, FT_Pos x, FT_Pos y) const
-{
-    uint8_t* pOutRow = pCacheEntry->pData + y * pCacheEntry->iWidth + x;
-    uint8_t* pInRow = pBitmap->buffer;
-    for(int iY = 0; iY < pBitmap->rows; ++iY, pOutRow += pCacheEntry->iWidth,
-        pInRow += pBitmap->pitch)
-    {
+void freetype_font::render_mono(cached_text* pCacheEntry, FT_Bitmap* pBitmap,
+                                FT_Pos x, FT_Pos y) const {
+  uint8_t* pOutRow = pCacheEntry->data + y * pCacheEntry->width + x;
+  uint8_t* pInRow = pBitmap->buffer;
+  int rows = static_cast<int>(pBitmap->rows);
+  int width = static_cast<int>(pBitmap->width);
+  for (int iY = 0; iY < rows;
+       ++iY, pOutRow += pCacheEntry->width, pInRow += pBitmap->pitch) {
 #ifndef TRUST_RENDER_COORDS
-        if(y + iY < 0)
-            continue;
-        if(y + iY >= pCacheEntry->iHeight)
-            break;
+    if (y + iY < 0) continue;
+    if (y + iY >= pCacheEntry->height) break;
 #endif
-        uint8_t *pIn = pInRow, *pOut = pOutRow;
-        uint8_t iMask = 0x80;
-        for(int iX = 0; iX < pBitmap->width; ++iX, ++pOut)
-        {
+    uint8_t *pIn = pInRow, *pOut = pOutRow;
+    uint8_t iMask = 0x80;
+    for (int iX = 0; iX < width; ++iX, ++pOut) {
 #ifndef TRUST_RENDER_COORDS
-            if(x + iX < 0)
-                continue;
-            if(x + iX >= pCacheEntry->iWidth)
-                break;
+      if (x + iX < 0) continue;
+      if (x + iX >= pCacheEntry->width) break;
 #endif
-            if(*pIn & iMask)
-                *pOut = 0xFF;
-            iMask  = static_cast<uint8_t>(iMask / 2);
-            if(iMask == 0)
-            {
-                iMask = 0x80;
-                ++pIn;
-            }
-        }
+      if (*pIn & iMask) *pOut = 0xFF;
+      iMask = static_cast<uint8_t>(iMask / 2);
+      if (iMask == 0) {
+        iMask = 0x80;
+        ++pIn;
+      }
     }
+  }
 }
 
-void THFreeTypeFont::_renderGray(cached_text_t *pCacheEntry, FT_Bitmap* pBitmap, FT_Pos x, FT_Pos y) const
-{
-    uint8_t* pOutRow = pCacheEntry->pData + y * pCacheEntry->iWidth + x;
-    uint8_t* pInRow = pBitmap->buffer;
-    for(int iY = 0; iY < pBitmap->rows; ++iY, pOutRow += pCacheEntry->iWidth,
-        pInRow += pBitmap->pitch)
-    {
+void freetype_font::render_gray(cached_text* pCacheEntry, FT_Bitmap* pBitmap,
+                                FT_Pos x, FT_Pos y) const {
+  uint8_t* pOutRow = pCacheEntry->data + y * pCacheEntry->width + x;
+  uint8_t* pInRow = pBitmap->buffer;
+  int rows = static_cast<int>(pBitmap->rows);
+  int width = static_cast<int>(pBitmap->width);
+  for (int iY = 0; iY < rows;
+       ++iY, pOutRow += pCacheEntry->width, pInRow += pBitmap->pitch) {
 #ifndef TRUST_RENDER_COORDS
-        if(y + iY < 0)
-            continue;
-        if(y + iY >= pCacheEntry->iHeight)
-            break;
+    if (y + iY < 0) continue;
+    if (y + iY >= pCacheEntry->height) break;
 #endif
-        uint8_t *pIn = pInRow, *pOut = pOutRow;
-        for(int iX = 0; iX < pBitmap->width; ++iX, ++pIn, ++pOut)
-        {
+    uint8_t *pIn = pInRow, *pOut = pOutRow;
+    for (int iX = 0; iX < width; ++iX, ++pIn, ++pOut) {
 #ifndef TRUST_RENDER_COORDS
-            if(x + iX < 0)
-                continue;
-            if(x + iX >= pCacheEntry->iWidth)
-                break;
+      if (x + iX < 0) continue;
+      if (x + iX >= pCacheEntry->width) break;
 #endif
-            unsigned int iIn = *pIn;
-            unsigned int iOut = *pOut;
-            uint8_t cMerged = static_cast<uint8_t>(iIn + iOut - (iIn * iOut) / 255);
-            *pOut = cMerged;
-        }
+      unsigned int iIn = *pIn;
+      unsigned int iOut = *pOut;
+      uint8_t cMerged = static_cast<uint8_t>(iIn + iOut - (iIn * iOut) / 255);
+      *pOut = cMerged;
     }
+  }
 }
 
-#endif // CORSIX_TH_USE_FREETYPE2
+#endif  // CORSIX_TH_USE_FREETYPE2

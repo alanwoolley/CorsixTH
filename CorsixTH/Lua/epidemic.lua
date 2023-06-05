@@ -18,6 +18,10 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE. --]]
 
+corsixth.require("announcer")
+
+local AnnouncementPriority = _G["AnnouncementPriority"]
+
 class "Epidemic"
 
 ---@type Epidemic
@@ -140,6 +144,13 @@ function Epidemic:infectOtherPatients()
     -- Patient is not infectious.
     if patient.cured or patient.vaccinated then return false end
 
+    -- Don't allow infection outside the hospital grounds
+    -- Also check both patients to prevent infecting through outer walls
+    local ppx, ppy = patient.tile_x, patient.tile_y
+    if ppx and ppy and not self.hospital:isInHospital(ppx, ppy) then return false end
+    local opx, opy = other.tile_x, other.tile_y
+    if opx and opy and not self.hospital:isInHospital(opx, opy) then return false end
+
     -- 'other' is already infected or is going home.
     if other.infected or other.cured or other.vaccinated then return false end
     if other.is_emergency then return false end -- Don't interact with emergencies.
@@ -224,7 +235,7 @@ end
 function Epidemic:announceStartOfEpidemic()
   local announcements = {"EPID001.wav", "EPID002.wav", "EPID003.wav", "EPID004.wav"}
   if self.hospital:isPlayerHospital() then
-    self.world.ui:playAnnouncement(announcements[math.random(1, #announcements)])
+    self.world.ui:playAnnouncement(announcements[math.random(1, #announcements)], AnnouncementPriority.Critical)
   end
 end
 
@@ -233,7 +244,7 @@ end
 function Epidemic:announceEndOfEpidemic()
   local announcements = {"EPID005.wav", "EPID006.wav", "EPID007.wav", "EPID008.wav"}
   if self.hospital:isPlayerHospital() then
-    self.world.ui:playAnnouncement(announcements[math.random(1, #announcements)])
+    self.world.ui:playAnnouncement(announcements[math.random(1, #announcements)], AnnouncementPriority.Critical)
   end
 end
 
@@ -265,9 +276,10 @@ epidemic was started to be fair on the players so they don't instantly fail.
 Additionally if any patients die during an epidemic we also remove them,
 otherwise a player may never win the epidemic in such a case.]]
 function Epidemic:checkPatientsForRemoval()
-  for i, infected_patient in ipairs(self.infected_patients) do
+  for i = #self.infected_patients, 1, -1 do
+    local infected_patient = self.infected_patients[i]
     if (not self.coverup_in_progress and infected_patient.going_home) or
-        infected_patient.dead then
+        infected_patient.dead or infected_patient.tile_x == nil then
       table.remove(self.infected_patients,i)
     end
   end
@@ -385,6 +397,8 @@ function Epidemic:startCoverUp()
   self.timer = UIWatch(self.world.ui, "epidemic")
   self.countdown_intervals = self.timer.open_timer
   self.world.ui:addWindow(self.timer)
+  -- last chance clean up as entities might have ticked and changed state
+  self:checkPatientsForRemoval()
   self.coverup_in_progress = true
   --Set the mood icon for all infected patients
   for _, infected_patient in ipairs(self.infected_patients) do
@@ -509,16 +523,8 @@ end
 --[[ Forces evacuation of the hospital - it makes ALL patients leave and storm out. ]]
 function Epidemic:evacuateHospital()
   for _, patient in ipairs(self.hospital.patients) do
-    local patient_room = patient:getRoom()
-    if patient_room then
-      patient_room:makeHumanoidDressIfNecessaryAndThenLeave(patient)
-    end
-    if patient.has_passed_reception then
-      patient:clearDynamicInfo()
-      patient:setDynamicInfo('text', {_S.dynamic_info.patient.actions.epidemic_sent_home})
-      patient:setMood("exit","activate")
-      local spawn_point = self.world.spawn_points[math.random(1, #self.world.spawn_points)]
-      patient:setNextAction(SpawnAction("despawn", spawn_point):setMustHappen(true))
+    if patient.has_passed_reception and not patient.going_home then
+      patient:goHome("evacuated")
     end
   end
 end
@@ -547,8 +553,8 @@ end
   Typically this is used to determine if a patient can be vaccinated
   @param patient (Patient) the patient we wish to determine if they are static.]]
 local function is_static(patient)
-  local action = patient.action_queue[1]
-  return action.name == "queue" or action.name == "idle" or
+  local action = patient:getCurrentAction()
+  return action.name == "queue" or action.name == "idle" or action.name == "seek_room" or
       (action.name == "use_object" and action.object.object_type.id == "bench")
 end
 
@@ -585,6 +591,7 @@ function Epidemic:createVaccinationActions(patient,nurse)
     patient:giveVaccinationCandidateStatus()
     local level_config = self.world.map.level_config
     local fee = level_config.gbv.VacCost or 50
+    nurse:setDynamicInfoText(_S.dynamic_info.staff.actions.vaccine)
     nurse:setNextAction(WalkAction(x, y):setMustHappen(true):enableWalkingToVaccinate())
     nurse:queueAction(VaccinateAction(patient, fee))
   end
@@ -599,7 +606,7 @@ function Epidemic:getBestVaccinationTile(nurse, patient)
   local px, py = patient.tile_x, patient.tile_y
   -- If the patient is using a bench the best tile to use is
   -- directly in front of them
-  local action = patient.action_queue[1]
+  local action = patient:getCurrentAction()
   if action.name == "use_object" then
     local object_in_use = action.object
     if object_in_use.object_type.id == "bench" then
@@ -697,7 +704,7 @@ function Epidemic:tryAnnounceInspector()
   end
 end
 
-function Epidemic:afterLoad(old, new)
+function Epidemic:afterLoad(old, new) -- luacheck: ignore 212 keep args for child class
   if old < 106 then
     self.level_config = nil
   end

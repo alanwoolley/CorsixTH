@@ -21,10 +21,13 @@ SOFTWARE. --]]
 require("class_test_base")
 
 require("entity")
-require("entities/object")
+require("entities.object")
 
 describe("object.lua: ", function()
   local stub_world = {map = {}}
+  local stub_hospital = {world = stub_world}
+  _G["Hospital"] = stub_hospital
+
   local fake_object_type = {ticks = false, idle_animations = {west = true}}
   local tile_x, tile_y, direction = 10, 10, "west"
 
@@ -32,7 +35,7 @@ describe("object.lua: ", function()
     stub(stub_world, "getLocalPlayerHospital")
     stub(stub_world, "addObjectToTile")
     stub(stub_world, "clearCaches")
-    return Object(stub_world, fake_object_type, tile_x, tile_y, direction)
+    return Object(stub_hospital, fake_object_type, tile_x, tile_y, direction)
   end
 
   it("can create Object objects", function()
@@ -40,5 +43,14 @@ describe("object.lua: ", function()
 
     assert.are.equal(fake_object_type, object.object_type)
     assert.are.equal(stub_world.map, object.world.map)
+  end)
+  it("can transfer state", function()
+    local object1 = createObjectWithFakeInput()
+    object1.times_used = object1.times_used + 7
+    local object2 = createObjectWithFakeInput()
+    assert.are_not.equal(object1.times_used, object2.times_used)
+
+    object2:setState(object1:getState())
+    assert.are.equal(object1.times_used, object2.times_used)
   end)
 end)

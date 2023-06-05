@@ -19,10 +19,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE. --]]
 
 local pathsep = package.config:sub(1, 1)
-local rnc = require "rnc"
-local lfs = require "lfs"
-local SDL = require "sdl"
-local TH = require "TH"
+local rnc = require("rnc")
+local lfs = require("lfs")
+local SDL = require("sdl")
+local TH = require("TH")
 local ipairs
     = ipairs
 
@@ -70,10 +70,10 @@ function Audio:init()
     self.not_loaded = true
     return
   end
-  local mp3 = self.app.config.audio_mp3
+  local music = self.app.config.audio_music or self.app.config.audio_mp3
   local music_dir
-  if mp3 then
-    music_dir = mp3
+  if music then
+    music_dir = music
     if music_dir:sub(-1) ~= pathsep then
       music_dir = music_dir .. pathsep
     end
@@ -95,11 +95,13 @@ function Audio:init()
     -----------------------------
 
     - Will search through all the files in music_dir.
-    - Adds xmi and mp3 files.
-    - If ATLANTIS.XMI and ATLANTIS.MP3 exists, the MP3 is preferred.
+    - Adds most files supported by SDL2_mixer (regardless of local library's ability)
+    - Prefers waveform audio (eg mp3) over instructional (eg midi)
     - Uses titles from MIDI.TXT if found, else the filename.
   --]]
   local midi_txt -- File name of midi.txt file, if any.
+  local waveform = { MP3=true, OGG=true, WAV=true, AIFF=true, VOC=true, FLAC=true }
+  local instructional = { MID=true, MOD=true, XM=true, XMI=true }
 
   local _f, _s, _v
   if music_dir then
@@ -108,27 +110,22 @@ function Audio:init()
     _f, _s, _v = pairs(self.app.fs:listFiles("Sound", "Midi") or {})
   end
   for file in _f, _s, _v do
-    local filename, ext = file:match"^(.*)%.([^.]+)$"
+    local info
+    local filename, ext = file:match("^(.+)%.([^.]+)$")
     ext = ext and ext:upper()
-    -- Music file found (mp3/xmi).
-    if ext == "MP3" or ext == "XMI" then
-      local info = musicFileTable(filename)
-      info.title = filename
-      if ext == "MP3" then
-        if music_dir then
-          info.filename_mp3 = music_dir .. file
-        else
-          print("Warning: CorsixTH only supports xmi if audio_mp3" ..
-              " is not defined in the config file.")
-            music_array[filename:upper()] = nil
-        end
-         -- Remove the xmi version of this file, if found.
-         info.filename = nil
-      elseif ext == "XMI" and not info.filename_mp3 then
-        -- NB: If the mp3 version exists, this file is ignored
-        info.filename = table.concat({"Sound", "Midi", file}, pathsep)
-      end
+    if waveform[ext] or instructional[ext] then
+      info = musicFileTable(filename)
       -- This title might be replaced later by the midi_txt.
+      info.title = filename
+    end
+    if instructional[ext] and not music_dir then
+       info.filename = table.concat({"Sound", "Midi", file}, pathsep)
+    -- User supplied music file found
+    elseif waveform[ext] then
+      info.filename_music = music_dir .. file
+    -- Waveform can overwrite instructional, but not vice versa
+    elseif instructional[ext] and not info.filename_music then
+      info.filename_music = music_dir .. file
     elseif ext == "TXT" and (file:sub(1, 4):upper() == "MIDI" or
                              file:sub(1, 5):upper() == "NAMES") then
       -- If it Looks like the midi.txt or equiv, then remember it for later.
@@ -150,8 +147,8 @@ function Audio:init()
     else
       data = assert(self.app.fs:readContents("Sound", "Midi", midi_txt))
     end
-    for file, title in data:gmatch"([^\r\n\26]+).-([^\r\n\26]+)" do
-      local info = musicFileTable(file:match"^(.*)%." or file)
+    for file, title in data:gmatch("([^\r\n\26]+).-([^\r\n\26]+)") do
+      local info = musicFileTable(file:match("^(.*)%.") or file)
       if next(info) ~= nil then
         info.title = title
       else
@@ -167,8 +164,11 @@ function Audio:init()
     self.has_bg_music = true
   end
 
-  local status, err = SDL.audio.init(self.app.config.audio_frequency,
-    self.app.config.audio_channels, self.app.config.audio_buffer_size)
+  local status, err = SDL.audio.init(
+    self.app.config.audio_frequency,
+    self.app.config.audio_channels,
+    self.app.config.audio_buffer_size,
+    self.app:findSoundFont())
   if status then
     -- NB: Playback will not start if play_music is set to false
     self:playRandomBackgroundTrack()
@@ -182,8 +182,6 @@ function Audio:init()
 end
 
 function Audio:initSpeech(speech_file)
-  self.sound_archive = nil
-  self.sound_fx = nil
   if self.not_loaded then
     return
   end
@@ -209,6 +207,10 @@ function Audio:initSpeech(speech_file)
     archive_data = load_sound_file(speech_file)
   end
 
+  self.sound_archive = nil
+  self.sound_fx = nil
+  self.speech_file_name = nil
+
   if not archive_data then
     if self.app.good_install_folder then
       print("Notice: No sound effects as no SOUND/DATA/".. speech_file ..
@@ -229,10 +231,17 @@ function Audio:initSpeech(speech_file)
       self.speech_file_name = speech_file
       self.sound_fx = TH.soundEffects()
       self.sound_fx:setSoundArchive(self.sound_archive)
-      local w, h = self.app.config.width / 2, self.app.config.height / 2
-      self.sound_fx:setCamera(math.floor(w), math.floor(h), math.floor((w^2 + h^2)^0.5))
+      self:setSoundStage()
       --self:dumpSoundArchive[[E:\CPP\2K8\CorsixTH\DataRaw\Sound\]]
     end
+  end
+end
+
+--! Set the visual area for sound effects playback
+function Audio:setSoundStage()
+  if self.sound_fx then
+    local w, h = self.app.config.width / 2, self.app.config.height / 2
+    self.sound_fx:setCamera(math.floor(w), math.floor(h), math.floor((w^2 + h^2)^0.5))
   end
 end
 
@@ -495,14 +504,8 @@ end
 --! If nil is returned music might either be playing or completely stopped.
 function Audio:pauseBackgroundTrack()
   assert(self.background_music, "Trying to pause music while music is stopped")
-  -- TODO: There is a bug in SDL for Windows that makes all sound, not just music stop
-  -- when pausing. For the time being, stop the music instead to prevent this.
-  self:stopBackgroundTrack()
-  return false
-  -------------------------------------------------
-  -- Real pause logic
-  -------------------------------------------------
-  --[[local status
+
+  local status
   if self.background_paused then
     self.background_paused = nil
     status = SDL.audio.resumeMusic()
@@ -532,14 +535,14 @@ function Audio:pauseBackgroundTrack()
     end
   end
   self:notifyJukebox()
-  return self.background_paused--]]
+  return self.background_paused
 end
 
 --! Stops playing background music for the time being.
 --! Does not affect the configuration setting play_music.
 function Audio:stopBackgroundTrack()
   if self.background_paused then
-    -- unpause first in order to clear the backupped volume
+    -- Resume first in order to clear the saved volume.
     self:pauseBackgroundTrack()
   end
   SDL.audio.stopMusic()
@@ -558,15 +561,15 @@ function Audio:playBackgroundTrack(index)
     local music = info.music
     if not music then
       local data
-      if info.filename_mp3 then
-        data = assert(GetFileData(info.filename_mp3))
+      if info.filename_music then
+        data = assert(GetFileData(info.filename_music))
       else
         data = assert(self.app.fs:readContents(info.filename))
       end
       if data:sub(1, 3) == "RNC" then
         data = assert(rnc.decompress(data))
       end
-      if not info.filename_mp3 then
+      if not info.filename_music then
         data = SDL.audio.transcodeXmiToMid(data)
       end
       -- Loading of music files can incur a slight pause, which is why it is
@@ -577,7 +580,7 @@ function Audio:playBackgroundTrack(index)
       SDL.audio.loadMusicAsync(data, function(music_data, e)
 
         if music_data == nil then
-          error("Could not load music file \'" .. (info.filename_mp3 or info.filename) .. "\'" ..
+          error("Could not load music file \'" .. (info.filename_music or info.filename) .. "\'" ..
               (e and (" (" .. e .. ")" or "")))
         else
           info.music = music_data

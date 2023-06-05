@@ -28,9 +28,8 @@ function UICasebook:UICasebook(ui, disease_selection)
   self:UIFullscreen(ui)
   local gfx = ui.app.gfx
   if not pcall(function()
-    self.background = gfx:loadRaw("DrugN01V", 640, 480)
-    local palette = gfx:loadPalette("QData", "DrugN01V.pal")
-    palette:setEntry(255, 0xFF, 0x00, 0xFF) -- Make index 255 transparent
+    self.background = gfx:loadRaw("DrugN01V", 640, 480, "QData", "QData", "DrugN01V.pal", true)
+    local palette = gfx:loadPalette("QData", "DrugN01V.pal", true)
     self.panel_sprites = gfx:loadSpriteTable("QData", "DrugN02V", true, palette)
     self.title_font = gfx:loadFont("QData", "Font25V", false, palette)
     self.selected_title_font = gfx:loadFont("QData", "Font26V", false, palette)
@@ -41,6 +40,7 @@ function UICasebook:UICasebook(ui, disease_selection)
     return
   end
 
+  self.ui = ui
   self.hospital = ui.hospital
   self.casebook = self.hospital.disease_casebook
   self:updateDiseaseList()
@@ -54,11 +54,7 @@ function UICasebook:UICasebook(ui, disease_selection)
   self:addPanel(0, 235, 400):makeButton(0, 0, 140, 20, 0, self.concentrateResearch)
     :setTooltip(_S.tooltip.casebook.research)
 
-  -- Hotkeys
-  self:addKeyHandler("up", self.scrollUp)
-  self:addKeyHandler("down", self.scrollDown)
-  self:addKeyHandler("right", self.increasePay)
-  self:addKeyHandler("left", self.decreasePay)
+  self:registerKeyHandlers();
 
   -- Icons representing cure effectiveness and other important information.
   self.machinery = self:addPanel(6, 306, 352):setTooltip(_S.tooltip.casebook.cure_type.machine)
@@ -95,6 +91,14 @@ function UICasebook:UICasebook(ui, disease_selection)
     self.selected_disease = self.names_sorted[self.selected_index]
     self:updateIcons()
   end
+end
+
+function UICasebook:registerKeyHandlers()
+  -- Hotkeys
+  self:addKeyHandler("ingame_scroll_up", self.scrollUp)
+  self:addKeyHandler("ingame_scroll_down", self.scrollDown)
+  self:addKeyHandler("ingame_scroll_left", self.decreasePay)
+  self:addKeyHandler("ingame_scroll_right", self.increasePay)
 end
 
 function UICasebook:close()
@@ -144,7 +148,6 @@ end
 function UICasebook:updateIcons()
   local disease = self.selected_disease
   local hosp = self.hospital
-  local world = hosp.world
 
   local known = true
   -- Curable / not curable icons and their tooltip
@@ -165,31 +168,21 @@ function UICasebook:updateIcons()
       local build = false
       local staff = false
       -- Room requirements
-      if #req.rooms > 0 then
-        for _, room_id in ipairs(req.rooms) do
-          -- Not researched yet?
-          if not hosp.discovered_rooms[world.available_rooms[room_id]] then
-            known = false
-            research = (research and (research .. ", ") or " (") .. TheApp.rooms[room_id].name
-          end
-          -- Researched, but not built. TODO: maybe make this an else clause to not oversize the tooltip that much
-          build = (build and (build .. ", ") or " (") .. TheApp.rooms[room_id].name
+      for _, room_id in ipairs(req.rooms) do
+        -- Not researched yet?
+        if not hosp:isRoomDiscovered(room_id) then
+          known = false
+          research = (research and (research .. ", ") or " (") .. TheApp.rooms[room_id].name
         end
+        -- Researched, but not built. TODO: maybe make this an else clause to not oversize the tooltip that much
+        build = (build and (build .. ", ") or " (") .. TheApp.rooms[room_id].name
       end
       research = research and (_S.tooltip.casebook.cure_requirement.research_machine .. research .. "). ") or ""
       build    = build    and (_S.tooltip.casebook.cure_requirement.build_room .. build .. "). ") or ""
 
-      local staffclass_to_string = {
-        Nurse        = _S.staff_title.nurse,
-        Doctor       = _S.staff_title.doctor,
-        Surgeon      = _S.staff_title.surgeon,
-        Psychiatrist = _S.staff_title.psychiatrist,
-        Researcher   = _S.staff_title.researcher,
-      }
-
       -- Staff requirements
       for sclass, amount in pairs(req.staff) do
-        staff = (staff and (staff .. ", ") or " (") .. staffclass_to_string[sclass] .. ": " .. amount
+        staff = (staff and (staff .. ", ") or " (") .. StaffProfile.translateStaffClass(sclass) .. ": " .. amount
       end
       staff = staff and (_S.tooltip.casebook.cure_requirement.hire_staff .. staff .. "). ") or ""
 
@@ -398,4 +391,19 @@ function UICasebook:onTick()
     end
   end
   return UIFullscreen.onTick(self)
+end
+
+function UICasebook:afterLoad(old, new)
+  if old < 176 then
+    local gfx = TheApp.gfx
+    self.background = gfx:loadRaw("DrugN01V", 640, 480, "QData", "QData", "DrugN01V.pal", true)
+    local palette = gfx:loadPalette("QData", "DrugN01V.pal", true)
+    self.panel_sprites = gfx:loadSpriteTable("QData", "DrugN02V", true, palette)
+    self.title_font = gfx:loadFont("QData", "Font25V", false, palette)
+    self.selected_title_font = gfx:loadFont("QData", "Font26V", false, palette)
+    self.drug_font = gfx:loadFont("QData", "Font24V", false, palette)
+  end
+
+  UIFullscreen.afterLoad(self, old, new)
+  self:registerKeyHandlers()
 end

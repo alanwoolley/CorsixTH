@@ -1,0 +1,272 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>com.corsixth.corsixth</id>
+  <!-- Copyright 2019 Artem Polishchuk <ego.cordatus@gmail.com> -->
+  <metadata_license>CC0</metadata_license>
+  <project_license>BSD-3-Clause AND MIT</project_license>
+  <name>CorsixTH</name>
+  <summary>Open source clone of Theme Hospital</summary>
+  <description>
+    <p>CorsixTH aims to reimplement the game engine of Theme Hospital, and be
+       able to load the original game data files. This means that you will need
+       a purchased copy of Theme Hospital, or a copy of the demo, in order to
+       use CorsixTH. After most of the original engine has been reimplemented in
+       open source code, the project will serve as a base from which extensions
+       and improvements to the original game can be made.</p>
+  </description>
+  <provides>
+    <binary>corsix-th</binary>
+    <id>com.corsixth.CorsixTH</id>
+  </provides>
+  <launchable type="desktop-id">com.corsixth.corsixth.desktop</launchable>
+  <releases>
+    <release version="0.66" date="2022-06-25" type="stable">
+      <description>
+        <p>New Features:</p>
+        <ul>
+          <li>Direct Zoom has been improved and is now enabled by default</li>
+          <li>Nurses can now leave the ward without disturbing her patients</li>
+          <li>Patients with Serious Radiation now glow a beautiful shade of green</li>
+          <li>Patients with Jellyitis now wobble wobble wobble</li>
+          <li>The Hotkeys menu has been overhauled to make it easier to use</li>
+          <li>You can now reset your zoom level by pressing 0</li>
+          <li>A new fax code cheat has been added!</li>
+          <li>The replace machine prompt can now tell you the new strength before purchase</li>
+          <li>A machine's dynamic info will tell you the strength a machine can be upgraded
+            to if you replaced it (can be disabled in configuration settings)</li>
+        </ul>
+        <p>Changes:</p>
+        <ul>
+          <li>Improved pee and vomit conditions</li>
+          <li>Patients will no longer queue for reception until nearby</li>
+          <li>The Adviser will no longer queue repetitive messages</li>
+          <li>Dropdown menus will now close when clicked outside of</li>
+          <li>Non-visual diseases can now be delayed in the level config of a custom game</li>
+          <li>Gamelog.txt will now contain system information instead of within the window
+            title</li>
+        </ul>
+        <p>Translations:</p>
+        <ul>
+          <li>Translations should no longer show random '/' on new lines</li>
+          <li>Russian language updated (Thanks @Matvey1705 !)</li>
+          <li>Czech language updated (Thanks @jansakos !)</li>
+          <li>German language updated (Thanks @Manuel-K !)</li>
+        </ul>
+        <p>Bug Fixes:</p>
+        <ul>
+          <li>Checking for updates should now work moving forward (promise)</li>
+          <li>All cured trophy bugfix now properly applied from 0.65.1</li>
+          <li>Firing staff from a multi-use object now ensures they leave the hospital</li>
+          <li>Missing config and hotkey values will now use default values</li>
+          <li>Fixed an instance where an emergency fax could show the wrong cure</li>
+          <li>Sound effect boundary is now properly applied on window resize</li>
+          <li>The cheats menu is now immediately usable after typing the cheat code on a
+            fax</li>
+          <li>User action while paused setting no longer uses configuration default</li>
+          <li>Quick Save and Quick Load behaviour has been improved</li>
+          <li>The cheats menu dialog will no longer slide off the screen</li>
+          <li>You can now purchase plots while wall transparency is on</li>
+          <li>Fixed playback of movie audio on surround sound systems is the most accurate</li>
+          <li>Patients no longer leave or become unhappy waiting too long when
+              they are in their treatment room</li>
+          <li>Resolved formatting issues with numbers after loading a save</li>
+        </ul>
+      </description>
+    </release>
+    <release version="0.66~rc1" date="2022-06-18" type="development">
+      <description>
+        <p>Fixes:</p>
+        <ul>
+          <li>Patients no longer leave or become unhappy waiting too long when
+              they are in their treatment room</li>
+          <li>Loading a save game containing a graph would crash</li>
+          <li>More crashing advisor statements have been corrected</li>
+          <li>Resolved formatting issues with numbers after loading a save</li>
+        </ul>
+      </description>
+    </release>
+    <release version="0.66~beta2" date="2022-06-04" type="development">
+      <description>
+        <p>Fixes:</p>
+        <ul>
+          <li>Crashing advisor statements introduced in 0.66-beta1</li>
+          <li>Issue loading 0.65.1 and earlier saves with VIP faxes</li>
+        </ul>
+      </description>
+    </release>
+    <release version="0.66~beta1" date="2022-05-21" type="development">
+      <description>
+        <p>New Features:</p>
+        <ul>
+          <li>Direct Zoom has been improved and is now enabled by default</li>
+          <li>Nurses can now leave the ward without disturbing her patients</li>
+          <li>Patients with Serious Radiation now glow a beautiful shade of green</li>
+          <li>Patients with Jellyitis now wobble wobble wobble</li>
+          <li>The Hotkeys menu has been overhauled to make it easier to use</li>
+          <li>You can now reset your zoom level by pressing 0</li>
+          <li>A new fax code cheat has been added!</li>
+          <li>The replace machine prompt can now tell you the new strength before purchase</li>
+          <li>A machine's dynamic info will tell you the strength a machine can be upgraded
+            to if you replaced it (can be disabled in configuration settings)</li>
+        </ul>
+        <p>Changes:</p>
+        <ul>
+          <li>Improved pee and vomit conditions</li>
+          <li>Patients will no longer queue for reception until nearby</li>
+          <li>The Adviser will no longer queue repetitive messages</li>
+          <li>Dropdown menus will now close when clicked outside of</li>
+          <li>Non-visual diseases can now be delayed in the level config of a custom game</li>
+          <li>Gamelog.txt will now contain system information instead of within the window
+            title</li>
+        </ul>
+        <p>Translations:</p>
+        <ul>
+          <li>Translations should no longer show random '/' on new lines</li>
+          <li>Russian language updated (Thanks @Matvey1705 !)</li>
+          <li>Czech language updated (Thanks @jansakos !)</li>
+          <li>German language updated (Thanks @Manuel-K !)</li>
+        </ul>
+        <p>Bug Fixes:</p>
+        <ul>
+          <li>Checking for updates should now work moving forward (promise)</li>
+          <li>All cured trophy bugfix now properly applied from 0.65.1</li>
+          <li>Firing staff from a multi-use object now ensures they leave the hospital</li>
+          <li>Missing config and hotkey values will now use default values</li>
+          <li>Fixed an instance where an emergency fax could show the wrong cure</li>
+          <li>Sound effect boundary is now properly applied on window resize</li>
+          <li>The cheats menu is now immediately usable after typing the cheat code on a
+            fax</li>
+          <li>User action while paused setting no longer uses configuration default</li>
+          <li>Quick Save and Quick Load behaviour has been improved</li>
+          <li>The cheats menu dialog will no longer slide off the screen</li>
+          <li>You can now purchase plots while wall transparency is on</li>
+          <li>Fixed playback of movie audio on surround sound systems is the most accurate</li>
+        </ul>
+      </description>
+    </release>
+    <release version="0.65.1" date="2021-07-17" type="stable">
+      <description>
+        <p>This is a hotfix release of 0.65 and replaces the June 2021 release</p>
+        <ul>
+          <li>Fixes a bug where the game would crash if you got the All Cured trophy at the
+            end of year awards, when loading a save from 0.64 or earlier</li>
+        </ul>
+      </description>
+    </release>
+    <release version="0.65" date="2021-06-19" type="stable">
+      <description>
+        <p>New Features:</p>
+        <ul>
+          <li>On MacOS DMG files are now supported as disk images for Theme
+            Hospital data</li>
+          <li>Hospital policies will now carry over to your next level in the
+            campaign</li>
+          <li>You can now remove destroyed rooms for a fee (config option)</li>
+          <li>The information dialogs that appear when a room is first built
+            can be disabled in the configuration file</li>
+          <li>Fire extinguishers in rooms now have a chance to save a smoking
+            machine from exploding</li>
+          <li>Advisor has more advice</li>
+          <li>Additional trophy of the original game is implemented</li>
+          <li>Windows and room size now impact staff happiness</li>
+          <li>Roujin's challenge cheat is back</li>
+          <li>Experimental direct_zoom config option, for more efficient zoom.
+            Fixes zoom on some hardware. Defaults off.</li>
+        </ul>
+        <p>Changes:</p>
+        <ul>
+          <li>Emergencies with unknown diseases will no longer occur</li>
+          <li>The VIP system has been overhauled to provide more balanced
+            ratings</li>
+          <li>Overpriced/Underpriced treatments now scale with difficulty</li>
+          <li>Placing a receptionist on a desk will now call her to the
+            desk</li>
+          <li>Boiler breakdowns now depend on handymen</li>
+          <li>Faxes can no longer be opened while paused (unless editing while
+            paused is enabled)</li>
+          <li>Improvements to receptionist announcement frequency and
+            behaviour</li>
+          <li>The game will now check common locations for Theme Hospital on
+            startup if it has not been configured</li>
+          <li>Games compiled without movie/audio can no longer access these
+            settings</li>
+          <li>Update check now occurs over TLS for better security</li>
+          <li>English names are now shown in a tooltip when hovering over a
+            language option</li>
+          <li>Improved TTF font rendering</li>
+        </ul>
+        <p>Translations:</p>
+        <ul>
+          <li>Greek language added! (thanks to dimitrios-iliadis!)</li>
+          <li>Updates to Brazilian-Portuguese language</li>
+          <li>Updates to English language</li>
+          <li>Fixes to Chinese unicode encoding</li>
+        </ul>
+        <p>Bug Fixes:</p>
+        <ul>
+          <li>Issues scheduling emergencies have been resolved</li>
+          <li>Games will no longer crash on load if the jukebox was open</li>
+          <li>Games will no longer crash because of an empty music folder</li>
+          <li>Fixed a scenario where editing a room caused staff to get
+            stuck</li>
+          <li>Games that scrolled while saving stop scrolling on load</li>
+          <li>Psychiatrists in the Operating Theatre are now properly
+            counted</li>
+          <li>Losing a game now gives the reason if the movie is skipped</li>
+          <li>Exiting the game will no longer hang when using the Wayland
+            backend</li>
+          <li>The mouse will now be freed on game crash</li>
+        </ul>
+      </description>
+    </release>
+    <release version="0.65~beta2" date="2021-05-29" type="development"></release>
+    <release version="0.65~beta1" date="2021-05-23" type="development"></release>
+    <release version="0.64" date="2020-06-16" type="stable"></release>
+  </releases>
+  <screenshots>
+    <screenshot type="default">
+      <image>https://corsixth.com/media/screenshots/1-medium.jpg</image>
+    </screenshot>
+    <screenshot>
+      <image>https://corsixth.com/media/screenshots/2-medium.jpg</image>
+    </screenshot>
+    <screenshot>
+      <image>https://camo.githubusercontent.com/1b82352e0f0eac03a6927af7e9d7bbad8c380f93/687474703a2f2f692e696d6775722e636f6d2f714856363055692e706e67</image>
+    </screenshot>
+  </screenshots>
+  <content_rating type="oars-1.1">
+    <content_attribute id="violence-cartoon">intense</content_attribute>
+    <content_attribute id="violence-fantasy">none</content_attribute>
+    <content_attribute id="violence-realistic">none</content_attribute>
+    <content_attribute id="violence-bloodshed">none</content_attribute>
+    <content_attribute id="violence-sexual">none</content_attribute>
+    <content_attribute id="violence-desecration">none</content_attribute>
+    <content_attribute id="violence-slavery">none</content_attribute>
+    <content_attribute id="violence-worship">none</content_attribute>
+    <content_attribute id="drugs-alcohol">none</content_attribute>
+    <content_attribute id="drugs-narcotics">none</content_attribute>
+    <content_attribute id="drugs-tobacco">none</content_attribute>
+    <content_attribute id="sex-nudity">mild</content_attribute>
+    <content_attribute id="sex-themes">none</content_attribute>
+    <content_attribute id="sex-homosexuality">none</content_attribute>
+    <content_attribute id="sex-prostitution">none</content_attribute>
+    <content_attribute id="sex-adultery">none</content_attribute>
+    <content_attribute id="sex-appearance">none</content_attribute>
+    <content_attribute id="language-profanity">none</content_attribute>
+    <content_attribute id="language-humor">moderate</content_attribute>
+    <content_attribute id="language-discrimination">none</content_attribute>
+    <content_attribute id="social-chat">none</content_attribute>
+    <content_attribute id="social-info">none</content_attribute>
+    <content_attribute id="social-audio">none</content_attribute>
+    <content_attribute id="social-location">none</content_attribute>
+    <content_attribute id="social-contacts">none</content_attribute>
+    <content_attribute id="money-purchasing">none</content_attribute>
+    <content_attribute id="money-gambling">none</content_attribute>
+  </content_rating>
+  <developer_name>CorsixTH developers</developer_name>
+  <url type="homepage">https://corsixth.com</url>
+  <url type="bugtracker">https://github.com/CorsixTH/CorsixTH/issues</url>
+  <url type="contact">https://webchat.freenode.net/?channels=corsix-th</url>
+  <url type="contact">https://discord.gg/Mxeztvh</url>
+  <url type="help">https://github.com/CorsixTH/CorsixTH/wiki</url>
+</component>

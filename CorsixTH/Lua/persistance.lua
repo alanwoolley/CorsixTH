@@ -18,15 +18,15 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE. --]]
 
-local persist = require "persist"
+local persist = require("persist")
 local saved_permanents = {}
 
 strict_declare_global "permanent"
 strict_declare_global "unpermanent"
 
 local th_getfenv
-local th_getupvalue
-if _G._VERSION == "Lua 5.2" or _G._VERSION == "Lua 5.3" then
+local th_getupvalue -- luacheck: ignore 231
+if _G._VERSION == "Lua 5.2" or _G._VERSION == "Lua 5.3" or _G._VERSION == "Lua 5.4" then
   th_getfenv = function(f)
     local _, val = nil, nil
     if type(f) == "function" then
@@ -101,6 +101,11 @@ local function MakePermanentObjectsTable(inverted)
     for k, v in pairs(class) do
       if type(v) == "function" then
         permanent[v] = name .. "." .. k
+      end
+    end
+    for k, v in pairs(class._metatable) do
+      if type(v) == "function" then
+        permanent[v] = name .. "._metatable." .. k
       end
     end
   until true end
@@ -250,15 +255,42 @@ end
 --!param filename (string) Path of the file to write.
 function SaveGameFile(filename)
   local data = SaveGame()
-  local f = assert(io.open(filename, "wb"))
+  local f = TheApp:writeToFileOrTmp(filename, "wb")
   f:write(data)
   f:close()
 end
 
+--! Compatibility function to work out the game's graphics set
+--!param map The savegame map data
+--!param world The savegame world data
+local function gfxSetHeuristic(map, world)
+  -- First eliminate all but the first campaign level (same in demo and full)
+  local toxicity = tostring(_S.level_names[1]:upper())
+  local level_name = tostring(map.level_name)
+  if level_name ~= toxicity then
+    return "full"
+  end
+  -- Now check a disease only in the demo (baldness)
+  for _, disease in ipairs(world.available_diseases) do
+    if disease.id == "baldness" then
+      return "demo"
+    end
+  end
+  return "full"
+end
+
+--! Puts loaded file into the game
+--!param data The file
 function LoadGame(data)
   --local status, res = xpcall(function()
   local objtable = MakePermanentObjectsTable(true)
   local state = assert(persist.load(data, objtable))
+  -- Graphics set types were defined in savegame version 166+.
+  if not state.world.gfx_set then
+    state.world.gfx_set = gfxSetHeuristic(state.map, state.world)
+  end
+  -- Check the game we're loading is compatible with program
+  if not TheApp:checkCompatibility(state.world.savegame_version, state.world.gfx_set) then return end
   state.ui:resync(TheApp.ui)
   TheApp.ui = state.ui
   TheApp.world = state.world
@@ -279,8 +311,10 @@ function LoadGame(data)
   TheApp:afterLoad()
   TheApp.world:resetAnimations()
   TheApp.ui:onChangeResolution()
-    -- Possibly add the blueish tone if the game is currently paused.
-  if not TheApp.world.user_actions_allowed then
+  -- Check if the blueish tone should be applied.
+  -- Note: Blue filter control should be handled from world or ui, however when
+  -- loading a game we should let persistance do it.
+  if not TheApp.ui:checkForMustPauseWindows() and TheApp.world:isUserActionProhibited() then
     TheApp.video:setBlueFilterActive(true)
   end
 end

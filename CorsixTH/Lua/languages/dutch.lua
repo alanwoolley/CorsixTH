@@ -1330,15 +1330,15 @@ menu_debug_overlay = {
   heat = "  TEMPERATUUR  "
 }
 menu_charts = {
-  bank_manager  = "  (F1) KASBOEK  ",
-  statement     = "  (F2) AFSCHRIFTEN  ",
-  staff_listing = "  (F3) PERSONEELSLIJST  ",
-  town_map      = "  (F4) KAART  ",
-  casebook      = "  (F5) BEHANDELINGEN  ",
-  research      = "  (F6) ONDERZOEK  ",
-  status        = "  (F7) STATUS  ",
-  graphs        = "  (F8) GRAFIEKEN  ",
-  policy        = "  (F9) BELEID  ",
+  bank_manager  = "  (%1%) KASBOEK  ",
+  statement     = "  (%1%) AFSCHRIFTEN  ",
+  staff_listing = "  (%1%) PERSONEELSLIJST  ",
+  town_map      = "  (%1%) KAART  ",
+  casebook      = "  (%1%) BEHANDELINGEN  ",
+  research      = "  (%1%) ONDERZOEK  ",
+  status        = "  (%1%) STATUS  ",
+  graphs        = "  (%1%) GRAFIEKEN  ",
+  policy        = "  (%1%) BELEID  ",
   briefing      = "  OPDRACHT  ",
 }
 progress_report = {
@@ -1509,7 +1509,7 @@ adviser = {
     drug_fully_researched = "Je onderzoek op het gebied van %s is voltooid.",
     new_machine_researched = "Het laboratorium heeft een %s uitgevonden.",
     drug_improved = "Het medicijn voor %s is verbeterd door het laboratorium.",
-	drug_improved_1 = "%s medicijn is vebeterd door het laboratorium.", --is dit netjes in het spel? of kunnen we beter bovenstaande string kopiëren?
+    drug_improved_1 = "%s medicijn is vebeterd door het laboratorium.", --is dit netjes in het spel? of kunnen we beter bovenstaande string kopiëren?
     new_available = "Er is nu een %s beschikbaar.",
     new_drug_researched = "Het laboratorium heeft een middel tegen %s uitgevonden.",
   },
@@ -1637,16 +1637,16 @@ adviser = {
     no_desk_2 = "Lekker gedaan, dit moet een nieuw record zijn: bijna een jaar zonder patiënten! Als je hier manager wilt blijven, neem dan nu een receptioniste aan en bouw een receptiebalie waar ze kan werken!",
     no_desk_3 = "Fantastisch, bijna een jaar voorbij en je hebt nog steeds geen bemande receptie. Hoe denk je dat je patiënten gaat krijgen? Los het onmiddellijk op, en stop met dat gerommel!",
     no_desk_4 = "Een receptioniste moet haar eigen werkplek hebben om de patiënten te begroeten bij binnenkomst.",
-	no_desk_5 = "Nou, het werd tijd! Je zult binnekort een paar patiënten zien arriveren!",
-	no_desk_6 = "Je hebt een receptioniste aangenomen, dus zou je niet een receptiebalie bouwen waar ze haar werk kan doen?",
-	no_desk_7 = "Je hebt een receptiebalie gebouwd, dus zou je niet een receptioniste aannemen? Je zult geen patiënten zien binnenkomen tot je dit opgelost hebt!",
-	cannot_afford = "Je hebt niet genoeg geld op je rekening staan om dit personeelslid aan te nemen.",
+    no_desk_5 = "Nou, het werd tijd! Je zult binnekort een paar patiënten zien arriveren!",
+    no_desk_6 = "Je hebt een receptioniste aangenomen, dus zou je niet een receptiebalie bouwen waar ze haar werk kan doen?",
+    no_desk_7 = "Je hebt een receptiebalie gebouwd, dus zou je niet een receptioniste aannemen? Je zult geen patiënten zien binnenkomen tot je dit opgelost hebt!",
+    cannot_afford = "Je hebt niet genoeg geld op je rekening staan om dit personeelslid aan te nemen.",
     cannot_afford_2 = "Je hebt niet genoeg geld op de bank staan om dit te kopen!",
-	research_screen_open_1 = "Je moet eerst een laboratorium bouwen, voordat je het onderzoeksscherm kunt bekijken.",
+    research_screen_open_1 = "Je moet eerst een laboratorium bouwen, voordat je het onderzoeksscherm kunt bekijken.",
     research_screen_open_2 = "Onderzoek is in dit level nog niet toegankelijk.",
-	researcher_needs_desk_1 = "Een onderzoeker heeft een bureau nodig om aan te werken.",
-	researcher_needs_desk_2 = "Je onderzoeker is blij dat je hem op pauze laat gaan. Als het je bedoeling was om meer onderzoekers tegelijk te laten werken, dan moet je voor elk van hen een bureau neerzetten zodat ze hun werk kunnen doen.",
-	researcher_needs_desk_3 = "Elke onderzoeker heeft zijn eigen bureau nodig om aan te werken.",
+    researcher_needs_desk_1 = "Een onderzoeker heeft een bureau nodig om aan te werken.",
+    researcher_needs_desk_2 = "Je onderzoeker is blij dat je hem op pauze laat gaan. Als het je bedoeling was om meer onderzoekers tegelijk te laten werken, dan moet je voor elk van hen een bureau neerzetten zodat ze hun werk kunnen doen.",
+    researcher_needs_desk_3 = "Elke onderzoeker heeft zijn eigen bureau nodig om aan te werken.",
     nurse_needs_desk_2 = "Je zuster is blij dat je haar een pauze gunt. Als het je bedoeling was om meer zusters tegelijk in de slaapzaal te laten werken, dan moet je voor elk van hen een bureau neerzetten.",
     nurse_needs_desk_1 = "Elke zuster heeft haar eigen bureau nodig om aan te werken.",
   },
@@ -1849,16 +1849,16 @@ introduction_texts = {
     "Als je niet teveel mensen doodt en ze redelijk gelukkig houdt, zou je niet al teveel problemen moeten hebben met dit level!//" ..
     "En nu mag je het zelf opknappen. Veel succes ermee!",
   level1 =
-    "Welkom in je eerste ziekenhuis!" ..
+    "Welkom in je eerste ziekenhuis!//" ..
     "Zorg dat de boel op gang komt door een receptie te plaatsen en een spreekkamer te bouwen. Neem ook een receptioniste en een arts in dienst. " ..
-    "Wacht dan tot er mensen langskomen." ..
+    "Wacht dan tot er mensen langskomen. " ..
     "Het is een goed idee om een psychiatrische afdeling te bouwen en een arts in te huren met de benodigde kwalificaties. " ..
     "Een apotheek en een zuster zijn essentieel voor het genezen van je patiënten. " ..
     "Kijk uit voor ernstige gevallen van plofkop. Een inflatiekliniek lost deze probleempjes op. " ..
     "Genees, om de spits af te bijten, 10 mensen en hou je reputatie boven de 200.",
   level9 =
-    "Nu je de kas van het ministerie flink hebt gespekt en de minister dankzij jouw donaties vrolijk in zijn splinternieuwe limousine rondrijdt, kun je nu weer terug naar je echte taak: het bouwen van een ziekenhuis dat niet alleen goed draait maar ook duidelijk om haar arme en zieke patiënten geeft." ..
-    "Verwacht dat er een boel problemen de kop opsteken." ..
+    "Nu je de kas van het ministerie flink hebt gespekt en de minister dankzij jouw donaties vrolijk in zijn splinternieuwe limousine rondrijdt, kun je nu weer terug naar je echte taak: het bouwen van een ziekenhuis dat niet alleen goed draait maar ook duidelijk om haar arme en zieke patiënten geeft. " ..
+    "Verwacht dat er een boel problemen de kop opsteken. " ..
     "Als je genoeg kamers en een goed getrainde staf hebt, zal je die problemen makkelijk het hoofd moeten kunnen bieden. " ..
     "Je ziekenhuis moet uiteindelijk $200,000 waard zijn. Verzamel ook een comfortabele $400.000 op je bankrekening. " ..
     "Met minder dan dat kun je het level niet uitspelen.",
@@ -1954,11 +1954,11 @@ introduction_texts = {
     "Je ziekenhuis moet $240.000 waard zijn en je moet $500.000 op de bank hebben staan. Ook moet je reputatie minimaal 700 bedragen.",
   level18 = "",
   demo =
-    "Welkom in het demo ziekenhuis!" ..
-    "Jammer genoeg bevat de demo versie buiten zelfgemaakte levels alleen dit ziekenhuis, maar er is meer dan genoeg te doen om je voorlopig bezig te houden!" ..
-    "Je zult verschillende kwalen tegenkomen die verschillende ruimtes nodig hebben om genezen te worden, af en toe kunnen zich noodgevallen voordoen, en je zult nieuwe ruimtes uit moeten vinden met het laboratorium" ..
-    "Jouw doel is om $100,000 te verdienen, de waarde van je ziekenhuis te verhogen naar $70,000 en een reputatie van 700 te behalen, terwijl je 75% van je patiënten geneest" ..
-    "Zorg er voor dat je reputatie niet lager wordt dan 300 en dat je niet meer dan 40% van je patiënten vermoord, anders zal je ontslagen worden!" ..
+    "Welkom in het demo ziekenhuis!//" ..
+    "Jammer genoeg bevat de demo versie buiten zelfgemaakte levels alleen dit ziekenhuis, maar er is meer dan genoeg te doen om je voorlopig bezig te houden! " ..
+    "Je zult verschillende kwalen tegenkomen die verschillende ruimtes nodig hebben om genezen te worden, af en toe kunnen zich noodgevallen voordoen, en je zult nieuwe ruimtes uit moeten vinden met het laboratorium. " ..
+    "Jouw doel is om $100,000 te verdienen, de waarde van je ziekenhuis te verhogen naar $70,000 en een reputatie van 700 te behalen, terwijl je 75% van je patiënten geneest. " ..
+    "Zorg er voor dat je reputatie niet lager wordt dan 300 en dat je niet meer dan 40% van je patiënten vermoord, anders zal je ontslagen worden!//" ..
     "Succes!",
 }
 humanoid_name_starts = {
@@ -2187,6 +2187,7 @@ errors = {
   alien_dna = "LET OP: Er zijn geen animaties voor alien patiënten die zitten, op deuren kloppenen, deuren openen, enz. Daarom veranderen ze naar een normaal mens als ze dit doen en veranderen dan weer terug, net als in Them Hospital.  Patiënten met alien-DNA verschijnen alleen wanneer dit in het level is toegestaan.",
   fractured_bones = "LET OP: De animatie voor vrouwelijke patiënten met gebrokken botten is niet goed.",
   no_games_to_contine = "Er zijn geen opgeslagen spellen.",
+  dialog_empty_queue = "Een mensachtige is de weg helemaal kwijt, er was geen informatie meer wat vervolgens te gaan doen. Meer gedetailleerde informatie kun je vinden in het kommando scherm. Een window met deze mensachtige is geopend, wil je dat ze het ziekenhuis verlaten?",
 }
 diseases = {
   diag_ward = {
@@ -2520,10 +2521,10 @@ menu_file_load = {
   [8] = "  GAME 8  ",
 }
 menu_file = {
-  quit =    "  (SHIFT+Q) AFSLUITEN  ",
-  save =    "  (SHIFT+S) OPSLAAN  ",
-  load =    "  (SHIFT+L) LADEN  ",
-  restart = "  (SHIFT+R) HERSTARTEN  ",
+  quit =    "  (%1%) AFSLUITEN  ",
+  save =    "  (%1%) OPSLAAN  ",
+  load =    "  (%1%) LADEN  ",
+  restart = "  (%1%) HERSTARTEN  ",
 }
 high_score = {
   categories = {
@@ -2560,7 +2561,7 @@ menu_debug = {
   mapwho_checking = "  MAPWHO CHECKING      ",
   sprite_viewer = "  SPRITE VIEWER  ",
   keep_clear_cells = "  LEGE CELLS BEHOUDEN     ",
-  dump_strings = "  STRINGDUMP MAKEN  ",
+  dump_strings = "  (%1%) STRINGDUMP MAKEN  ",
   machine_pagers = "  MACHINE PAGERS       ",
   remove_objects = "  VOORWERPEN VERWIJDEREN       ",
   enter_nav_debug = "  GA NAAR NAV DEBUG      ",
@@ -2580,21 +2581,21 @@ menu_debug = {
   limit_camera = "  CAMERABEGRENZING  ",
   nav_bits = "  NAV BITS             ",
   remove_walls = "  MUREN ONZICHTBAAR MAKEN         ",
-  dump_gamelog = "  (CTRL+D) GAME LOG DUMPEN  ",
+  dump_gamelog = "  (%1%) GAME LOG DUMPEN  ",
   win_level_anim = "  LEVEL GEWONNEN ANIM       ",
   pixbuf_cells = "  PIXBUF CELLS         ",
-  transparent_walls = "  (X) TRANSPARANTE MUREN  ",
+  transparent_walls = "  (%1%) TRANSPARANTE MUREN  ",
   show_help_hotspot = "  HELP HOTSPOTS TONEN   ",
   show_nav_cells = "  NAV CELLS TONEN       ",
   entry_cells = "  ENTRY CELLS          ",
   plant_pagers = "  PLANT PAGERS         ",
-  lua_console = "  (F12) LUA CONSOLE  ",
+  lua_console = "  (%1%) LUA CONSOLE  ",
   make_debug_fax = "  DEBUG FAX  ",
   calls_dispatcher = "  CALLS DISPATCHER  ",
-  cheats = "  (F11) CHEATS  ",
+  cheats = "  (%1%) CHEATS  ",
   jump_to_level = "  SPRING NAAR LEVEL  ",
-  debug_script = "  (SHIFT + D) LAAT FOUTSCRIPT LOPEN  ",
-  connect_debugger = "  (CTRL + C) MAAK VERBINDING MET LUA DBGp SERVER  ",
+  debug_script = "  (%1%) LAAT FOUTSCRIPT LOPEN  ",
+  connect_debugger = "  (%1%) MAAK VERBINDING MET LUA DBGp SERVER  ",
 }
 
 drug_companies = {
@@ -2644,13 +2645,13 @@ menu_options = {
   music_vol = "  VOLUME MUZIEK  ",
   announcements = "  OMROEPBERICHTEN   ",
   lock_windows = "  VENSTERS VASTZETTEN  ",
-  sound = "  (ALT+S) GELUID   ",
-  announcements_vol = "  (ALT+A) VOLUME OMROEPBERICHTEN  ",
-  music = "  (ALT+M) MUZIEK   ",
+  sound = "  (%1%) GELUID   ",
+  announcements_vol = "  (%1%) VOLUME OMROEPBERICHTEN  ",
+  music = "  (%1%) MUZIEK   ",
   autosave = "  AUTOSAVE  ",
-  jukebox = "  (J) JUKEBOX  ",
+  jukebox = "  (%1%) JUKEBOX  ",
   edge_scrolling = "  RANDSCROLLEN  ",
-  adviser_disabled = "  (SHIFT+A) ADVISEUR  ",
+  adviser_disabled = "  (%1%) ADVISEUR  ",
   warmth_colors = "  WARMTE KLEUREN  ",
   twentyfour_hour_clock = "  24 UUR KLOK  ",
   wage_increase = "  SALARIS VERZOEKEN  ",
@@ -2660,12 +2661,12 @@ menu_options_wage_increase = {
   grant = "    TOEKENNEN ",
 }
 menu_options_game_speed = {
-  pause = "  PAUZE  ",
-  slowest = "  EN NOG LANGZAMER  ",
-  slower = "  LANGZAAM  ",
-  normal = "  NORMAAL  ",
-  max_speed = "  MAX SNELHEID ",
-  and_then_some_more = "  EN NOG EEN BEETJE ",
+  pause = "  (%1%) PAUZE  ",
+  slowest = "  (%1%) EN NOG LANGZAMER  ",
+  slower = "  (%1%) LANGZAAM  ",
+  normal = "  (%1%) NORMAAL  ",
+  max_speed = "  (%1%) MAX SNELHEID ",
+  and_then_some_more = "  (%1%) EN NOG EEN BEETJE ",
 }
 menu_options_warmth_colors = {
   choice_1 = "   ROOD ",

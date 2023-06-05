@@ -24,7 +24,7 @@
 ;---------------------------------- Definitions for the game -----------------------------------
 
 !define PRODUCT_NAME "CorsixTH"
-!define PRODUCT_VERSION "Trunk"
+!define PRODUCT_VERSION "0.66"
 !define PRODUCT_UNINST_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCT_NAME}"
 !define PRODUCT_UNINST_ROOT_KEY "HKLM"
 !define PRODUCT_STARTMENU_REGVAL "NSIS:StartMenuDir"
@@ -47,11 +47,11 @@ InstallDir "$PROGRAMFILES\${PRODUCT_NAME}"
 ; Include Word Functions for VersionCompare
 !include "WordFunc.nsh"
 
+!include "nsDialogs.nsh"
+!include "LogicLib.nsh"
+
 ; This is needed to be able to install into the program files directory
 RequestExecutionLevel admin
-
-!define VC_REDIST_PATH_VER "14.0"
-!define VC_REDIST_MIN_VER "14.10"
 
 ; -------------------- Definitions and macros that create the graphical interface -----------------
 
@@ -78,10 +78,12 @@ RequestExecutionLevel admin
 !insertmacro MUI_PAGE_DIRECTORY
 
 ; Another directory page to choose where the original game is
-Var ORIGINALPATH
+Var OriginalPath
 Var CONFIGAPPDATA
+Var Dialog
+Var AppDataSaveCheckBox
 
-Page Custom OptionsPage OptionsPageLeave
+Page custom OptionsPage OptionsPageLeave
 
 ; Start menu page
 var ICONS_GROUP
@@ -173,27 +175,27 @@ FunctionEnd
 
 Function OptionsPage
   ${If} ${FileExists} "$APPDATA\CorsixTH\config.txt"
-    IntOp $CONFIGAPPDATA 1 * 1
+    StrCpy $CONFIGAPPDATA ${BST_CHECKED}
     Abort
   ${ElseIf} ${FileExists} "$INSTDIR\config.txt"
+    StrCpy $CONFIGAPPDATA ${BST_UNCHECKED}
     Abort
   ${EndIf}
-  ReserveFile "OptionsPage.ini"
+
+  nsDialogs::Create 1018
+  Pop $Dialog
+
   !insertmacro MUI_HEADER_TEXT $(options_title) $(options_subtitle)
-  !insertmacro MUI_INSTALLOPTIONS_EXTRACT "OptionsPage.ini"
 
-  ; The ini file is actually static. Set strings so that they are localized.
-  WriteINIStr "$PLUGINSDIR\OptionsPage.ini" "Field 1" "Text" $(save_in_appdata)
-  WriteINIStr "$PLUGINSDIR\OptionsPage.ini" "Field 3" "Text" $(original_folder)
-  WriteINIStr "$PLUGINSDIR\OptionsPage.ini" "Field 4" "Text" $(original_text)
+  ${NSD_CreateCheckBox} 12u 12u 300u 10u $(save_in_appdata)
+  Pop $AppDataSaveCheckBox
+  ${NSD_Check} $AppDataSaveCheckBox
 
-  !insertmacro MUI_INSTALLOPTIONS_DISPLAY "OptionsPage.ini"
+  nsDialogs::Show
 FunctionEnd
 
 Function OptionsPageLeave
-  ; Get install path and where to put configuration files and saved games.
-  !insertmacro MUI_INSTALLOPTIONS_READ $ORIGINALPATH "OptionsPage.ini" "Field 2" "State"
-  !insertmacro MUI_INSTALLOPTIONS_READ $CONFIGAPPDATA "OptionsPage.ini" "Field 1" "State"
+  ${NSD_GetState} $AppDataSaveCheckBox $CONFIGAPPDATA
 FunctionEnd
 
 
@@ -226,7 +228,7 @@ Section "MainSection" SEC01
 
   continued:
   ; Time to make the configuration file and Saves folder at the correct location
-  ${If} $CONFIGAPPDATA == 1
+  ${If} $CONFIGAPPDATA == ${BST_CHECKED}
     SetOutPath "$APPDATA\CorsixTH"
     IfFileExists "$APPDATA\CorsixTH\Saves" saves
 
@@ -248,7 +250,7 @@ Section "MainSection" SEC01
   ; Change settings in the config file.
   System::Call 'user32::GetSystemMetrics(i 0) i .r0'
   System::Call 'user32::GetSystemMetrics(i 1) i .r1'
-  !insertmacro ReplaceInFile config_template.txt ORIGINAL_HOSPITAL_DIRECTORY $ORIGINALPATH
+  !insertmacro ReplaceInFile config_template.txt ORIGINAL_HOSPITAL_DIRECTORY $OriginalPath
   !insertmacro ReplaceInFile config_template.txt LANGUAGE_CHOSEN $(install_language)
   !insertmacro ReplaceInFile config_template.txt SCREEN_SIZE_WIDTH "$0"
   !insertmacro ReplaceInFile config_template.txt SCREEN_SIZE_HEIGHT "$1"
@@ -285,21 +287,6 @@ Section "MainSection" SEC01
 
   !insertmacro MUI_STARTMENU_WRITE_BEGIN Application
   !insertmacro MUI_STARTMENU_WRITE_END
-
-  ReadRegStr $1 HKLM "SOFTWARE\Microsoft\DevDiv\vc\Servicing\${VC_REDIST_PATH_VER}\RuntimeMinimum" "Version"
-  ${If} $1 == ""
-    goto prompt_install
-  ${EndIf}
-  ${VersionCompare} $1 ${VC_REDIST_MIN_VER} $2
-  ${If} $2 < 2
-    goto installed
-  ${EndIf}
-
-  prompt_install:
-  MessageBox MB_YESNO "$(no_vc_redist)" IDNO +2
-  ExecShell open "$(vc_redist_url)"
-  installed:
-
 SectionEnd
 
 

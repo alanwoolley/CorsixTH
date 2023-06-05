@@ -51,13 +51,12 @@ function UIAnnualReport:UIAnnualReport(ui, world)
   self.rep_amount = 0
 
   if not pcall(function()
-    local palette   = gfx:loadPalette("QData", "Award02V.pal")
-    palette:setEntry(255, 0xFF, 0x00, 0xFF) -- Make index 255 transparent
+    local palette = gfx:loadPalette("QData", "Award02V.pal", true)
 
     -- Right now the statistics are first
     --self.background = gfx:loadRaw("Fame01V", 640, 480)
     self.award_background = gfx:loadRaw("Award01V", 640, 480)
-    self.stat_background = gfx:loadRaw("Award02V", 640, 480)
+    self.stat_background = gfx:loadRaw("Award02V", 640, 480, "QData", "QData", "Award02V.pal", true)
     self.background = self.stat_background
 
     self.stat_font = gfx:loadFont("QData", "Font45V", false, palette)
@@ -133,48 +132,39 @@ function UIAnnualReport:UIAnnualReport(ui, world)
 
   -- Get and sort values used on the statistics screen.
   -- The six categories. The extra tables are used to be able to sort the values.
-    self.money = {}
     self.money_sort = {}
-    self.visitors = {}
     self.visitors_sort = {}
-    self.salary = {}
     self.salary_sort = {}
-    self.deaths = {}
     self.deaths_sort = {}
-    self.cures = {}
     self.cures_sort = {}
-    self.value = {}
     self.value_sort = {}
 
     -- TODO: Right now there are no real competitors, they all have initial values.
     for i, hospital in ipairs(world.hospitals) do
-      self.money[hospital.name] = hospital.balance - hospital.loan
-      self.money_sort[i] = hospital.balance - hospital.loan
-      self.visitors[hospital.name] = hospital.num_visitors
-      self.visitors_sort[i] = hospital.num_visitors
-      self.deaths[hospital.name] = hospital.num_deaths
-      self.deaths_sort[i] = hospital.num_deaths
-      self.cures[hospital.name] = hospital.num_cured
-      self.cures_sort[i] = hospital.num_cured
-      self.value[hospital.name] = hospital.value
-      self.value_sort[i] = hospital.value
-      self.salary[hospital.name] = hospital.player_salary
-      self.salary_sort[i] = hospital.player_salary
+      self.money_sort[i] = {value = math.floor(hospital.balance - hospital.loan), hosp_index = i}
+      self.visitors_sort[i] = {value = hospital.num_visitors, hosp_index = i}
+      self.deaths_sort[i] = {value = hospital.num_deaths, hosp_index = i}
+      self.cures_sort[i] = {value = hospital.num_cured, hosp_index = i}
+      self.value_sort[i] = {value = math.floor(hospital.value), hosp_index = i}
+      self.salary_sort[i] = {value = math.floor(hospital.player_salary), hosp_index = i}
     end
 
-    local sort_order = function(a,b) return a>b end
-    table.sort(self.money_sort, sort_order)
-    table.sort(self.visitors_sort, sort_order)
-    table.sort(self.deaths_sort) -- We want this to be in increasing order
-    table.sort(self.cures_sort, sort_order)
-    table.sort(self.value_sort, sort_order)
-    table.sort(self.salary_sort, sort_order)
+    -- sort putting local player hospital first when values the same
+    local desc_order = function(a,b) return a.value > b.value or (a.value == b.value and a.hosp_index < b.hosp_index) end
+    local asc_order = function(a,b) return a.value < b.value or (a.value == b.value and a.hosp_index < b.hosp_index) end
+    table.sort(self.money_sort, desc_order)
+    table.sort(self.visitors_sort, desc_order)
+    table.sort(self.deaths_sort, asc_order)
+    table.sort(self.cures_sort, desc_order)
+    table.sort(self.value_sort, desc_order)
+    table.sort(self.salary_sort, desc_order)
 
-  -- Pause the game to allow the player plenty of time to check all statistics and trophies won
-  if world and not world:isCurrentSpeed("Pause") then
-    world:setSpeed("Pause")
-  end
   TheApp.video:setBlueFilterActive(false)
+end
+
+-- Make sure this window pauses the game, we want to let the player browse their awards
+function UIAnnualReport:mustPause()
+  return true
 end
 
 --! Finds out which awards and/or trophies the player has been awarded this year.
@@ -210,12 +200,15 @@ function UIAnnualReport:checkTrophiesAndAwards(world)
       self.rep_amount = self.rep_amount + win_value
     end
     -- Impressive Reputation in the year (above a threshold throughout the year)
-    if hosp.reputation_above_threshold then
+    if hosp.has_impressive_reputation then
       self:addTrophy(_S.trophy_room.consistant_rep.trophies[math.random(1, 2)], "money", prices.TrophyReputationBonus)
       self.won_amount = self.won_amount + prices.TrophyReputationBonus
     end
-    -- No deaths or around a 100% Cure rate in the year
-    if hosp.num_deaths_this_year == 0 then
+    -- Everyone treated successfully, no deaths, or around a 100% Cure rate in the year
+    if hosp.num_cured_ty > 1 and hosp.num_deaths_this_year == 0 and hosp.not_cured_ty == 0 then
+      self:addTrophy(_S.trophy_room.all_cured.trophies[math.random(1, 2)], "money", prices.TrophyAllCuredBonus)
+      self.won_amount = self.won_amount + prices.TrophyAllCuredBonus
+    elseif hosp.num_deaths_this_year == 0 then
       self:addTrophy(_S.trophy_room.no_deaths.trophies[math.random(1, 3)], "money", prices.TrophyDeathBonus)
       self.won_amount = self.won_amount + prices.TrophyDeathBonus
     elseif hosp.num_cured_ty > (hosp.not_cured_ty * 0.9)  then
@@ -261,7 +254,10 @@ function UIAnnualReport:checkTrophiesAndAwards(world)
     end
 
     -- Deaths
-    if hosp.num_deaths_this_year < prices.DeathsAward then
+    if hosp.num_cured_ty > 1 and hosp.num_deaths_this_year == 0 and hosp.not_cured_ty == 0 then
+      self:addAward(_S.trophy_room.no_deaths.awards[1], "money", prices.AllCuresBonus)
+      self.award_won_amount = self.award_won_amount + prices.AllCuresBonus
+    elseif hosp.num_deaths_this_year < prices.DeathsAward then
       self:addAward(_S.trophy_room.no_deaths.awards[math.random(1, 2)], "money", prices.DeathsBonus)
       self.award_won_amount = self.award_won_amount + prices.DeathsBonus
     elseif hosp.num_deaths_this_year > prices.DeathsPoor then
@@ -350,7 +346,7 @@ function UIAnnualReport:addTrophy(text, award_type, amount)
     trophy_parts.info = {
       text = text,
       award_type = award_type,
-      amount = amount
+      amount = math.floor(amount)
     }
 
     local --[[persistable:annual_report_show_trophy_motivation]] function change() self:showTrophyMotivation(no) end
@@ -386,7 +382,7 @@ function UIAnnualReport:addAward(text, award_type, amount)
     award_parts.info = {
       text = text,
       award_type = award_type,
-      amount = amount
+      amount = math.floor(amount)
     }
 
     -- The plaque
@@ -455,17 +451,8 @@ end
 --! Overridden close function. The game should be unpaused again when closing the dialog.
 function UIAnnualReport:close()
   if TheApp.world:getLocalPlayerHospital().game_won then
-    if not TheApp.world:isCurrentSpeed("Pause") then
-      TheApp.world:setSpeed("Pause")
-      TheApp.video:setBlueFilterActive(false)
-    end
+    TheApp.video:setBlueFilterActive(false)
     TheApp.world.ui.bottom_panel:openLastMessage()
-  elseif TheApp.world:isCurrentSpeed("Pause") then
-    if TheApp.ui.speed_up_key_pressed then
-      TheApp.world:setSpeed("Speed Up")
-    else
-      TheApp.world:setSpeed(TheApp.world.prev_speed)
-    end
   end
   self:updateAwards()
   Window.close(self)
@@ -514,7 +501,12 @@ function UIAnnualReport:draw(canvas, x, y)
   local font = self.stat_font
   local world = self.ui.app.world
 
-  if self.state == 1 then -- Fame screen
+  if self.state == 1 then -- Fame/Shame screen (High Scores)
+    -- TODO: This screen should be displayed at the start of the annual report, but currently
+    -- it is not shown, likely as the code for this being unfinished. When implemented
+    -- we only show this screen at the very start, and once they go to the next screen
+    -- it no longer becomes accessible.
+
     -- Title and column names
     font:draw(canvas, _S.high_score.best_scores, x + 220, y + 104, 200, 0)
     font:draw(canvas, _S.high_score.pos, x + 218, y + 132)
@@ -526,13 +518,14 @@ function UIAnnualReport:draw(canvas, x, y)
     local dy = 0
     --for i = 1, 10 do
       font:draw(canvas, i .. ".", x + 220, y + 160 + dy)
-      font:draw(canvas, world.hospitals[1].name:upper(), x + 260, y + 160 + dy)
+      font:draw(canvas, world:getLocalPlayerHospital().name:upper(), x + 260, y + 160 + dy)
       font:draw(canvas, "NA", x + 360, y + 160 + dy)
       -- dy = dy + 25
     --end
   elseif self.state == 2 then -- Statistics screen
     self:drawStatisticsScreen(canvas, x, y)
   else -- Award and trophy screen
+    -- Note: Each 'amount' is wrapped by string.format("%.0f", x) to persist integer notation
     -- Write out motivation if appropriate
     if self.trophy_motivation then
       -- If it is a plaque showing we write in stone text.
@@ -545,7 +538,7 @@ function UIAnnualReport:draw(canvas, x, y)
       end
       self.stone_font:draw(canvas, award_type, x + 220, y + 330, 200, 0)
       -- Amount won/lost
-      self.stone_font:draw(canvas, "+" .. info.amount, x + 220, y + 355, 200, 0)
+      self.stone_font:draw(canvas, string.format("+%.0f", info.amount), x + 220, y + 355, 200, 0)
     elseif self.award_motivation then
       local info = self.awards[self.award_motivation].info
       self.write_font:drawWrapped(canvas, info.text, x + 235, y + 125, 165, "center")
@@ -556,11 +549,7 @@ function UIAnnualReport:draw(canvas, x, y)
       end
       self.write_font:draw(canvas, award_type, x + 220, y + 290, 200, 0)
       -- The amount won/lost
-      local text = ""
-      if info.amount > 0 then
-        text = "+"
-      end
-      self.write_font:draw(canvas, text .. info.amount, x + 220, y + 315, 200, 0)
+      self.write_font:draw(canvas, string.format("%+.0f", info.amount), x + 220, y + 315, 200, 0)
     end
   end
 end
@@ -571,7 +560,8 @@ function UIAnnualReport:drawStatisticsScreen(canvas, x, y)
   local world = self.ui.app.world
 
   -- Draw titles
-  font:draw(canvas, _S.menu.charts .. " " .. (world.year + 1999), x + 210, y + 30, 200, 0)
+  -- world date year is + 1, so adding it to 1998 realigns it
+  font:draw(canvas, _S.menu.charts .. " " .. (world:date():year() + 1998), x + 210, y + 30, 200, 0)
   font:draw(canvas, _S.high_score.categories.money, x + 140, y + 98, 170, 0)
   font:draw(canvas, _S.high_score.categories.salary, x + 328, y + 98, 170, 0)
   font:draw(canvas, _S.high_score.categories.cures, x + 140, y + 205, 170, 0)
@@ -584,82 +574,82 @@ function UIAnnualReport:drawStatisticsScreen(canvas, x, y)
   -- Helper function to find where the person is in the array.
   -- TODO: This whole sorting thing, it should be possible to do it in a better way?
   local getindex = function(tablename, val)
-    local i = 0
-    local index
     for ind, value in ipairs(tablename) do
-      if value == val then
-        if not index then
-          index = ind
-        end
-        i = i + 1
+      if value['hosp_index'] == val then
+        return ind
       end
     end
-    return index, i
   end
 
   local row_y = 128
   local row_dy = 15
   local col_x = 190
   local row_no_y = 106
-  local dup_money = 0
-  local dup_salary = 0
-  local dup_cures = 0
-  local dup_deaths = 0
-  local dup_visitors = 0
-  local dup_value = 0
-  for _, player in ipairs(world.hospitals) do
-    local name = player.name
 
+  for i, hospital in ipairs(world.hospitals) do
+    local name = hospital.name
+
+    -- Note: Each 'value' is wrapped by string.format("%.0f", x) to persist integer notation
     -- Most Money
-    local index_m, dup_m = getindex(self.money_sort, self.money[name])
+    local index_m = getindex(self.money_sort, i)
     -- index_* is the returned value of the sorted place for this player.
     -- However there might be many players with the same value, so each iteration a
     -- duplicate has been found, one additional row lower is the right place to be.
     font:draw(canvas, name:upper(), x + 140,
-        y + row_y + row_dy * (index_m - 1) + row_dy * dup_money)
-    font:draw(canvas, self.money[name], x + 240,
-        y + row_y + row_dy * (index_m - 1) + row_dy * dup_money, 70, 0, "right")
+        y + row_y + row_dy * (index_m - 1))
+    font:draw(canvas, string.format("%.0f", self.money_sort[index_m].value), x + 240,
+        y + row_y + row_dy * (index_m - 1), 70, 0, "right")
 
     -- Highest Salary
-    local index_s, dup_s = getindex(self.salary_sort, self.salary[name])
+    local index_s = getindex(self.salary_sort, i)
     font:draw(canvas, name:upper(), x + 140 + col_x,
-        y + row_y + row_dy * (index_s - 1) + row_dy * dup_salary)
-    font:draw(canvas, self.salary[name], x + 240 + col_x,
-        y + row_y + row_dy * (index_s - 1) + row_dy * dup_salary, 70, 0, "right")
+        y + row_y + row_dy * (index_s - 1))
+    font:draw(canvas, string.format("%.0f", self.salary_sort[index_s].value), x + 240 + col_x,
+        y + row_y + row_dy * (index_s - 1), 70, 0, "right")
 
     -- Most Cures
-    local index_c, dup_c = getindex(self.cures_sort, self.cures[name])
+    local index_c = getindex(self.cures_sort, i)
     font:draw(canvas, name:upper(), x + 140,
-        y + row_y + row_no_y + row_dy * (index_c - 1) + row_dy * dup_cures)
-    font:draw(canvas, self.cures[name], x + 240,
-        y + row_y + row_no_y + row_dy * (index_c - 1) + row_dy * dup_cures, 70, 0, "right")
+        y + row_y + row_no_y + row_dy * (index_c - 1))
+    font:draw(canvas, string.format("%.0f", self.cures_sort[index_c].value), x + 240,
+        y + row_y + row_no_y + row_dy * (index_c - 1), 70, 0, "right")
 
     -- Most Deaths
-    local index_d, dup_d = getindex(self.deaths_sort, self.deaths[name])
+    local index_d = getindex(self.deaths_sort, i)
     font:draw(canvas, name:upper(), x + 140 + col_x,
-        y + row_y + row_no_y + row_dy * (index_d - 1) + row_dy * dup_deaths)
-    font:draw(canvas, self.deaths[name], x + 240 + col_x,
-        y + row_y + row_no_y + row_dy * (index_d - 1) + row_dy * dup_deaths, 70, 0, "right")
+        y + row_y + row_no_y + row_dy * (index_d - 1))
+    font:draw(canvas, string.format("%.0f", self.deaths_sort[index_d].value), x + 240 + col_x,
+        y + row_y + row_no_y + row_dy * (index_d - 1), 70, 0, "right")
 
     -- Most Visitors
-    local index_v, dup_v = getindex(self.visitors_sort, self.visitors[name])
+    local index_v = getindex(self.visitors_sort, i)
     font:draw(canvas, name:upper(), x + 140,
-        y + row_y + row_no_y * 2 + row_dy * (index_v - 1) + row_dy * dup_visitors)
-    font:draw(canvas, self.visitors[name], x + 240,
-        y + row_y + row_no_y * 2 + row_dy * (index_v - 1) + row_dy * dup_visitors, 70, 0, "right")
+        y + row_y + row_no_y * 2 + row_dy * (index_v - 1))
+    font:draw(canvas, string.format("%.0f", self.visitors_sort[index_v].value), x + 240,
+        y + row_y + row_no_y * 2 + row_dy * (index_v - 1), 70, 0, "right")
 
     -- Highest Value
-    local index_v2, dup_v2 = getindex(self.value_sort, self.value[name])
+    local index_v2 = getindex(self.value_sort, i)
     font:draw(canvas, name:upper(), x + 140 + col_x,
-        y + row_y + row_no_y * 2 + row_dy * (index_v2 - 1) + row_dy * dup_value)
-    font:draw(canvas, self.value[name], x + 240 + col_x,
-        y + row_y + row_no_y * 2 + row_dy * (index_v2 - 1) + row_dy * dup_value, 70, 0, "right")
-
-    if dup_m > 1 then dup_money = dup_money + 1 else dup_money = 0 end
-    if dup_s > 1 then dup_salary = dup_salary + 1 else dup_salary = 0 end
-    if dup_c > 1 then dup_cures = dup_cures + 1 else dup_cures = 0 end
-    if dup_d > 1 then dup_deaths = dup_deaths + 1 else dup_deaths = 0 end
-    if dup_v > 1 then dup_visitors = dup_visitors + 1 else dup_visitors = 0 end
-    if dup_v2 > 1 then dup_value = dup_value + 1 else dup_value = 0 end
+        y + row_y + row_no_y * 2 + row_dy * (index_v2 - 1))
+    font:draw(canvas, string.format("%.0f", self.value_sort[index_v2].value), x + 240 + col_x,
+        y + row_y + row_no_y * 2 + row_dy * (index_v2 - 1), 70, 0, "right")
   end
+end
+
+function UIAnnualReport:afterLoad(old, new)
+  if old < 176 then
+    local gfx = TheApp.gfx
+
+    local palette = gfx:loadPalette("QData", "Award02V.pal", true)
+    self.award_background = gfx:loadRaw("Award01V", 640, 480)
+    self.stat_background = gfx:loadRaw("Award02V", 640, 480, "QData", "QData", "Award02V.pal", true)
+    self.background = self.stat_background
+    self.stat_font = gfx:loadFont("QData", "Font45V", false, palette)
+    self.write_font = gfx:loadFont("QData", "Font47V", false, palette)
+    self.stone_font = gfx:loadFont("QData", "Font46V", false, palette)
+    self.panel_sprites = gfx:loadSpriteTable("QData", "Award03V", true, palette)
+  end
+
+  UIFullscreen.afterLoad(self, old, new)
 end

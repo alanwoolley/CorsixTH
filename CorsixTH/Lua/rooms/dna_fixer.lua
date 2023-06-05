@@ -20,6 +20,7 @@ SOFTWARE. --]]
 
 local room = {}
 room.id = "dna_fixer"
+room.vip_must_visit = true
 room.level_config_id = 23
 room.class = "DNAFixerRoom"
 room.name = _S.rooms_short.dna_fixer
@@ -58,7 +59,7 @@ function DNAFixerRoom:commandEnteringPatient(patient)
 
   local --[[persistable:dna_fixer_shared_loop_callback]] function loop_callback()
     -- If the other humanoid has already started to idle we move on
-    if staff.action_queue[1].name == "idle" and patient.action_queue[1].name == "idle" then
+    if staff:getCurrentAction().name == "idle" and patient:getCurrentAction().name == "idle" then
       -- We need to change to another type before starting, to be able
       -- to have different animations depending on gender.
       patient:setType(patient.change_into)

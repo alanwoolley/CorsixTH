@@ -18,7 +18,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE. --]]
 
-local TH = require "TH"
+local TH = require("TH")
 
 
 class "UseObjectAction" (HumanoidAction)
@@ -79,10 +79,10 @@ local function action_use_next_phase(action, phase)
   if phase == -3 and not action.anims.begin_use_3 then
     phase = phase + 1
   end
-    if phase == -2 and not action.anims.begin_use_4 then
+  if phase == -2 and not action.anims.begin_use_4 then
     phase = phase + 1
   end
-    if phase == -1 and not action.anims.begin_use_5 then
+  if phase == -1 and not action.anims.begin_use_5 then
     phase = phase + 1
   end
   if phase == 0 and not action.anims.in_use then
@@ -97,10 +97,10 @@ local function action_use_next_phase(action, phase)
   if phase == 3 and not action.anims.finish_use_3 then
     phase = phase + 1
   end
-    if phase == 4 and not action.anims.finish_use_4 then
+  if phase == 4 and not action.anims.finish_use_4 then
     phase = phase + 1
   end
-    if phase == 5 and not action.anims.finish_use_5 then
+  if phase == 5 and not action.anims.finish_use_5 then
     phase = phase + 1
   end
   if phase == 6 and not action.do_walk or phase == 6 and action.destroy_user_after_use then
@@ -110,6 +110,35 @@ local function action_use_next_phase(action, phase)
     phase = 100
   end
   return phase
+end
+
+--! Compute the position of the animated humanoid from the footprint.
+--!param action (UseObbjectAction) Action being performed.
+--!param humanoid (Humanoid) Person using the object.
+local function setHumanoidTileSpeed(action, humanoid)
+  local object = action.object
+  local obj_orient = object.object_type.orientations[object.direction]
+
+  -- Decide the animation tile.
+  local tx, ty
+  if obj_orient.use_animate_from_use_position then
+    tx, ty = action.old_tile_x, action.old_tile_y
+  else
+    tx, ty = object:getRenderAttachTile()
+  end
+  if humanoid.humanoid_class == "Handyman" and
+      obj_orient.added_handyman_animate_offset_while_in_use then
+    tx = tx + obj_orient.added_handyman_animate_offset_while_in_use[1]
+    ty = ty + obj_orient.added_handyman_animate_offset_while_in_use[2]
+  end
+
+  -- Decide pixel offset.
+  local anim_offset = obj_orient.animation_offset
+  local added_offset = obj_orient.added_animation_offset_while_in_use or {0, 0}
+  local px = anim_offset[1] + added_offset[1]
+  local py = anim_offset[2] + added_offset[2]
+
+  humanoid:setTilePositionSpeed(tx, ty, px, py)
 end
 
 local action_use_object_tick
@@ -234,34 +263,8 @@ local function action_use_phase(action, humanoid, phase)
     humanoid:setAnimation(anim, flags)
   end
 
-  local offset = object.object_type.orientations
-  if offset then
-    local tx, ty
-    offset = offset[object.direction]
-    if offset.use_animate_from_use_position then
-      tx, ty = action.old_tile_x, action.old_tile_y
-    else
-      tx, ty = object:getRenderAttachTile()
-    end
-    if humanoid.humanoid_class == "Handyman" and
-      offset.added_handyman_animate_offset_while_in_use then
-      tx = tx + offset.added_handyman_animate_offset_while_in_use[1]
-      ty = ty + offset.added_handyman_animate_offset_while_in_use[2]
-    end
-    local added_offset = nil
-    if offset.added_animation_offset_while_in_use then
-      added_offset = offset.added_animation_offset_while_in_use
-    end
-    offset = offset.animation_offset
-    if added_offset then
-      humanoid:setTilePositionSpeed(tx, ty, offset[1] + added_offset[1],
-        offset[2] + added_offset[2])
-    else
-      humanoid:setTilePositionSpeed(tx, ty, offset[1], offset[2])
-    end
-  else
-    humanoid:setTilePositionSpeed(object.tile_x, object.tile_y, 0, 0)
-  end
+  setHumanoidTileSpeed(action, humanoid)
+
   humanoid.user_of = object
   local length = anim_length * humanoid.world:getAnimLength(anim)
   if action.min_length and phase == 0 and action.min_length > length then
@@ -269,8 +272,9 @@ local function action_use_phase(action, humanoid, phase)
     -- Even it out so that an integer number of animation sequences are done.
     length = action.min_length + action.min_length % length
   end
+
   if phase == 0 and (not is_list) and length == 1 and action.prolonged_usage and
-      action.on_interrupt and not action.loop_callback then
+      action.on_interrupt and not action.loop_callback then -- luacheck: ignore 542
     -- a timer would be redundant, so do not set one
   else
     humanoid:setTimer(length, action_use_object_tick)
@@ -306,7 +310,7 @@ local function finish_using(object, humanoid)
 end
 
 action_use_object_tick = permanent"action_use_object_tick"( function(humanoid)
-  local action = humanoid.action_queue[1]
+  local action = humanoid:getCurrentAction()
   local object = action.object
   local phase = action.phase
   local oldphase = phase

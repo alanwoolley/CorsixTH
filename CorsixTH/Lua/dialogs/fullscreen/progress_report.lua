@@ -25,7 +25,6 @@ class "UIProgressReport" (UIFullscreen)
 local UIProgressReport = _G["UIProgressReport"]
 
 function UIProgressReport:UIProgressReport(ui)
-  -- TODO: Refactor this file!
   self:UIFullscreen(ui)
 
   local world = self.ui.app.world
@@ -33,11 +32,10 @@ function UIProgressReport:UIProgressReport(ui)
   local gfx   = ui.app.gfx
 
   if not pcall(function()
-    local palette   = gfx:loadPalette("QData", "Rep01V.pal")
-    palette:setEntry(255, 0xFF, 0x00, 0xFF) -- Make index 255 transparent
+    local palette = gfx:loadPalette("QData", "Rep01V.pal", true)
 
-    self.background = gfx:loadRaw("Rep01V", 640, 480)
-    self.red_font  = gfx:loadFont("QData", "Font101V", false, palette)
+    self.background = gfx:loadRaw("Rep01V", 640, 480, "QData", "QData", "Rep01V.pal", true)
+    self.red_font = gfx:loadFont("QData", "Font101V", false, palette)
     self.normal_font = gfx:loadFont("QData", "Font100V", false, palette)
     self.small_font = gfx:loadFont("QData", "Font106V")
     self.panel_sprites = gfx:loadSpriteTable("QData", "Rep02V", true, palette)
@@ -85,6 +83,8 @@ function UIProgressReport:UIProgressReport(ui)
       world_goals[crit_name].visible = false
     end
     if res_value then
+      -- FIXME: res_value and cure_value are depersisted as floating points, using
+      -- string.format("%.0f", x) is not suitable due to %d (num) param in _S string
       local tooltip
       if world.level_criteria[tab.criterion].formats == 2 then
         tooltip = _S.tooltip.status[crit_name]:format(math.floor(res_value), math.floor(cur_value))
@@ -154,7 +154,7 @@ function UIProgressReport:drawMarkers(canvas, x, y)
   end
 
   -- Possibly show warning that it's too cold, too hot, patients not happy
-  -- or if theres need to build drink machines as folks are thirsty.  Only show one at a time though!
+  -- or if there's need to build drink machines as folks are thirsty.  Only show one at a time though!
   -- TODO the levels may need adjustment
   local msg = self.ui.hospital.show_progress_screen_warnings
   if warmth < 0.3 and msg == 1 then
@@ -226,8 +226,23 @@ function UIProgressReport:draw(canvas, x, y)
   self:drawMarkers(canvas, x, y)
 
   self.normal_font:draw(canvas, _S.progress_report.header .. " " ..
-      (world.year + 1999), x + 227, y + 40, 400, 0)
+      (world:date():year() + 1999), x + 227, y + 40, 400, 0)
   self.small_font:draw(canvas, _S.progress_report.win_criteria:upper(), x + 263, y + 172)
   self.small_font:draw(canvas, _S.progress_report.percentage_pop:upper() .. " " ..
       (hospital.population * 100) .. "%", x + 450, y + 65)
+end
+
+function UIProgressReport:afterLoad(old, new)
+  if old < 176 then
+    local gfx = TheApp.gfx
+
+    local palette = gfx:loadPalette("QData", "Rep01V.pal", true)
+    self.background = gfx:loadRaw("Rep01V", 640, 480, "QData", "QData", "Rep01V.pal", true)
+    self.red_font = gfx:loadFont("QData", "Font101V", false, palette)
+    self.normal_font = gfx:loadFont("QData", "Font100V", false, palette)
+    self.small_font = gfx:loadFont("QData", "Font106V")
+    self.panel_sprites = gfx:loadSpriteTable("QData", "Rep02V", true, palette)
+  end
+
+  UIFullscreen.afterLoad(self, old, new)
 end

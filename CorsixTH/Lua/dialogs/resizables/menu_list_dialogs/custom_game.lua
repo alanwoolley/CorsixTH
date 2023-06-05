@@ -37,7 +37,7 @@ local details_width = 280
 --!param items (table) Table to insert the level metadata into.
 local findLevelsInDir = function(path, items)
   for file in lfs.dir(path) do
-    if file:match"%.level$" then
+    if file:match("%.level$") then
       local level_info = TheApp:readLevelFile(file)
       if level_info.name and level_info.map_file then
         items[#items + 1] = {
@@ -75,7 +75,7 @@ function UICustomGame:UICustomGame(ui)
 
   -- Now add the free build button beside the list.
   if not pcall(function()
-    local palette = ui.app.gfx:loadPalette("QData", "DrugN01V.pal")
+    local palette = ui.app.gfx:loadPalette("QData", "DrugN01V.pal", true)
     self.panel_sprites = ui.app.gfx:loadSpriteTable("QData", "DrugN02V", true, palette)
     self.border_sprites = ui.app.gfx:loadSpriteTable("Bitmap", "aux_ui", true)
   end) then

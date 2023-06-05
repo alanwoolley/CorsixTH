@@ -18,7 +18,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE. --]]
 
-dofile "persistance"
+corsixth.require("persistance")
 
 --! Base class for user-interface dialogs.
 class "Window"
@@ -47,6 +47,8 @@ function Window:Window()
   }
   self.textboxes = { -- list of textboxes in that window. NB: (Game)UI also uses this.
   }                  -- Take care not to handle things twice as UI is subclass of window!
+  self.hotkeyboxes = {
+  }
   self.key_handlers = {--[[a set]]}
   self.windows = false -- => {} when first window added
   self.active_button = false
@@ -55,6 +57,11 @@ function Window:Window()
   self.panel_sprites = false
   self.visible = true
   self.draggable = true
+end
+
+-- Most windows don't pause the game. Specific windows: fax, annual report, staff rise, and errors do pause and are set in the specific files
+function Window:mustPause()
+  return false
 end
 
 -- Sets the window's onscreen position. Each of x and y can be:
@@ -123,6 +130,9 @@ function Window:close()
   for _, box in pairs(self.textboxes) do
     self.ui:unregisterTextBox(box)
   end
+  for _, box in pairs(self.hotkeyboxes) do
+    self.ui:unregisterHotkeyBox(box)
+  end
   self.closed = true
 end
 
@@ -181,6 +191,10 @@ end
 
 function Panel:makeTextbox(...)
   return self.window:makeTextboxOnPanel(self, ...)
+end
+
+function Panel:makeHotkeyBox(...)
+  return self.window:makeHotkeyBoxOnPanel(self, ...)
 end
 
 local function sanitize(colour)
@@ -410,7 +424,7 @@ local --[[persistable: window_panel_bevel_draw]] function panel_bevel_draw(panel
   if panel.lowered then
     canvas:drawRect(panel.highlight_colour, x + panel.x, y + panel.y, panel.w, panel.h)
     canvas:drawRect(panel.shadow_colour, x + panel.x, y + panel.y, panel.w - 1, panel.h - 1)
-    canvas:drawRect(panel.colour, x + panel.x + 1, y + panel.y + 1, panel.w - 2, panel.h - 2)
+    canvas:drawRect(panel.lowered_colour, x + panel.x + 1, y + panel.y + 1, panel.w - 2, panel.h - 2)
   else
     canvas:drawRect(panel.shadow_colour, x + panel.x + 1, y + panel.y + 1, panel.w - 1, panel.h - 1)
     canvas:drawRect(panel.highlight_colour, x + panel.x, y + panel.y, panel.w - 1, panel.h - 1)
@@ -432,8 +446,9 @@ features a highlight and a shadow that makes it appear either lowered or raised.
 !param highlight_colour (colour in form .red, .green and .blue or nil) [optional] The colour for the highlight.
 !param shadow_colour (colour in form .red, .green and .blue or nil) [optional] The colour for the shadow.
 !param disabled_colour (colour in form .red, .green and .blue or nil) [optional] The colour for the disabled panel.
+!param lowered_colour (colour in form .red, .green and .blue or nil) [optional] The colour for the lowered (toggled) panel.
 ]]
-function Window:addBevelPanel(x, y, w, h, colour, highlight_colour, shadow_colour, disabled_colour)
+function Window:addBevelPanel(x, y, w, h, colour, highlight_colour, shadow_colour, disabled_colour, lowered_colour)
   highlight_colour = highlight_colour or {
     red = sanitize(colour.red + 40),
     green = sanitize(colour.green + 40),
@@ -449,6 +464,7 @@ function Window:addBevelPanel(x, y, w, h, colour, highlight_colour, shadow_colou
     green = sanitize(math.floor((colour.green + 100) / 2)),
     blue = sanitize(math.floor((colour.blue + 100) / 2)),
   }
+  lowered_colour = lowered_colour or colour
 
   local panel = setmetatable({
     window = self,
@@ -460,6 +476,7 @@ function Window:addBevelPanel(x, y, w, h, colour, highlight_colour, shadow_colou
     highlight_colour = TheApp.video:mapRGB(highlight_colour.red, highlight_colour.green, highlight_colour.blue),
     shadow_colour = TheApp.video:mapRGB(shadow_colour.red, shadow_colour.green, shadow_colour.blue),
     disabled_colour = TheApp.video:mapRGB(disabled_colour.red, disabled_colour.green, disabled_colour.blue),
+    lowered_colour = TheApp.video:mapRGB(lowered_colour.red, lowered_colour.green, lowered_colour.blue),
     custom_draw = panel_bevel_draw,
     visible = true,
     lowered = false,
@@ -731,8 +748,8 @@ end
 
 --[[ Convert a static panel into a clickable button.
 !param panel (Panel) The panel to convert into a button.
-!param x (integer) The X co-ordinate of the clickable rectangle on the panel.
-!param y (integer) The Y co-ordinate of the clickable rectangle on the panel.
+!param x (integer) The X coordinate of the clickable rectangle on the panel.
+!param y (integer) The Y coordinate of the clickable rectangle on the panel.
 !param w (integer) The width of the clickable rectangle on the panel.
 !param h (integer) The height of the clickable rectangle on the panel.
 !param sprite (integer) An index into the window's sprite sheet. The panel will
@@ -934,7 +951,7 @@ function Textbox:drawCursor(canvas, x, y)
     cursor_y = cursor_y - 3
     -- Add x separation, but only if there was actually some text in this line.
     if self.text[self.cursor_pos[1]] ~= "" then
-      cursor_x = cursor_x + 1 -- TODO font:getSeparation?
+      cursor_x = cursor_x + 1
     end
     canvas:drawRect(col, cursor_x, cursor_y, w, 1)
   end
@@ -1282,6 +1299,166 @@ function Window:makeTextboxOnPanel(panel, confirm_callback, abort_callback)
   return textbox
 end
 
+--! A window element used to accept hotkey configurations.
+class "HotkeyBox"
+
+---@type HotkeyBox
+local HotkeyBox = _G["HotkeyBox"]
+
+--!dummy
+function HotkeyBox:HotkeyBox()
+  self.panel = nil
+  self.confirm_callback = nil
+  self.abort_callback = nil
+  self.button = nil
+  self.text = nil
+  self.allowed_input = nil
+  self.char_limit = nil
+  self.visible = nil
+  self.enabled = nil
+  self.active = nil
+  self.noted_keys = {}
+end
+
+local hotkeybox_mt = permanent("Window.<hotkeybox_mt>", getmetatable(HotkeyBox()))
+
+--! Set the box to not active and run confirm callback, if any
+function HotkeyBox:confirm()
+  self:setActive(false)
+  if self.confirm_callback then
+    self.confirm_callback()
+  end
+  self.noted_keys = {}
+end
+
+--! Set the box to not active and run abort callback, if any
+function HotkeyBox:abort()
+  self:setActive(false)
+  if self.abort_callback then
+    self.abort_callback()
+  end
+  self.noted_keys = {}
+end
+
+--! Set the hotkeybox active status to true or false, taking care of any
+-- additional things that need to be done: deactivate any other hotkeyboxes,
+-- handle blinking cursor, keyboard repeat on/off, set button state accordingly
+--!param active (boolean) whether to activate (true) or deactivate (false) the box
+function HotkeyBox:setActive(active)
+  local ui = self.panel.window.ui
+  if active then
+    -- Unselect any other hotkeybox
+    for _, hotkeybox in ipairs(ui.hotkeyboxes) do
+      if hotkeybox ~= self and hotkeybox.active then
+        hotkeybox:abort()
+      end
+    end
+
+    -- Update text
+    self.panel:setLabel(self.text)
+  end
+
+  self.active = active
+  -- Update button if necessary
+  if self.button.toggled ~= active then
+    self.button:toggle()
+  end
+end
+
+function HotkeyBox:clicked()
+  local active = self.button.toggled
+  if active then
+    self:setActive(true)
+  else
+    if self.text == "" then
+      self:abort()
+    else
+      self:confirm()
+    end
+  end
+end
+
+function HotkeyBox:keyInput(char, rawchar, modifiers)
+  if not self.active then
+    return false
+  end
+  -- Just return true so any key's we press aren't passed to anything else.
+  return true
+end
+
+--[[ Limit input handled by textbox to specific classes of characters
+!param types (string or table) One of, or an table of any number of input types
+! valid input types are:
+!  "alpha": Letters (lower and uppercase)
+!  "numbers": 0-9
+!  "misc": other characters, currently space and hyphen
+!  "all": experimental category that allows, theoretically, all input
+]]
+function HotkeyBox:allowedInput(types)
+  if type(types) ~= "table" then types = {types} end
+  self.allowed_input = {}
+  for _, t in ipairs(types) do
+    self.allowed_input[t] = true
+  end
+  return self
+end
+
+--[[ Set the text of the textbox to a given string or list of strings.
+! Use empty string to make textbox a single line textbox (default).
+! Use table with empty string {""} to make it a multiline textbox.
+!param text (string or table) The string or list of strings the textbox should contain.
+]]
+function HotkeyBox:setText(text)
+  self.text = text
+  self.panel:setLabel(self.text)
+  return self
+end
+
+function HotkeyBox:setPosition(x, y)
+  self.button:setPosition(x, y)
+end
+
+function HotkeyBox:setSize(width, height)
+  self.button:setSize(width, height)
+end
+
+--================================
+--================================
+--================================
+
+--[[ Convert a static panel into a hotkeybox.
+! hotkeyboxes consist of the panel given as a parameter, which is made into a
+ToggleButton automatically, and handle keyboard input while active.
+!param panel (panel) The panel that will serve as the hotkeybox base.
+!param confirm_callback (function) The function to call when text is confirmed.
+!param abort_callback (function) The function to call when entering is aborted.
+]]
+function Window:makeHotkeyBoxOnPanel(panel, confirm_callback, abort_callback)
+  local hotkeybox = setmetatable({
+    panel = panel,
+    confirm_callback = confirm_callback,
+    abort_callback = abort_callback,
+    button = nil, -- placeholder
+    text = "",
+    allowed_input = {
+      alpha = true,
+      numbers = true,
+      misc = true,
+    },
+    char_limit = nil,
+    visible = true,
+    enabled = true,
+    active = false,
+    noted_keys = {},
+  }, hotkeybox_mt)
+
+  local button = panel:makeToggleButton(0, 0, panel.w, panel.h, nil, hotkeybox.clicked, hotkeybox)
+  hotkeybox.button = button
+
+  self.hotkeyboxes[#self.hotkeyboxes + 1] = hotkeybox
+  self.ui:registerHotkeyBox(hotkeybox)
+  return hotkeybox
+end
 
 function Window:draw(canvas, x, y)
   x, y = x + self.x, y + self.y
@@ -1301,6 +1478,11 @@ function Window:draw(canvas, x, y)
   if not class.is(self, UI) then -- prevent UI (sub)class from handling the textboxes too
     for _, box in ipairs(self.textboxes) do
       box:drawCursor(canvas, x, y)
+    end
+  end
+  if not class.is(self, UI) then -- prevent UI (sub)class from handling the hotkeyboxes too
+    for _, _ in ipairs(self.hotkeyboxes) do
+      -- Empty right now. Don't know if I need it. -- LEIGET
     end
   end
   if self.windows then
@@ -1350,15 +1532,12 @@ function Window:hitTestPanel(x, y, panel)
 end
 
 --[[ Used to test if the window has a (non-transparent) pixel at the given position.
-!param x (integer) The X co-ordinate of the pixel to test, relative to the
+!param x (integer) The X coordinate of the pixel to test, relative to the
 top-left corner of the window.
-!param y (integer) The Y co-ordinate of the pixel to test, relative to the
+!param y (integer) The Y coordinate of the pixel to test, relative to the
 top-left corner of the window.
 ]]
 function Window:hitTest(x, y)
-  if x < 0 or y < 0 or (self.width and x >= self.width) or (self.height and y >= self.height) then
---    return false
-  end
   if self.panels[1] then
     for _, panel in ipairs(self.panels) do
       if self:hitTestPanel(x, y, panel) then
@@ -1378,6 +1557,7 @@ end
 
 function Window:onMouseDown(button, x, y)
   local repaint = false
+  if not self.visible then return false end
   if self.windows then
     for _, window in ipairs(self.windows) do
       if window:onMouseDown(button, x - window.x, y - window.y) then
@@ -1570,9 +1750,9 @@ function Window:beginDrag(x, y)
 end
 
 --[[ Called when the user moves the mouse.
-!param x (integer) The new X co-ordinate of the cursor, relative to the top-left
+!param x (integer) The new X coordinate of the cursor, relative to the top-left
 corner of the window.
-!param y (integer) The new Y co-ordinate of the cursor, relative to the top-left
+!param y (integer) The new Y coordinate of the cursor, relative to the top-left
 corner of the window.
 !param dx (integer) The number of pixels which the cursor moved horizontally.
 !param dy (integer) The number of pixels which the cursor moved vertically.
@@ -1751,12 +1931,12 @@ end
 --! Create a static (non-changeable) tooltip to be displayed in a certain region.
 --! tooltip_x and tooltip_y are optional; if not specified, it will default to top center of region.
 --!param text (string) The string to display.
---!param x (integer) The X co-ordinate relative to the top-left corner.
---!param y (integer) The Y co-ordinate relative to the top-left corner.
---!param r (integer) The right (X + width) co-ordinate relative to the top-left corner.
---!param b (integer) The bottom (Y + height) co-ordinate relative to the top-left corner.
---!param tooltip_x (integer) [optional] The X co-ordinate to display the tooltip at.
---!param tooltip_y (integer) [optional] The Y co-ordinate to display the tooltip at.
+--!param x (integer) The X coordinate relative to the top-left corner.
+--!param y (integer) The Y coordinate relative to the top-left corner.
+--!param r (integer) The right (X + width) coordinate relative to the top-left corner.
+--!param b (integer) The bottom (Y + height) coordinate relative to the top-left corner.
+--!param tooltip_x (integer) [optional] The X coordinate to display the tooltip at.
+--!param tooltip_y (integer) [optional] The Y coordinate to display the tooltip at.
 function Window:makeTooltip(text, x, y, r, b, tooltip_x, tooltip_y)
   local region = {
     text = text, x = x, y = y, r = r, b = b,
@@ -1770,12 +1950,12 @@ end
 --! Create a dynamic tooltip to be displayed in a certain region.
 --! tooltip_x and tooltip_y are optional; if not specified, it will default to top center of region.
 --!param callback (function) A function that returns the string to display or nil for no tooltip.
---!param x (integer) The X co-ordinate relative to the top-left corner.
---!param y (integer) The Y co-ordinate relative to the top-left corner.
---!param r (integer) The right (X + width) co-ordinate relative to the top-left corner.
---!param b (integer) The bottom (Y + height) co-ordinate relative to the top-left corner.
---!param tooltip_x (integer) [optional] The X co-ordinate to display the tooltip at.
---!param tooltip_y (integer) [optional] The Y co-ordinate to display the tooltip at.
+--!param x (integer) The X coordinate relative to the top-left corner.
+--!param y (integer) The Y coordinate relative to the top-left corner.
+--!param r (integer) The right (X + width) coordinate relative to the top-left corner.
+--!param b (integer) The bottom (Y + height) coordinate relative to the top-left corner.
+--!param tooltip_x (integer) [optional] The X coordinate to display the tooltip at.
+--!param tooltip_y (integer) [optional] The Y coordinate to display the tooltip at.
 function Window:makeDynamicTooltip(callback, x, y, r, b, tooltip_x, tooltip_y)
   local region = {
     callback = callback, x = x, y = y, r = r, b = b,
@@ -1807,8 +1987,8 @@ end
 -- (see Button:setTooltip, Panel:setTooltip, Window:make[Dynamic]Tooltip)
 --! Button tooltips take precedence over region tooltips, which again take precedence over panels.
 -- Returns tooltip in form of { text = .. , x = .. , y = .. } or nil for no tooltip.
---!param x (integer) The X co-ordinate relative to the top-left corner.
---!param y (integer) The Y co-ordinate relative to the top-left corner.
+--!param x (integer) The X coordinate relative to the top-left corner.
+--!param y (integer) The Y coordinate relative to the top-left corner.
 function Window:getTooltipAt(x, y)
   if x < 0 or y < 0 or (self.width and x >= self.width) or (self.height and y >= self.height) then
     return
@@ -1838,6 +2018,12 @@ function Window:getTooltipAt(x, y)
   end
 end
 
+function Panel:afterLoad(old, new)
+  if old < 160 then
+    self.lowered_colour = self.colour
+  end
+end
+
 --! Stub to be extended in subclasses, if needed.
 function Window:afterLoad(old, new)
   if old < 2 then
@@ -1857,10 +2043,19 @@ function Window:afterLoad(old, new)
       btn.ui = self.ui
     end
   end
+  if old < 132 then
+    -- Hotkey boxes were added.
+    self.hotkeyboxes = {}
+  end
 
   if self.windows then
     for _, w in pairs(self.windows) do
       w:afterLoad(old, new)
+    end
+  end
+  if self.panels then
+    for _, p in pairs(self.panels) do
+      p:afterLoad(old, new)
     end
   end
 end

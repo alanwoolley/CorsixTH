@@ -1,4 +1,220 @@
 -------------------------------------------------------------------------------
+Version 0.66 - released June 2022
+-------------------------------------------------------------------------------
+# New Features/Enhancements
+* Direct Zoom has been improved and is now enabled by default
+* Nurses can now leave the ward without disturbing her patients
+* Patients with Serious Radiation now glow a beautiful shade of green
+* Patients with Jellyitis now wobble wobble wobble
+* The Hotkeys menu has been overhauled to make it easier to use
+* You can now reset your zoom level by pressing '0'
+* A new fax code cheat has been added!
+* The replace machine prompt will now tell you the new strength before purchase
+  (can be disabled in configuration settings)
+* A machine's dynamic info will tell you the strength a machine can be upgraded
+  to if you replaced it (can be disabled in configuration settings)
+* MacOS users can now place the CorsixTH.app anywhere (e.g. outside
+  /Applications)
+
+
+# Changes
+* Improved pee and vomit conditions
+* Patients will no longer queue for reception until nearby
+* The Adviser will no longer queue repetitive messages
+* Dropdown menus will now close when clicked outside of
+* Non-visual diseases can now be delayed in the level config of a custom game
+* Gamelog.txt will now contain system information instead of within the window
+  title
+* Patients no longer become fed up and leave the hospital if already in their
+  treatment room
+
+
+# Translations
+* Translations should no longer show random '/' on new lines
+* Russian language updated (Thanks @Matvey1705 !)
+* Czech language updated (Thanks @jansakos !)
+* German language updated (Thanks @Manuel-K !)
+
+
+# Bug Fixes
+* Checking for updates should now work moving forward (promise)
+* All cured trophy bugfix now properly applied from 0.65.1
+* Firing staff from a multi-use object now ensures they leave the hospital
+* Missing config and hotkey values will now use default values
+* Fixed an instance where an emergency fax could show the wrong cure
+* Sound effect boundary is now properly applied on window resize
+* The cheats menu is now immediately usable after typing the cheat code on a
+  fax
+* User action while paused setting no longer uses configuration default
+* Quick Save and Quick Load behaviour has been improved
+* The cheats menu dialog will no longer slide off the screen
+* You can now purchase plots while wall transparency is on
+* Fixed playback of movie audio on surround sound systems is the most accurate
+* Resolved formatting issues with numbers after loading a save
+
+
+# Packager Notes
+* FFmpeg 5 is now supported
+* FFmpeg 3 and below are no longer supported
+* LibAV is no longer supported
+* CMake minimum version has been increased to 3.10
+* MacOS Packagers, please note the macos_luarocks script has been modified
+* MacOS versions can now be made portable
+
+-------------------------------------------------------------------------------
+Version 0.65.1 - released July 2021
+-------------------------------------------------------------------------------
+# This is a hotfix release of 0.65 and replaces the June 2021 release
+* Fixes a bug where the game would crash if you got the All Cured trophy at the
+  end of year awards, when loading a save from 0.64 or earlier
+
+-------------------------------------------------------------------------------
+Version 0.65 - released June 2021
+-------------------------------------------------------------------------------
+# New Features/Enhancements
+* CorsixTH is now available as a Flatpak! (thanks to @rmnvgr !)
+* On MacOS DMG files are now supported as disk images for Theme Hospital data
+* Hospital policies will now carry over to your next level in the campaign
+* You can now remove destroyed rooms for a fee (config option)
+* The information dialogs that appear when a room is first built can be
+  disabled in the configuration file
+* Fire extinguishers in rooms now have a chance to save a smoking machine
+  from exploding
+* Advisor has more advice
+* Additional trophy of the original game is implemented
+* Windows and room size now impact staff happiness
+* Roujin's challenge cheat is back
+* Experimental direct_zoom config option, for more efficient zoom. Fixes
+  zoom on some hardware. Defaults off.
+
+# Changes
+* Emergencies with unknown diseases will no longer occur
+* The VIP system has been overhauled to provide more balanced ratings
+* Overpriced/Underpriced treatments now scale with difficulty
+* Placing a receptionist on a desk will now call her to the desk
+* Boiler breakdowns now depend on handymen
+* Faxes can no longer be opened while paused (unless editing while paused is
+  enabled)
+* Improvements to receptionist announcement frequency and behaviour
+* The game will now check common locations for Theme Hospital on startup if it
+  has not been configured
+* Games compiled without movie/audio can no longer access these settings
+* Update check now occurs over TLS for better security
+* English names are now shown in a tooltip when hovering over a language
+  option
+* Improved TTF font rendering
+
+# Translations
+* Greek language added! (thanks to dimitrios-iliadis!)
+* Updates to Brazilian-Portuguese language
+* Updates to English language
+* Fixes to Chinese unicode encoding
+
+# Bug Fixes
+* Issues scheduling emergencies have been resolved
+* Games will no longer crash on load if the jukebox was open
+* Games will no longer crash because of an empty music folder
+* Fixed a scenario where editing a room caused staff to get stuck
+* Games that scrolled while saving stop scrolling on load
+* Psychiatrists in the Operating Theatre are now properly counted
+* Losing a game now gives the reason if the movie is skipped
+* Exiting the game will no longer hang when using the Wayland backend
+* The mouse will now be freed on game crash
+
+# Packager Notes
+* Support added for Lua 5.4.x. (5.4.0 and 5.4.1 are not supported)
+* CMake minimum version has been increased to 3.5
+* The CMake option to enable AnimView is now BUILD_ANIMVIEW=ON
+
+-------------------------------------------------------------------------------
+Version 0.64 - released June 2020
+-------------------------------------------------------------------------------
+# New Features
+* EXPERIMENTAL: ISO images may be used as a Theme Hospital data source. Known
+  limitations of using ISOs are that the in game movies will not play, and the
+  first time Windows install will not allow selecting the ISO file in the file
+  dialog.
+
+# Bug Fixes
+* Confirm dialogs are now sized properly in all languages.
+* Many circumstances causing rooms to become stuck have been fixed.
+* Level 6 map issues causing errors have been corrected.
+* Epidemic patients couldn't be treated while they were seeking a room.
+* CJK text layout issues have been corrected.
+* French Level 5 description was replaced so that formatting characters
+  no longer show up in it.
+* Some undefined behavior and potential memory leaks have been corrected.
+* Earthquake cheat now breaks your hospital instead of the game.
+
+# Translations
+* Updated translations for Chinese, French, Brazilian Portugese.
+
+-------------------------------------------------------------------------------
+Version 0.63 - released May 2019
+-------------------------------------------------------------------------------
+# New Features
+* Game music now supports ogg, flac, wav, aiff, voc, and mod in addition to
+  mp3 and mid/xmi tracks.
+* No more hunting for that machine that's always breaking down. Save your
+  camera position with ALT+number, and restore with CTRL+number.
+* Announcements are now queued to play one after another instead of
+  overlapping.
+* New man page for unix like operating systems.
+* Fax message improvements.
+* Hotkey configuration! All hotkeys in the game are now configurable from
+  within a new option in the settings menu.
+* Configure the scroll and zoom speed in game.
+* Improved mouse 'release' behaviour. Release mouse (CTRL+F10 by default) now
+  always releases the mouse, so the game will not scroll when moving out of
+  the window. Clicking in the game window causes the game to recognize the
+  mouse again.
+
+# Bug Fixes
+* Handymen now know where to find machines that have been moved.
+* Fix crashes that happen when staff are killed in exploding rooms.
+* Open file leak in the file tree dialogs.
+* Autopsy machine can only be 'discovered' once.
+* Fix issue with staff getting stuck in rooms that support multiple staff.
+* Fix position of patients dragged in the room queue while a staff is waiting
+  for the door, or a patient is waiting to leave.
+* Pathfinding has been improved.
+* Fix fax messages and options displayed in many circumstances.
+* Fix game error where lava hole is not accessible without entering a room.
+* Map fixes for many of the custom campaign levels.
+* Engine stability fixes.
+
+# Packaging
+* Appdata metainfo, desktop files, and a scalable icon are now included by
+  make install on XDG systems.
+
+-------------------------------------------------------------------------------
+Version 0.62 - released July 2018
+-------------------------------------------------------------------------------
+# New Features
+* Player salary is now preserved between campaign levels
+* Mouse capture is now shown on in game options screen
+* Completely out of source builds are now supported on all platforms
+* FHS style file layout (separate bin and share/corsixth directories) support
+  for Linux (and non-Apple Unixes)
+* On Linux (and other non-Apple Unixes) the CorsixTH executable is now called
+  corsix-th
+* LuaJIT 2.x is now supported, if using LuaJIT 1.x JIT is no longer enabled
+* Meandering staff behaviour has been tweaked to look more natural
+
+# Bug Fixes
+* Hoppalong map in the included campaign was fixed to not crash
+* Correctly handle the death of emergency patients
+* VIP and other game event scheduling fixes
+* VIP now works correctly when the hospital has no functional rooms
+* Heat now spreads out from radiators in all directions again
+* Fix for game error that caused the same litter to be cleaned up twice, and
+  resulted in a crash
+* Fix moving machines with no state
+* All known memory leaks caused by our code have been fixed
+* Many text and formatting improvements across languages
+
+
+-------------------------------------------------------------------------------
 Version 0.61 - released December 2017
 -------------------------------------------------------------------------------
 * Mouse capture support. Now by default the mouse will be captured in its
@@ -1085,7 +1301,7 @@ Version Beta 2 - released 2010-03-24
 * Additional functional diagnosis rooms: General Diagnosis, Ultrascan, X-Ray
 * Room queues should now re-balance themselves when new rooms are built.
 
-* Translation: Norwegian (bokmål).
+* Translation: Norwegian (bokmÃ¥l).
 
 A lot of other small improvements.
 Also, a great number of bugs have been squashed. Most remaining bugs are no

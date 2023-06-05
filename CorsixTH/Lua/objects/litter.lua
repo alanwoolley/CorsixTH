@@ -18,7 +18,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE. --]]
 
-local TH = require "TH"
+local TH = require("TH")
 
 local object = {}
 object.id = "litter"
@@ -53,12 +53,13 @@ class "Litter" (Entity)
 ---@type Litter
 local Litter = _G["Litter"]
 
-function Litter:Litter(world, object_type, x, y, direction, etc)
+function Litter:Litter(hospital, object_type, x, y)
   local th = TH.animation()
   self:Entity(th)
   self.ticks = object_type.ticks
   self.object_type = object_type
-  self.world = world
+  self.hospital = hospital
+  self.world = hospital.world
   self:setTile(x, y)
 end
 
@@ -86,22 +87,23 @@ function Litter:setLitterType(anim_type, mirrorFlag)
       error("Unknown litter type")
     end
     if self:isCleanable() then
-      local hospital = self.world:getHospital(self.tile_x, self.tile_y)
-      hospital:addHandymanTask(self, "cleaning", 1, self.tile_x, self.tile_y)
+      self.hospital:addHandymanTask(self, "cleaning", 1, self.tile_x, self.tile_y)
     end
   end
 end
 
 --! Remove the litter from the world.
 function Litter:remove()
-  assert(self:isCleanable())
+  assert(self:isCleanable() or TheApp.config.remove_destroyed_rooms)
 
-  self.world:removeObjectFromTile(self, self.tile_x, self.tile_y)
+  if self.tile_x then
+    self.world:removeObjectFromTile(self, self.tile_x, self.tile_y)
 
-  local hospital = self.world:getHospital(self.tile_x, self.tile_y)
-  local taskIndex = hospital:getIndexOfTask(self.tile_x, self.tile_y, "cleaning", self)
-  hospital:removeHandymanTask(taskIndex, "cleaning")
-
+    local taskIndex = self.hospital:getIndexOfTask(self.tile_x, self.tile_y, "cleaning", self)
+    self.hospital:removeHandymanTask(taskIndex, "cleaning")
+  else
+    print("Warning: Removing litter that has already been removed.")
+  end
   self.world:destroyEntity(self)
 end
 
@@ -137,7 +139,7 @@ end
 function Litter:afterLoad(old, new)
   if old < 52 then
     if self.tile_x then
-      self.world.hospitals[1]:addHandymanTask(self, "cleaning", 1, self.tile_x, self.tile_y)
+      self.hospital:addHandymanTask(self, "cleaning", 1, self.tile_x, self.tile_y)
     else
       -- This object was not properly removed from the world.
       self.world:destroyEntity(self)
@@ -145,15 +147,27 @@ function Litter:afterLoad(old, new)
   end
   if old < 54 then
     if not self:isCleanable() then
-      local hospital = self.world:getHospital(self.tile_x, self.tile_y)
-      local taskIndex = hospital:getIndexOfTask(self.tile_x, self.tile_y, "cleaning", self)
-      hospital:removeHandymanTask(taskIndex, "cleaning")
+      local taskIndex = self.hospital:getIndexOfTask(self.tile_x, self.tile_y, "cleaning", self)
+      self.hospital:removeHandymanTask(taskIndex, "cleaning")
     end
   end
 
   if old < 121 then
     self.ticks = object.ticks
   end
+
+  if old < 151 then
+    self.hospital = self.world:getHospital(self.tile_x, self.tile_y)
+  end
+  if old < 162 then
+    -- Afterload 151 could cause nil hospital if the litter was outside it.
+    -- For ease, remove affected litter
+    if not self.hospital then
+      self.hospital = TheApp.world:getLocalPlayerHospital()
+      self:remove()
+    end
+  end
+  Entity.afterLoad(self, old, new)
 end
 
 return object

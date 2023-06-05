@@ -123,7 +123,7 @@ menu_file.restart = "  START FORFRA  "
 
 menu_debug = {
   jump_to_level               = "  Gå til bane  ",
-  transparent_walls           = "  (K) Gennemsigtige VæGE  ",
+  transparent_walls           = "  (%1%) Gennemsigtige VæGE  ",
   limit_camera                = "  BEGRæNS KAMERAET  ",
   disable_salary_raise        = "  STOP LÖNFORHÖJELSER  ",
   make_debug_fax              = "  LAV FEJLFINDINGS FAX  ",
@@ -133,11 +133,11 @@ menu_debug = {
   show_watch                  = "  VIS URET ",
   create_emergency            = "  LAV ET AKUTTILFæLDE  ",
   place_objects               = "  PLACER OBJEKTER  ",
-  cheats                      = "  (F11) SNYD  ",
-  lua_console                 = "  (F12) LUA KONSOL  ",
+  cheats                      = "  (%1%) SNYD  ",
+  lua_console                 = "  (%1%) LUA KONSOL  ",
   calls_dispatcher            = "  KALD På AFSENDER  ",
-  dump_strings                = "  DUMP TEKT  ",
-  dump_gamelog                = "  (CTRL + D) DUMP SPILLOG  ",
+  dump_strings                = "  (%1%) DUMP TEKT  ",
+  dump_gamelog                = "  (%1%) DUMP SPILLOG  ",
   map_overlay                 = "  KORTOVERSIGT  ",
   sprite_viewer               = "  SPRITE VISER  ",
 }
@@ -1007,10 +1007,10 @@ menu = {
 }
 
 menu_file = {
-  load                = "  INDLæS  ",
-  save                = "  GEM  ",
-  restart             = "  START FORFRA  ",
-  quit                = "  AFSLUT  ",
+  load                = "  (%1%) INDLæS  ",
+  save                = "  (%1%) GEM  ",
+  restart             = "  (%1%) START FORFRA  ",
+  quit                = "  (%1%) AFSLUT  ",
 }
 
 
@@ -1027,27 +1027,27 @@ menu_file_load = {
 
 -- Menu Options
 menu_options = {
-  sound               = "  LYD  ",
-  announcements       = "  ANNONCERINGER  ",
-  music               = "  MUSIK  ",
+  sound               = "  (%1%) LYD  ",
+  announcements       = "  (%1%) ANNONCERINGER  ",
+  music               = "  (%1%) MUSIK  ",
   sound_vol           = "  LYDSTYRKE  ",
   announcements_vol   = "  ANNONCERINGSSTYRKE  ",
   music_vol           = "  MUSIKSTYRKE  ",
   autosave            = "  AUTOMATISK GEM  ",
   game_speed          = "  SPILHASTIGHED  ",
-  jukebox             = "  JUKEBOX  ",
+  jukebox             = "  (%1%) JUKEBOX  ",
   edge_scrolling      = "  KANT SCROLLING  ",
   settings            = "  INDSTILLINGER  ",
 }
 
 -- Menu Options Game Speed
 menu_options_game_speed = {
-  pause               = "  (P) PAUSE  ",
-  slowest             = "  (1) LANGSOMMEST  ",
-  slower              = "  (2) LANGSOMMERE  ",
-  normal              = "  (3) NORMAL  ",
-  max_speed           = "  (4) HURTIGST  ",
-  and_then_some_more  = "  (5) OG SÅ LIGE LIDT MERE  ",
+  pause               = "  (%1%) PAUSE  ",
+  slowest             = "  (%1%) LANGSOMMEST  ",
+  slower              = "  (%1%) LANGSOMMERE  ",
+  normal              = "  (%1%) NORMAL  ",
+  max_speed           = "  (%1%) HURTIGST  ",
+  and_then_some_more  = "  (%1%) OG SÅ LIGE LIDT MERE  ",
 }
 
 -- Menu Display
@@ -1059,14 +1059,14 @@ menu_display = {
 
 -- Menu Charts
 menu_charts = {
-  statement           = "  ERKLÆRINGER  ",
-  casebook            = "  MEDICINBOG  ",
-  policy              = "  POLITIK  ",
-  research            = "  FORSKNING  ",
-  graphs              = "  DIAGRAMMER  ",
-  staff_listing       = "  PERSONALEHÅNDTERING  ",
-  bank_manager        = "  BANKKONSULENT  ",
-  status              = "  STATUS  ",
+  statement           = "  (%1%) ERKLÆRINGER  ",
+  casebook            = "  (%1%) MEDICINBOG  ",
+  policy              = "  (%1%) POLITIK  ",
+  research            = "  (%1%) FORSKNING  ",
+  graphs              = "  (%1%) DIAGRAMMER  ",
+  staff_listing       = "  (%1%) PERSONALEHÅNDTERING  ",
+  bank_manager        = "  (%1%) BANKKONSULENT  ",
+  status              = "  (%1%) STATUS  ",
   briefing            = "  BRIEFING  ",
 }
 
@@ -2348,31 +2348,21 @@ fax = {
     rep_loss   = "Dit ry i nærområdet har taget skade.",
 
     remarks = {
-      super = {
-        "Det er et meget flot hospital. Næste gang jeg bliver alvorligt syg, vil jeg indlægges der.",
-        "Se det er hvad jeg kalder for et hospital af topklasse!",
-        "Et super hospital, og det er noget jeg ved en del om, for jeg har været indlagt en hel del gange.",
-      },
-      good = {
-        "Det er et godt organiseret hospital. Tak fordi jeg måtte komme.",
-        "Hmm. Det er absolut ikke noget dårligt sted, jeg har set.",
-        "Jeg kan godt lide dit charmerende hospital. Forresten, er der nogen som vil med ud at spise indisk?",
-      },
-      mediocre = {
-        "Nå, jeg har set værre. Men du kunne göre en lang række forbedringer.",
-        "Åh, min kære tid. Det her er ikke det sted man går hen, hvis man föler sig dårlig.",
-        "Et helt normalt hospital, for at være ærlig. Jeg havde forventet noget mere.",
-      },
-      bad = {
-        "Hvad laver jeg egentlig her?! Det er jo værre end en fire timers opera!",
-        "Det var ækelt! Kalder du det her et hospital?! Det ligner mere en svinesti!",
-        "Jeg er træt af at være en offentlig person, og træt af at skulle besöge steder som dette stinkende hul! Jeg siger op!.",
-      },
-      very_bad = {
-        "Föj for et syn! Dette hospital skal jeg nok få lukket ned!",
-        "Jeg har aldrig set magen. Det er en skandale!",
-        "Jeg er chokeret! Du kan ikke kalde dette et hospital! Jeg går ud og tager mig en stærk drink!",
-      },
+      [1] = "Det er et meget flot hospital. Næste gang jeg bliver alvorligt syg, vil jeg indlægges der.",
+      [2] = "Se det er hvad jeg kalder for et hospital af topklasse!",
+      [3] = "Et super hospital, og det er noget jeg ved en del om, for jeg har været indlagt en hel del gange.",
+      [4] = "Det er et godt organiseret hospital. Tak fordi jeg måtte komme.",
+      [5] = "Hmm. Det er absolut ikke noget dårligt sted, jeg har set.",
+      [6] = "Jeg kan godt lide dit charmerende hospital. Forresten, er der nogen som vil med ud at spise indisk?",
+      [7] = "Nå, jeg har set værre. Men du kunne göre en lang række forbedringer.",
+      [8] = "Åh, min kære tid. Det her er ikke det sted man går hen, hvis man föler sig dårlig.",
+      [9] = "Et helt normalt hospital, for at være ærlig. Jeg havde forventet noget mere.",
+      [10] = "Hvad laver jeg egentlig her?! Det er jo værre end en fire timers opera!",
+      [11] = "Det var ækelt! Kalder du det her et hospital?! Det ligner mere en svinesti!",
+      [12] = "Jeg er træt af at være en offentlig person, og træt af at skulle besöge steder som dette stinkende hul! Jeg siger op!.",
+      [13] = "Föj for et syn! Dette hospital skal jeg nok få lukket ned!",
+      [14] = "Jeg har aldrig set magen. Det er en skandale!",
+      [15] = "Jeg er chokeret! Du kan ikke kalde dette et hospital! Jeg går ud og tager mig en stærk drink!",
     },
   },
 

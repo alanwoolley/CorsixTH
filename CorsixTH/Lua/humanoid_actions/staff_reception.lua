@@ -26,7 +26,7 @@ local StaffReceptionAction = _G["StaffReceptionAction"]
 -- Action class for the "staff reception desk" action.
 --!param desk (object) Desk to staff.
 function StaffReceptionAction:StaffReceptionAction(desk)
-  assert(class.is(desk, ReceptionDesk), "Invalid value for parameter 'desk'")
+  assert(class.is(desk, ReceptionDesk), "Invalid value for parameter 'desk'") -- luacheck: ignore 113
 
   self:HumanoidAction("staff_reception")
   self.object = desk -- Reception desk object.
@@ -45,7 +45,8 @@ local action_staff_reception_interrupt = permanent"action_staff_reception_interr
     humanoid:setTilePositionSpeed(dx, dy)
     humanoid:finishAction()
   else
-    HumanoidRawWalk(humanoid, humanoid.tile_x, humanoid.tile_y, dx, dy, nil, function()
+    HumanoidRawWalk(humanoid, humanoid.tile_x, humanoid.tile_y, dx, dy, nil,
+        --[[persistable:action_staff_reception_walk]] function()
       humanoid:setTilePositionSpeed(dx, dy)
       humanoid:finishAction()
     end)
@@ -53,7 +54,7 @@ local action_staff_reception_interrupt = permanent"action_staff_reception_interr
 end)
 
 local action_staff_reception_idle_phase = permanent"action_staff_reception_idle_phase"( function(humanoid)
-  local action = humanoid.action_queue[1]
+  local action = humanoid:getCurrentAction()
   local direction = humanoid.last_move_direction
   local anims = humanoid.walk_anims
   local object = action.object
