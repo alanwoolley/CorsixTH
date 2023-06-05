@@ -18,7 +18,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE. --]]
 
-local TH = require "TH"
+local TH = require("TH")
 
 --! Room / door / reception desk queue visualisation dialog.
 class "UIQueue" (Window)
@@ -126,8 +126,7 @@ function UIQueue:onMouseDown(button, x, y)
     return Window.onMouseDown(self, button, x, y)
   end
   local x_min = 219
-  local y_min = 15
-  self.hovered = self:getHoveredPatient(x - x_min, y - y_min)
+  self.hovered = self:getHoveredPatient(x - x_min)
   -- Select patient to drag - if left clicking.
   if button == "left" then
     self.dragged = self.hovered
@@ -175,17 +174,16 @@ function UIQueue:onMouseUp(button, x, y)
       self.dragged = nil
       return
     end
-
     if x > 170 and x < 210 and y > 25 and y < 105 then -- Inside door bounding box
-      queue:move(index, 1) -- move to front
+      queue:movePatient(index, 'front') -- move to front
     elseif x > 542 and x < 585 and y > 50 and y < 105 then -- Inside exit sign bounding box
-      queue:move(index, num_patients) -- move to back
+      queue:movePatient(index, 'back') -- move to back
     elseif isInsideQueueBoundingBox(x, y) then
       local dx = 1
       if num_patients ~= 1 then
         dx = math.floor(width / (num_patients - 1))
       end
-      queue:move(index, math.floor((x - 220) / dx) + 1) -- move to dropped position
+      queue:movePatient(index, math.floor((x - 220) / dx)) -- move to dropped position
       self:onMouseMove(x, y, 0, 0)
     end
 
@@ -198,16 +196,20 @@ function UIQueue:onMouseUp(button, x, y)
       room = self.ui.app.world:getRoom(wx, wy)
     end
 
-    -- The new room must be of the same class as the current one
+    -- The new room must be of the same class as the current one and active
     local this_room = self.dragged.patient.next_room_to_visit
-    if this_room and room and room ~= this_room and room.room_info.id == this_room.room_info.id then
+    if this_room and room and room ~= this_room and
+        room.room_info.id == this_room.room_info.id and room.is_active then
       -- Move to another room
       local patient = self.dragged.patient
       patient:setNextAction(room:createEnterAction(patient))
       patient.next_room_to_visit = room
-      patient:updateDynamicInfo(_S.dynamic_info.patient.actions.on_my_way_to:format(room.room_info.name))
-      room.door.queue:expect(patient)
+      patient:setDynamicInfoText(_S.dynamic_info.patient.actions.on_my_way_to:format(room.room_info.name))
       room.door:updateDynamicInfo()
+      -- call staff to room if required
+      if not room:testStaffCriteria(room:getRequiredStaffCriteria()) then
+        patient.world.dispatcher:callForStaff(room)
+      end
     end
   end
   self.dragged = nil
@@ -215,7 +217,6 @@ end
 
 function UIQueue:onMouseMove(x, y, dx, dy)
   local x_min = 219
-  local y_min = 15
   if self.dragged then
     self.dragged.x = x + self.x
     self.dragged.y = y + self.y
@@ -234,7 +235,7 @@ function UIQueue:onMouseMove(x, y, dx, dy)
   end
 
   -- Update hovered patient
-  self.hovered = self:getHoveredPatient(x - x_min, y - y_min)
+  self.hovered = self:getHoveredPatient(x - x_min)
   Window:onMouseMove(x, y, dx, dy)
 end
 
@@ -247,7 +248,7 @@ function UIQueue:close()
   Window.close(self)
 end
 
-function UIQueue:getHoveredPatient(x, y)
+function UIQueue:getHoveredPatient(x)
   local queue = self.queue
   local num_patients = queue:reportedSize()
   local width = 276

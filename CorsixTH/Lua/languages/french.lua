@@ -207,7 +207,8 @@ adviser.information = {
   patient_leaving_too_expensive = "Un patient part sans payer la facture pour %s. Sacrée perte !",
   vip_arrived = "Attention ! %s arrive pour visiter votre hôpital ! Faites en sorte de lui faire bonne impression.",
   first_death = "Vous venez de tuer votre premier patient. Alors, heureux ?",
-  promotion_to_specialist = "L'un de vos INTERNES est devenu MÉDECIN.", -- Fix the famous "Level 5 bug"
+  promotion_to_doctor = "L'un de vos INTERNES est devenu MÉDECIN.", -- Fix the famous "Level 5 bug"
+  promotion_to_specialist = "L'un de vos MÉDECINS est devenu SPÉCIALISTE.",
 }
 buy_objects_window = {
   price = "Prix : ",
@@ -534,29 +535,29 @@ tooltip.research_policy.no_research = "Aucune recherche n'est actuellement effec
 tooltip.research_policy.research_progress = "Progrès vers la prochaine découverte dans cette catégorie : %1%/%2%"
 
 menu_file = {
-  load =    " (SHIFT+L) CHARGER   ",
-  save =    " (SHIFT+S) ENREGISTRER   ",
-  restart = " (SHIFT+R) RELANCER",
-  quit =    " (SHIFT+Q) QUITTER   ",
+  load =    " (%1%) CHARGER   ",
+  save =    " (%1%) ENREGISTRER   ",
+  restart = " (%1%) RELANCER",
+  quit =    " (%1%) QUITTER   ",
 }
 
 -- Options menu
 menu_options = {
   lock_windows = "  FIGER LES FENETRES  ",
   edge_scrolling = "  DEFILEMENT PAR BORD  ",
-  adviser_disabled = "  ASSISTANT  ",
+  adviser_disabled = "  (%1%) ASSISTANT  ",
   warmth_colors = "  COULEURS CHAUDES  ",
   wage_increase = " AUGMENTATION DE SALAIRE ",
   twentyfour_hour_clock = " HORLOGE 24 HEURES ",
 }
 
 menu_options_game_speed = {
-  pause               = "  (P) PAUSE  ",
-  slowest             = "  (1) AU PLUS LENT  ",
-  slower              = "  (2) PLUS LENT  ",
-  normal              = "  (3) NORMAL  ",
-  max_speed           = "  (4) VITESSE MAXI  ",
-  and_then_some_more  = "  (5) ET ENCORE PLUS  ",
+  pause               = "  (%1%) PAUSE  ",
+  slowest             = "  (%1%) AU PLUS LENT  ",
+  slower              = "  (%1%) PLUS LENT  ",
+  normal              = "  (%1%) NORMAL  ",
+  max_speed           = "  (%1%) VITESSE MAXI  ",
+  and_then_some_more  = "  (%1%) ET ENCORE PLUS  ",
 }
 
 menu_options_warmth_colors = {
@@ -572,32 +573,32 @@ menu_options_wage_increase = {
 
 -- Charts Menu ' Temporary; must see in-game for correct translation
 menu_charts = {
-  bank_manager  = "  (F1) GESTION BANCAIRE  ",
-  statement     = "  (F2) DECLARATION  ",
-  staff_listing = "  (F3) LISTE DU PERSONNEL  ",
-  town_map      = "  (F4) CARTE DE LA VILLE  ",
-  casebook      = "  (F5) MALLETTE  ",
-  research      = "  (F6) RECHERCHE  ",
-  status        = "  (F7) STATUTS  ",
-  graphs        = "  (F8) GRAPHIQUES  ",
-  policy        = "  (F9) POLITIQUE ",
+  bank_manager  = "  (%1%) GESTION BANCAIRE  ",
+  statement     = "  (%1%) DECLARATION  ",
+  staff_listing = "  (%1%) LISTE DU PERSONNEL  ",
+  town_map      = "  (%1%) CARTE DE LA VILLE  ",
+  casebook      = "  (%1%) MALLETTE  ",
+  research      = "  (%1%) RECHERCHE  ",
+  status        = "  (%1%) STATUTS  ",
+  graphs        = "  (%1%) GRAPHIQUES  ",
+  policy        = "  (%1%) POLITIQUE ",
 }
 
 -- Debug menu
 menu_debug = {
   jump_to_level               = "  ALLER AU NIVEAU  ",
-  connect_debugger            = " (CTRL + C) CONNECTER AU SERVEUR DE DÉBOGUAGE ",
-  transparent_walls           = "  (X) MURS TRANSPARENTS  ",
+  connect_debugger            = "  (%1%) CONNECTER AU SERVEUR DE DÉBOGUAGE ",
+  transparent_walls           = "  (%1%) MURS TRANSPARENTS  ",
   limit_camera                = "  LIMITER LA CAMERA  ",
   disable_salary_raise        = "  DÉSACTIVER LES AUGMENTATIONS DE SALAIRE  ",
   make_debug_fax              = "  CRÉER UN FAX DE TEST  ",
   make_debug_patient          = "  CRÉER UN PATIENT DE TEST  ",
-  cheats                      = "  (F11) TRICHES  ",
-  lua_console                 = "  (F12) CONSOLE LUA  ",
-  debug_script                = "  (MAJ + DS) ACTIVER LE DÉBOGUAGE PAR SCRIPT ",
+  cheats                      = "  (%1%) TRICHES  ",
+  lua_console                 = "  (%1%) CONSOLE LUA  ",
+  debug_script                = "  (%1%) ACTIVER LE DÉBOGUAGE PAR SCRIPT ",
   calls_dispatcher            = "  RÉPARTITION DES TÂCHES  ",
-  dump_strings                = "  EXTRAIRE LES TEXTES  ",
-  dump_gamelog                = "  (CTRL+D) EXTRAIRE LE JOURNAL DE JEU  ",
+  dump_strings                = "  (%1%) EXTRAIRE LES TEXTES  ",
+  dump_gamelog                = "  (%1%) EXTRAIRE LE JOURNAL DE JEU  ",
   map_overlay                 = "  INCRUSTATIONS DE CARTE  ",
   sprite_viewer               = "  VISIONNEUSE DE SPRITES  ",
 }
@@ -618,10 +619,10 @@ menu_debug_overlay = {
 }
 
 menu_player_count = {
-	players_1 = "  1 JOUEUR  ",
-	players_2 = "  2 JOUEURS  ",
-	players_3 = "  3 JOUEURS  ",
-	players_4 = "  4 JOUEURS  ",
+  players_1 = "  1 JOUEUR  ",
+  players_2 = "  2 JOUEURS  ",
+  players_3 = "  3 JOUEURS  ",
+  players_4 = "  4 JOUEURS  ",
 }
 
 -- Adviser
@@ -696,7 +697,7 @@ letter = {
   return_to_main_menu = "Voulez-vous retourner au menu principal ou continuer la partie ?",
   campaign_completed = "Incroyable ! Vous avez réussi à terminer tous les niveaux. Vous pouvez maintenant vous détendre et profiter de remplir des forums sur Internet de vos réalisations. Bonne chance !",
   campaign_level_missing = "Désolé, mais le prochain niveau de cette campagne semble manquer. (Nom: %s)",
-  campaign_level_completed = "Bon travail ! Vous avez battu le niveau. Mais ce n'est pas fini!\n Aimeriez-vous un poste à l'hôpital %s ?",
+  campaign_level_completed = "Bon travail ! Vous avez battu le niveau. Mais ce n'est pas fini !\n Aimeriez-vous un poste à l'hôpital %s ?",
 }
 
 -- Installation
@@ -1088,11 +1089,11 @@ tooltip.cheats_window = {
 -- Introduction Texts
 introduction_texts = {
   demo =
-    "Bienvenue dans l'hôpital de démonstration !" ..
+    "Bienvenue dans l'hôpital de démonstration !// " ..
     "Malheureusement, la version démo ne contient que ce niveau. Malgré tout, il y a assez à faire ici pour vous occuper un moment !" ..
-    "Vous allez rencontrer différentes maladies qui nécessitent des salles pour les soigner. De temps en temps, des urgences peuvent se produire. Et vous aurez besoin d'une salle de recherche pour trouver des nouvelles salles." ..
-    "Votre but est de gagner 100,000$, de faire monter la valeur de votre hôpital à 70,000$ et d'obtenir une réputation de 700, tout en ayant soigné au moins 75% de vos patients." ..
-    "Veillez à ce que votre réputation ne tombe pas en dessous de 300 et de ne pas tuer plus de 40% de vos patients, ou vous perdrez." ..
+    "Vous allez rencontrer différentes maladies qui nécessitent des salles pour les soigner. De temps en temps, des urgences peuvent se produire. Et vous aurez besoin d'une salle de recherche pour trouver des nouvelles salles. " ..
+    "Votre but est de gagner 100,000$, de faire monter la valeur de votre hôpital à 70,000$ et d'obtenir une réputation de 700, tout en ayant soigné au moins 75% de vos patients. " ..
+    "Veillez à ce que votre réputation ne tombe pas en dessous de 300 et de ne pas tuer plus de 40% de vos patients, ou vous perdrez.//" ..
     "Bonne chance !",
   level1 =
     "Bienvenue dans votre premier hôpital !//Démarrez l'activité en installant un bureau de réception et " ..
@@ -1104,12 +1105,12 @@ introduction_texts = {
   level8 =
     "A vous de gérer l'hôpital le plus efficace et le plus rentable possible.//Les gens du coin sont bien nantis alors " ..
     "pompez-leur tout le fric que vous pourrez. Soigner les gens c'est bien joli mais vous avez BESOIN de l'argent que ça " ..
-    "rapporte. Ratissez tous ces malades ! Amassez un joli paquet de $300.000 pour terminer ce niveau. ",
+    "rapporte. Ratissez tous ces malades ! Amassez un joli paquet de $300.000 pour terminer ce niveau.",
   level12 =
     "Côté défi, vous allez être servi ! Impressionné par votre succès, le Ministère veut vous assigner une mission de confiance. " ..
     "Vous devrez construire un autre hôpital de pointe, gagner des sommes scandaleuses et vous faire une réputation fabuleuse. " ..
     "Vous devrez également acheter tout le terrain possible, soigner toutes les maladies (nous avons bien dit TOUTES) et remporter " ..
-    "toutes les récompenses. Alors, heureux ? Gagnez $650.000, soignez 750 personnes et affichez une réputation de 800 pour gagner ce niveau. ",
+    "toutes les récompenses. Alors, heureux ? Gagnez $650.000, soignez 750 personnes et affichez une réputation de 800 pour gagner ce niveau.",
   level13 =
     "Votre incroyable talent en tant que directeur d'hôpital a attiré l'attention de la Division Spéciale Secrète des " ..
     "Services Spéciaux Secrets. On vous propose un bonus : il y a un hôpital infesté de rats qui réclame un Nettoyeur efficace. " ..

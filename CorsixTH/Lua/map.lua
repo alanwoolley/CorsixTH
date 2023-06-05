@@ -24,10 +24,9 @@ class "Map"
 ---@type Map
 local Map = _G["Map"]
 
-local pathsep = package.config:sub(1, 1)
 local math_floor, tostring, table_concat
     = math.floor, tostring, table.concat
-local thMap = require"TH".map
+local thMap = require("TH").map
 
 function Map:Map(app)
   self.width = false
@@ -39,6 +38,10 @@ function Map:Map(app)
   self.debug_font = false
   self.debug_tick_timer = 1
   self:setTemperatureDisplayMethod(app.config.warmth_colors_display_default)
+
+  -- Difficulty of the level (string) "easy", "full", "hard".
+  -- Use map:getDifficulty() to query the value.
+  self.difficulty = nil
 end
 
 local flag_cache = {}
@@ -104,10 +107,10 @@ function Map:registerTemperatureDisplayMethod()
   self.th:setTemperatureDisplay(self.temperature_display_method)
 end
 
--- Convert between world co-ordinates and screen co-ordinates
--- World co-ordinates are (at least for standard maps) in the range [1, 128)
+-- Convert between world coordinates and screen coordinates
+-- World coordinates are (at least for standard maps) in the range [1, 128)
 -- for both x and y, with the floor of the values giving the cell index.
--- Screen co-ordinates are pixels relative to the map origin - NOT relative to
+-- Screen coordinates are pixels relative to the map origin - NOT relative to
 -- the top-left corner of the screen (use UI:WorldToScreen and UI:ScreenToWorld
 -- for this).
 
@@ -166,7 +169,7 @@ the original game levels are considered.
 has been loaded.
 ]]
 function Map:load(level, difficulty, level_name, map_file, level_intro, map_editor)
-  local objects
+  local objects, _
   if not difficulty then
     difficulty = "full"
   end
@@ -176,11 +179,9 @@ function Map:load(level, difficulty, level_name, map_file, level_intro, map_edit
       local f = assert(loadfile(filename))
       return f()
     end
-  local path = debug.getinfo(1, "S").source:sub(2, -12)
-  local result = file(path .. "Lua" .. pathsep .. "base_config.lua")
 
+  local result = file(self.app:getFullPath({"Lua", "base_config.lua"}))
   local base_config = result
-  local _
   if type(level) == "number" then
     local errors, data
     -- Playing the original campaign.
@@ -203,8 +204,8 @@ function Map:load(level, difficulty, level_name, map_file, level_intro, map_edit
     -- Check if we're using the demo files. If we are, that special config should be loaded.
     if self.app.using_demo_files then
       -- Try to load our own configuration file for the demo.
-      local p = debug.getinfo(1, "S").source:sub(2, -12) .. "Levels" .. pathsep .. "demo.level"
-      errors, result = self:loadMapConfig(p, base_config, true)
+      local demo_path = self.app:getFullPath({"Levels", "demo.level"})
+      errors, result = self:loadMapConfig(demo_path, base_config, true)
       if errors then
         print("Warning: Could not find the demo configuration, try reinstalling the game")
       end
@@ -217,8 +218,8 @@ function Map:load(level, difficulty, level_name, map_file, level_intro, map_edit
       -- Override with the specific configuration for this level
       _, result = self:loadMapConfig(difficulty .. level_no .. ".SAM", base_config)
       -- Finally load additional CorsixTH config per level
-      local p = debug.getinfo(1, "S").source:sub(2, -12) .. "Levels" .. pathsep .. "original" .. level_no .. ".level"
-      _, result = self:loadMapConfig(p, result, true)
+      local level_path = self.app:getFullPath({"Levels", "original" .. level_no .. ".level"})
+      _, result = self:loadMapConfig(level_path, result, true)
       self.level_config = result
     end
   elseif map_editor then
@@ -268,7 +269,21 @@ function Map:load(level, difficulty, level_name, map_file, level_intro, map_edit
     end
   end
 
+  -- fix original level 6 map
+  if level == 6 and not map_file and not map_editor then
+    self:setCellFlags(56, 71, {hospital = true, buildable = true, buildableNorth = true, buildableSouth = true, buildableEast = true, buildableWest = true})
+    self:setCellFlags(58, 72, {passable = false})
+  end
+
   return objects
+end
+
+--! Get the difficulty of the level. Custom levels and campaign always have medium difficulty.
+--!return (int) difficulty of the level, 1=easy, 2=medium, 3=hard.
+function Map:getDifficulty()
+  if self.difficulty == "easy" then return 1 end
+  if self.difficulty == "hard" then return 3 end
+  return 2
 end
 
 --[[! Sets the plot owner of the given plot number to the given new owner. Makes sure
@@ -357,7 +372,7 @@ function Map:loadMapConfig(filename, config, custom)
       if line:sub(1, 1) == "#" then
         local parts = {}
         local nkeys = 0
-        for part in line:gmatch"%.?[-?a-zA-Z0-9%[_%]]+" do
+        for part in line:gmatch("%.?[-?a-zA-Z0-9%[_%]]+") do
           if part:sub(1, 1) == "." and #parts == nkeys + 1 then
             nkeys = nkeys + 1
           end
@@ -371,7 +386,7 @@ function Map:loadMapConfig(filename, config, custom)
         for i = 2, nkeys + 1 do
           local key = parts[1] .. parts[i]
           local t, n
-          for name in key:gmatch"[^.%[%]]+" do
+          for name in key:gmatch("[^.%[%]]+") do
             name = tonumber(name) or name
             if t then
               if not t[n] then
@@ -642,7 +657,7 @@ function Map:draw(canvas, sx, sy, sw, sh, dx, dy)
         break
       elseif screenY > -32 then
         repeat
-          if screenX < -32 then
+          if screenX < -32 then -- luacheck: ignore 542
           elseif screenX < sw + 32 then
             local xy = y * self.width + x
             local xpos = dx + screenX - 32
@@ -777,5 +792,50 @@ function Map:afterLoad(old, new)
   if old < 120 then
     -- Issue #1105 update pathfinding (rebuild walls) potentially broken by side object placement
     self.th:updatePathfinding()
+  end
+  if old < 136 then
+    if self.level_number == 6 then
+      self:setCellFlags(56, 71, {hospital = true, buildable = true, buildableNorth = true, buildableSouth = true, buildableEast = true, buildableWest = true})
+      self:setCellFlags(58, 72, {passable = false})
+    end
+  end
+  if old < 161 then
+    -- Permanently fix the 0.65 trophy bug (#2004)
+    -- make sure we erase the hofix variable too
+    self.hotfix1 = nil
+    self.level_config.awards_trophies.TrophyAllCuredBonus = 20000
+    self.level_config.awards_trophies.AllCuresBonus = 5000
+  end
+  if old < 164 then
+    -- New feature, by default non-visual illnesses were always available
+    -- at the start
+    self.level_config.non_visuals_available = {
+    [0] = {Value = 0}, -- I_UNCOMMON_COLD
+    {Value = 0}, -- I_BROKEN_WIND
+    {Value = 0}, -- I_SPARE_RIBS
+    {Value = 0}, -- I_KIDNEY_BEANS
+    {Value = 0}, -- I_BROKEN_HEART
+    {Value = 0}, -- I_RUPTURED_NODULES
+    {Value = 0}, -- I_MULTIPLE_TV_PERSONALITIES
+    {Value = 0}, -- I_INFECTIOUS_LAUGHTER
+    {Value = 0}, -- I_CORRUGATED_ANKLES
+    {Value = 0}, -- I_CHRONIC_NOSEHAIR
+    {Value = 0}, -- I_3RD_DEGREE_SIDEBURNS
+    {Value = 0}, -- I_FAKE_BLOOD
+    {Value = 0}, -- I_GASTRIC_EJECTIONS
+    {Value = 0}, -- I_THE_SQUITS
+    {Value = 0}, -- I_IRON_LUNGS
+    {Value = 0}, -- I_SWEATY_PALMS
+    {Value = 0}, -- I_HEAPED_PILES
+    {Value = 0}, -- I_GUT_ROT
+    {Value = 0}, -- I_GOLF_STONES
+    {Value = 0}, -- I_UNEXPECTED_SWELLING
+    }
+  end
+  if old < 175 then
+    -- Set max salary value for existing saves
+    self.level_config.payroll = {
+      MaxSalary = 2000,
+    }
   end
 end

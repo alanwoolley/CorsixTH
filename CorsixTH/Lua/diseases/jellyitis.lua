@@ -30,6 +30,7 @@ disease.cure_price = 1000
 disease.emergency_sound = "emerg014.wav"
 disease.emergency_number = 12
 disease.contagious = false
+disease.effect = AnimationEffect.Jelly
 disease.initPatient = function(patient)
   if math.random(0, 1) == 0 then
     patient:setType("Standard Male Patient")
@@ -44,7 +45,6 @@ disease.initPatient = function(patient)
   patient:setLayer(3, 0)
   patient:setLayer(4, 0)
 end
--- TODO: visual jelly effect should be applied from time to time while walking
 
 -- Diagnosis rooms are the rooms other than the GPs office which can be visited
 -- to aid in diagnosis. The need not be visited, and if they are visited, the

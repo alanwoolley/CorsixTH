@@ -24,6 +24,10 @@ class "UIOptions" (UIResizable)
 ---@type UIOptions
 local UIOptions = _G["UIOptions"]
 
+-- Constants for most button's width and height
+local BTN_WIDTH = 135
+local BTN_HEIGHT = 20
+
 local col_bg = {
   red = 154,
   green = 146,
@@ -54,8 +58,27 @@ local col_caption = {
   blue = 218,
 }
 
+-- Private functions
+
+--- Calculates the Y position for the dialog box in the option menu
+-- and increments along the current position for the next element
+-- @return The Y position to place the element at
+
+function UIOptions:_getOptionYPos()
+  -- Offset from top of options box
+  local STARTING_Y_POS = 15
+  -- Y Height is 20 for panel size + 10 for spacing
+  local Y_HEIGHT = 30
+
+  -- Multiply by the index so that index=1 is at STARTING_Y_POS
+  local calculated_pos = STARTING_Y_POS + Y_HEIGHT * (self._current_option_index - 1)
+  self._current_option_index = self._current_option_index + 1
+  return calculated_pos
+end
+
+
 function UIOptions:UIOptions(ui, mode)
-  self:UIResizable(ui, 320, 240, col_bg)
+  self:UIResizable(ui, 320, 460, col_bg)
 
   local app = ui.app
   self.mode = mode
@@ -66,6 +89,9 @@ function UIOptions:UIOptions(ui, mode)
   self:setDefaultPosition(0.5, 0.25)
   self.default_button_sound = "selectx.wav"
   self.app = app
+
+  -- Tracks the current position of the object
+  self._current_option_index = 1
 
   self:checkForAvailableLanguages()
 
@@ -90,23 +116,49 @@ function UIOptions:UIOptions(ui, mode)
 
   -- Window parts definition
   -- Title
-  self:addBevelPanel(80, 10, 165, 20, col_caption):setLabel(_S.options_window.caption)
+  local title_y_pos = self:_getOptionYPos()
+  self:addBevelPanel(80, title_y_pos, 165, 20, col_caption):setLabel(_S.options_window.caption)
     .lowered = true
 
+  -- Check for updates
+  local updates_y_pos = self:_getOptionYPos()
+  local updates_string = app.config.check_for_updates and
+      _S.options_window.option_enabled or _S.options_window.option_disabled
+  self:addBevelPanel(20, updates_y_pos, BTN_WIDTH, BTN_HEIGHT, col_shadow, col_bg, col_bg)
+      :setLabel(_S.options_window.check_for_updates):setTooltip(_S.tooltip.options_window.check_for_updates).lowered = true
+  self.updates_panel =
+      self:addBevelPanel(165, updates_y_pos, BTN_WIDTH, BTN_HEIGHT, col_bg):setLabel(updates_string)
+  self.updates_button = self.updates_panel:makeToggleButton(0, 0, 140, BTN_HEIGHT, nil, self.buttonUpdates)
+      :setToggleState(app.config.check_for_updates)
+
   -- Fullscreen
-  self:addBevelPanel(20, 45, 135, 20, col_shadow, col_bg, col_bg)
+  local fullscreen_y_pos = self:_getOptionYPos()
+  self:addBevelPanel(20, fullscreen_y_pos, BTN_WIDTH, BTN_HEIGHT, col_shadow, col_bg, col_bg)
     :setLabel(_S.options_window.fullscreen):setTooltip(_S.tooltip.options_window.fullscreen).lowered = true
   self.fullscreen_panel =
-    self:addBevelPanel(165, 45, 135, 20, col_bg):setLabel(app.fullscreen and _S.options_window.option_on or _S.options_window.option_off)
-  self.fullscreen_button = self.fullscreen_panel:makeToggleButton(0, 0, 140, 20, nil, self.buttonFullscreen)
+    self:addBevelPanel(165, fullscreen_y_pos, BTN_WIDTH, BTN_HEIGHT, col_bg):setLabel(app.fullscreen and _S.options_window.option_on or _S.options_window.option_off)
+  self.fullscreen_button = self.fullscreen_panel:makeToggleButton(0, 0, 140, BTN_HEIGHT, nil, self.buttonFullscreen)
     :setToggleState(app.fullscreen):setTooltip(_S.tooltip.options_window.fullscreen_button)
 
   -- Screen resolution
-  self:addBevelPanel(20, 70, 135, 20, col_shadow, col_bg, col_bg)
+  local screen_res_y_pos = self:_getOptionYPos()
+  self:addBevelPanel(20, screen_res_y_pos, BTN_WIDTH, BTN_HEIGHT, col_shadow, col_bg, col_bg)
     :setLabel(_S.options_window.resolution):setTooltip(_S.tooltip.options_window.resolution).lowered = true
+  self.resolution_panel = self:addBevelPanel(165, screen_res_y_pos, BTN_WIDTH, BTN_HEIGHT, col_bg):setLabel(app.config.width .. "x" .. app.config.height)
 
-  self.resolution_panel = self:addBevelPanel(165, 70, 135, 20, col_bg):setLabel(app.config.width .. "x" .. app.config.height)
-  self.resolution_button = self.resolution_panel:makeToggleButton(0, 0, 135, 20, nil, self.dropdownResolution):setTooltip(_S.tooltip.options_window.select_resolution)
+  self.resolution_button = self.resolution_panel:makeToggleButton(0, 0, BTN_WIDTH, BTN_HEIGHT, nil, self.dropdownResolution):setTooltip(_S.tooltip.options_window.select_resolution)
+
+  -- Mouse capture
+  local capture_mouse_y_pos = self:_getOptionYPos()
+  self:addBevelPanel(20, capture_mouse_y_pos, BTN_WIDTH, BTN_HEIGHT, col_shadow, col_bg, col_bg)
+    :setLabel(_S.options_window.capture_mouse):setTooltip(_S.tooltip.options_window.capture_mouse).lowered = true
+
+  self.mouse_capture_panel =
+    self:addBevelPanel(165, capture_mouse_y_pos, BTN_WIDTH, BTN_HEIGHT, col_bg):setLabel(app.config.capture_mouse and _S.options_window.option_on or _S.options_window.option_off)
+
+  self.mouse_capture_button = self.mouse_capture_panel:makeToggleButton(0, 0, BTN_WIDTH, BTN_HEIGHT, nil, self.buttonMouseCapture)
+    :setToggleState(app.config.capture_mouse):setTooltip(_S.tooltip.options_window.capture_mouse)
+
 
   -- Language
   -- Get language name in the language to normalize display.
@@ -117,30 +169,60 @@ function UIOptions:UIOptions(ui, mode)
   else
     lang = app.config.language
   end
-  self:addBevelPanel(20, 95, 135, 20, col_shadow, col_bg, col_bg)
+
+  local lang_y_pos = self:_getOptionYPos()
+  self:addBevelPanel(20, lang_y_pos, BTN_WIDTH, BTN_HEIGHT, col_shadow, col_bg, col_bg)
     :setLabel(_S.options_window.language):setTooltip(_S.tooltip.options_window.language).lowered = true
-  self.language_panel = self:addBevelPanel(165, 95, 135, 20, col_bg):setLabel(lang)
-  self.language_button = self.language_panel:makeToggleButton(0, 0, 135, 20, nil, self.dropdownLanguage):setTooltip(_S.tooltip.options_window.select_language)
+  self.language_panel = self:addBevelPanel(165, lang_y_pos, BTN_WIDTH, BTN_HEIGHT, col_bg):setLabel(lang)
+  self.language_button = self.language_panel:makeToggleButton(0, 0, BTN_WIDTH, BTN_HEIGHT, nil, self.dropdownLanguage):setTooltip(_S.tooltip.options_window.select_language)
 
   -- add the Audio global switch.
-  self:addBevelPanel(20, 120, 135, 20, col_shadow, col_bg, col_bg)
+  local audio_status = app:isAudioEnabled()
+  local audio_y_pos = self:_getOptionYPos()
+  self:addBevelPanel(20, audio_y_pos, BTN_WIDTH, BTN_HEIGHT, col_shadow, col_bg, col_bg)
     :setLabel(_S.options_window.audio):setTooltip(_S.tooltip.options_window.audio_button).lowered = true
   self.volume_panel =
-    self:addBevelPanel(165, 120, 135, 20, col_bg):setLabel(app.config.audio and _S.customise_window.option_on or _S.customise_window.option_off)
-  self.volume_button = self.volume_panel:makeToggleButton(0, 0, 135, 20, nil, self.buttonAudioGlobal)
-    :setToggleState(app.config.audio):setTooltip(_S.tooltip.options_window.audio_toggle)
+    self:addBevelPanel(165, audio_y_pos, BTN_WIDTH, BTN_HEIGHT, col_bg):setLabel(app.config.audio and audio_status and _S.customise_window.option_on or _S.customise_window.option_off)
+  self.volume_button = self.volume_panel:makeToggleButton(0, 0, BTN_WIDTH, BTN_HEIGHT, nil, self.buttonAudioGlobal)
+    :setToggleState(app.config.audio and audio_status):setTooltip(_S.tooltip.options_window.audio_toggle)
+  self.volume_button.enabled = audio_status
+
+  -- Set scroll speed.
+  local scroll_y_pos = self:_getOptionYPos()
+  self:addBevelPanel(20, scroll_y_pos, BTN_WIDTH, BTN_HEIGHT, col_shadow, col_bg, col_bg) : setLabel(_S.options_window.scrollspeed):setTooltip(_S.tooltip.options_window.scrollspeed).lowered = true
+  self.scrollspeed_panel = self:addBevelPanel(165, scroll_y_pos, BTN_WIDTH, BTN_HEIGHT, col_bg):setLabel(tostring(self.ui.app.config.scroll_speed))
+  self.scrollspeed_button = self.scrollspeed_panel : makeToggleButton(0, 0, BTN_WIDTH, BTN_HEIGHT, nil, self.buttonScrollSpeed) : setTooltip(_S.tooltip.options_window.scrollspeed)
+
+  -- Set shift scroll speed.
+  local shiftscroll_y_pos = self:_getOptionYPos()
+  self:addBevelPanel(20, shiftscroll_y_pos, BTN_WIDTH, BTN_HEIGHT, col_shadow, col_bg, col_bg) : setLabel(_S.options_window.shift_scrollspeed):setTooltip(_S.tooltip.options_window.shift_scrollspeed).lowered = true
+  self.shift_scrollspeed_panel = self:addBevelPanel(165, shiftscroll_y_pos, BTN_WIDTH, BTN_HEIGHT, col_bg):setLabel( tostring(self.ui.app.config.shift_scroll_speed) )
+  self.shift_scrollspeed_button = self.shift_scrollspeed_panel : makeToggleButton(0, 0, BTN_WIDTH, BTN_HEIGHT, nil, self.buttonShiftScrollSpeed) : setTooltip(_S.tooltip.options_window.shift_scrollspeed)
+
+  -- Set zoom speed.
+  local zoom_y_pos = self:_getOptionYPos()
+  self:addBevelPanel(20, zoom_y_pos, BTN_WIDTH, BTN_HEIGHT, col_shadow, col_bg, col_bg) : setLabel(_S.options_window.zoom_speed):setTooltip(_S.tooltip.options_window.zoom_speed).lowered = true
+  self.zoomspeed_panel = self:addBevelPanel(165, zoom_y_pos, BTN_WIDTH, BTN_HEIGHT, col_bg):setLabel( tostring(self.ui.app.config.zoom_speed) )
+  self.zoomspeed_button = self.zoomspeed_panel : makeToggleButton(0, 0, BTN_WIDTH, BTN_HEIGHT, nil, self.buttonZoomSpeed) : setTooltip(_S.tooltip.options_window.zoom_speed)
 
   -- "Customise" button
-  self:addBevelPanel(20, 150, 135, 30, col_bg):setLabel(_S.options_window.customise)
-    :makeButton(0, 0, 135, 30, nil, self.buttonCustomise):setTooltip(_S.tooltip.options_window.customise_button)
+  local customise_y_pos = self:_getOptionYPos()
+  self:addBevelPanel(20, customise_y_pos, BTN_WIDTH, 30, col_bg):setLabel(_S.options_window.customise)
+    :makeButton(0, 0, BTN_WIDTH, 30, nil, self.buttonCustomise):setTooltip(_S.tooltip.options_window.customise_button)
 
   -- "Folders" button
-  self:addBevelPanel(165, 150, 135, 30, col_bg):setLabel(_S.options_window.folder)
-    :makeButton(0, 0, 135, 30, nil, self.buttonFolder):setTooltip(_S.tooltip.options_window.folder_button)
+  self:addBevelPanel(165, customise_y_pos, BTN_WIDTH, 30, col_bg):setLabel(_S.options_window.folder)
+    :makeButton(0, 0, BTN_WIDTH, 30, nil, self.buttonFolder):setTooltip(_S.tooltip.options_window.folder_button)
 
+  -- "Hotkeys" button
+  local hotkey_y_pos = self:_getOptionYPos() + 10
+  self:addBevelPanel(20, hotkey_y_pos, 280, 40, col_bg):setLabel(_S.options_window.hotkey)
+    :makeButton(0, 0, 280, 40, nil, self.buttonHotkey):setTooltip(_S.tooltip.options_window.hotkey)
 
   -- "Back" button
-  self:addBevelPanel(20, 190, 280, 40, col_bg):setLabel(_S.options_window.back)
+  -- Give some extra space to back button. This is fine as long as it is the last button in the options menu
+  local back_button_y_pos = self:_getOptionYPos() + 30
+  self:addBevelPanel(20, back_button_y_pos, 280, 40, col_bg):setLabel(_S.options_window.back)
     :makeButton(0, 0, 280, 40, nil, self.buttonBack):setTooltip(_S.tooltip.options_window.back)
 end
 
@@ -152,12 +234,15 @@ local --[[persistable:options_height_textbox_reset]] function height_textbox_res
 function UIOptions:checkForAvailableLanguages()
   local app = self.app
   -- Set up list of available languages
-  local langs = {}
-  for _, lang in ipairs(app.strings.languages) do
+  local langs, c = {}, 1
+  for _, lang in pairs(app.strings.languages) do
     local font = app.strings:getFont(lang)
-    if app.gfx:hasLanguageFont(font) then
+    if app.gfx:hasLanguageFont(font) and app.strings.languages_english[lang] then
+      local eng_name = app.strings.languages_english[lang]
+      c = c + 1
       font = font and app.gfx:loadLanguageFont(font, app.gfx:loadSpriteTable("QData", "Font01V"))
-      langs[#langs + 1] = {text = lang, font = font, tooltip = _S.tooltip.options_window.language_dropdown_item:format(lang)}
+      langs[#langs + 1] = { text = lang, font = font,
+      tooltip = { _S.tooltip.options_window.language_dropdown_item:format(eng_name), nil, BTN_HEIGHT * c } }
     end
   end
   self.available_languages = langs
@@ -178,8 +263,9 @@ function UIOptions:dropdownLanguage(activate)
 end
 
 function UIOptions:selectLanguage(number)
+  local lang = self.app.strings.languages_english[self.available_languages[number]["text"]]
   local app = self.ui.app
-  app.config.language = (self.available_languages[number].text)
+  app.config.language = (lang)
   app:initLanguage()
   app:saveConfig()
 end
@@ -217,7 +303,21 @@ function UIOptions:selectResolution(number)
   end
 end
 
-function UIOptions:buttonFullscreen(checked)
+--! Changes check for update setting to on/of
+function UIOptions:toggleUpdateCheck()
+  self.ui.app.config.check_for_updates = not self.ui.app.config.check_for_updates
+  self.ui.app:saveConfig()
+end
+
+--! Function handles button toggle of checking for updates
+function UIOptions:buttonUpdates()
+  self:toggleUpdateCheck()
+  local new_updates_string = self.ui.app.config.check_for_updates and
+      _S.options_window.option_enabled or _S.options_window.option_disabled
+  self.updates_panel:setLabel(new_updates_string)
+end
+
+function UIOptions:buttonFullscreen()
   if not self.ui:toggleFullscreen() then
       local err = {_S.errors.unavailable_screen_size}
       self.ui:addWindow(UIInformation(self.ui, err))
@@ -226,6 +326,13 @@ function UIOptions:buttonFullscreen(checked)
   self.fullscreen_panel:setLabel(self.ui.app.fullscreen and _S.options_window.option_on or _S.options_window.option_off)
 end
 
+function UIOptions:buttonMouseCapture()
+  local app = self.ui.app
+  app.config.capture_mouse = not app.config.capture_mouse
+  app:saveConfig()
+  app:setCaptureMouse()
+  self.mouse_capture_button:setLabel(app.config.capture_mouse and _S.options_window.option_on or _S.options_window.option_off)
+end
 
 function UIOptions:buttonCustomise()
   local window = UICustomise(self.ui, "menu")
@@ -234,6 +341,11 @@ end
 
 function UIOptions:buttonFolder()
   local window = UIFolder(self.ui, "menu")
+  self.ui:addWindow(window)
+end
+
+function UIOptions:buttonHotkey()
+  local window = UIHotkeyAssign(self.ui, "menu")
   self.ui:addWindow(window)
 end
 
@@ -249,7 +361,7 @@ function UIOptions:buttonBrowseForTHInstall()
   self.ui:addWindow(browser)
 end
 
-function UIOptions:buttonAudioGlobal(checked)
+function UIOptions:buttonAudioGlobal()
   local app = self.ui.app
   app.config.audio = not app.config.audio
   app:saveConfig()
@@ -263,8 +375,39 @@ function UIOptions:buttonAudioGlobal(checked)
   app:initLanguage()
 end
 
+function UIOptions:buttonScrollSpeed()
+  local callback = function(scrollspeed_number)
+    self.scrollspeed_panel : setLabel(tostring(scrollspeed_number))
+    self.scrollspeed_button : setToggleState(false)
+  end
+
+  self.ui:addWindow(UIScrollSpeed(self.ui, callback))
+end
+
 function UIOptions:buttonBack()
   self:close()
+end
+
+function UIOptions:buttonShiftScrollSpeed()
+  local callback = function(shift_scrollspeed_number)
+    self.shift_scrollspeed_panel : setLabel( tostring(shift_scrollspeed_number) )
+    self.shift_scrollspeed_button : setToggleState(false)
+  end
+
+  self.ui:addWindow(UIShiftScrollSpeed(self.ui, callback))
+end
+
+function UIOptions:buttonBack()
+  self:close()
+end
+
+function UIOptions:buttonZoomSpeed()
+  local callback = function(zoomspeed_number)
+    self.zoomspeed_panel : setLabel( tostring(zoomspeed_number) )
+    self.zoomspeed_button : setToggleState(false)
+  end
+
+  self.ui:addWindow( UIZoomSpeed(self.ui, callback) )
 end
 
 function UIOptions:close()
@@ -326,7 +469,7 @@ function UIResolution:ok()
     local err = {_S.errors.minimum_screen_size}
     self.ui:addWindow(UIInformation(self.ui, err))
   elseif width > 3000 or height > 2000 then
-    self.ui:addWindow(UIConfirmDialog(self.ui,
+    self.ui:addWindow(UIConfirmDialog(self.ui, false,
       _S.confirmation.maximum_screen_size,
       --[[persistable:maximum_screen_size_confirm_dialog]]function()
       self:close(true)
@@ -344,5 +487,195 @@ function UIResolution:close(ok)
   UIResizable.close(self)
   if ok and self.callback then
     self.callback(tonumber(self.width_textbox.text) or 0, tonumber(self.height_textbox.text) or 0)
+  end
+end
+
+--! A window for setting the scroll speed of the camera.
+class "UIScrollSpeed" (UIResizable)
+
+---@type UIScrollSpeed
+local UIScrollSpeed = _G["UIScrollSpeed"]
+
+function UIScrollSpeed:UIScrollSpeed(ui, callback)
+  self:UIResizable(ui, 200, 140, col_bg)
+
+  self.on_top = true
+  self.esc_closes = true
+  self.resizable = false
+  self:setDefaultPosition(0.5, 0.5)
+  self.default_button_sound = "selectx.wav"
+  self.scrollspeed_temp = 2
+
+  self.callback = callback
+
+  self:addBevelPanel(20, 10, 160, 20, col_caption):setLabel(_S.options_window.scrollspeed).lowered = true
+
+  self:addBevelPanel(20, 50, 90, 20, col_shadow, col_bg, col_bg):setLabel(_S.options_window.scrollspeed)
+  --
+  self.scrollspeed_textbox = self:addBevelPanel(110, 50, 70, 20, col_textbox, col_highlight, col_shadow)
+    :setTooltip(_S.tooltip.options_window.scrollspeed)
+    :makeTextbox():allowedInput("numbers"):characterLimit(4):setText(tostring(self.ui.app.config.scroll_speed))
+
+  --Apply and cancel.
+  self:addBevelPanel(20, 90, 80, 40, col_bg):setLabel(_S.options_window.apply)
+    :makeButton(0, 0, 80, 40, nil, self.ok):setTooltip(_S.tooltip.options_window.apply_scrollspeed)
+  self:addBevelPanel(100, 90, 80, 40, col_bg):setLabel(_S.options_window.cancel)
+    :makeButton(0, 0, 80, 40, nil, self.cancel):setTooltip(_S.tooltip.options_window.cancel_scrollspeed)
+end
+
+function UIScrollSpeed:ok()
+  self.scrollspeed_temp = tonumber(self.scrollspeed_textbox.text) or 2
+
+  if self.scrollspeed_temp < 1 then
+    self.scrollspeed_temp = 1
+  elseif self.scrollspeed_temp > 10 then
+    self.scrollspeed_temp = 10
+  end
+
+  self:close(true)
+end
+
+function UIScrollSpeed:cancel()
+  self:close(false)
+end
+
+--!param ok (boolean or nil) whether the resolution entry was confirmed (true) or aborted (false)
+function UIScrollSpeed:close(ok)
+  UIResizable.close(self)
+
+  if ok then
+    self.scrollspeed_textbox.text = self.scrollspeed_temp or 2
+    self.ui.app.config.scroll_speed = self.scrollspeed_textbox.text
+    self.callback(self.scrollspeed_textbox.text)
+  else
+    self.callback(self.ui.app.config.scroll_speed)
+  end
+end
+
+
+--! A window for setting the scroll speed of the camera while pressing the SHIFT key..
+class "UIShiftScrollSpeed" (UIResizable)
+
+---@type UIShiftScrollSpeed
+local UIShiftScrollSpeed = _G["UIShiftScrollSpeed"]
+
+function UIShiftScrollSpeed:UIShiftScrollSpeed(ui, callback)
+  self:UIResizable(ui, 200, 140, col_bg)
+
+  self.on_top = true
+  self.esc_closes = true
+  self.resizable = false
+  self:setDefaultPosition(0.5, 0.5)
+  self.default_button_sound = "selectx.wav"
+  self.shift_scrollspeed_temp = 4
+
+  self.callback = callback
+
+  self:addBevelPanel(20, 10, 160, 20, col_caption):setLabel(_S.options_window.shift_scrollspeed).lowered = true
+
+  self:addBevelPanel(20, 50, 120, 20, col_shadow, col_bg, col_bg):setLabel(_S.options_window.shift_scrollspeed)
+  --
+  self.shift_scrollspeed_textbox = self:addBevelPanel(140, 50, 40, 20, col_textbox, col_highlight, col_shadow)
+    :setTooltip(_S.tooltip.options_window.shift_scrollspeed)
+    :makeTextbox():allowedInput("numbers"):characterLimit(4):setText(tostring(self.ui.app.config.shift_scroll_speed))
+
+  --Apply and cancel.
+  self:addBevelPanel(20, 90, 80, 40, col_bg):setLabel(_S.options_window.apply)
+    :makeButton(0, 0, 80, 40, nil, self.ok):setTooltip(_S.tooltip.options_window.apply_shift_scrollspeed)
+  self:addBevelPanel(100, 90, 80, 40, col_bg):setLabel(_S.options_window.cancel)
+    :makeButton(0, 0, 80, 40, nil, self.cancel):setTooltip(_S.tooltip.options_window.cancel_shift_scrollspeed)
+end
+
+function UIShiftScrollSpeed:ok()
+  self.shift_scrollspeed_temp = tonumber(self.shift_scrollspeed_textbox.text) or 4
+
+  if self.shift_scrollspeed_temp < 1 then
+    self.shift_scrollspeed_temp = 1
+  elseif self.shift_scrollspeed_temp > 10 then
+    self.shift_scrollspeed_temp = 10
+  end
+
+  self:close(true)
+end
+
+function UIShiftScrollSpeed:cancel()
+  self:close(false)
+end
+
+--!param ok (boolean or nil) whether the resolution entry was confirmed (true) or aborted (false)
+function UIShiftScrollSpeed:close(ok)
+  UIResizable.close(self)
+
+  if ok then
+    self.shift_scrollspeed_textbox.text = self.shift_scrollspeed_temp or 4
+    self.ui.app.config.shift_scroll_speed = self.shift_scrollspeed_textbox.text
+    self.callback(self.shift_scrollspeed_textbox.text)
+  else
+    self.callback(self.ui.app.config.shift_scroll_speed)
+  end
+end
+
+--! Window to set the zoom speed of the scroll wheel while in-game.
+class "UIZoomSpeed" (UIResizable)
+
+---@type UIZoomSpeed
+local UIZoomSpeed = _G["UIZoomSpeed"]
+
+function UIZoomSpeed:UIZoomSpeed(ui, callback)
+  self:UIResizable(ui, 200, 140, col_bg)
+
+  self.on_top = true
+  self.esc_closes = true
+  self.resizable = false
+  self:setDefaultPosition(0.5, 0.5)
+  self.default_button_sound = "selectx.wav"
+  self.zoomspeed_temp = 80
+
+  self.callback = callback
+
+  --
+  self:addBevelPanel(20, 10, 160, 20, col_caption):setLabel(_S.options_window.zoom_speed).lowered = true
+
+  --
+  self:addBevelPanel(20, 50, 90, 20, col_shadow, col_bg, col_bg):setLabel(_S.options_window.zoom_speed)
+
+  --
+  self.zoomspeed_textbox = self:addBevelPanel(110, 50, 70, 20, col_textbox, col_highlight, col_shadow)
+    :setTooltip(_S.tooltip.options_window.zoom_speed)
+    :makeTextbox():allowedInput("numbers"):characterLimit(4):setText( tostring(self.ui.app.config.zoom_speed) )
+
+  --Apply and cancel.
+  self:addBevelPanel(20, 90, 80, 40, col_bg):setLabel(_S.options_window.apply)
+    :makeButton(0, 0, 80, 40, nil, self.ok):setTooltip(_S.tooltip.options_window.apply_zoomspeed)
+  self:addBevelPanel(100, 90, 80, 40, col_bg):setLabel(_S.options_window.cancel)
+    :makeButton(0, 0, 80, 40, nil, self.cancel):setTooltip(_S.tooltip.options_window.cancel_zoomspeed)
+end
+
+function UIZoomSpeed:ok()
+  self.zoomspeed_temp = tonumber( self.zoomspeed_textbox.text ) or 80
+
+  if self.zoomspeed_temp < 10 then
+    self.zoomspeed_temp = 10
+  elseif self.zoomspeed_temp > 1000 then
+    self.zoomspeed_temp = 1000
+  end
+
+  self:close(true)
+end
+
+function UIZoomSpeed:cancel()
+  self:close(false)
+end
+
+--!param ok (boolean or nil) whether the resolution entry was confirmed (true) or aborted (false)
+function UIZoomSpeed:close(ok)
+  UIResizable.close(self)
+
+  if ok then
+    self.zoomspeed_textbox.text = self.zoomspeed_temp or 2
+    self.ui.app.config.zoom_speed = self.zoomspeed_textbox.text
+    self.callback(self.zoomspeed_textbox.text)
+  else
+    self.callback(self.ui.app.config.zoom_speed)
   end
 end

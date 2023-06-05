@@ -30,7 +30,7 @@ object.idle_animations = {
   west = 106,
 }
 
-dofile "queue"
+corsixth.require("queue")
 
 class "Door" (Object)
 
@@ -54,6 +54,7 @@ function Door:getRoom()
   return self.room
 end
 
+--! Updates a door's dynamic info
 function Door:updateDynamicInfo()
   if self.room and self.queue then
     if not self.room:hasQueueDialog() then
@@ -145,7 +146,7 @@ end
 
 function Door:closeDoor()
   if self.queue then
-    self.queue:rerouteAllPatients(SeekRoomAction(self:getRoom().room_info.id))
+    self.queue:rerouteAllPatients(self:getRoom().room_info.id)
     self.queue = nil
   end
   self:clearDynamicInfo(nil)
@@ -166,6 +167,8 @@ function Door:checkForDeadlock()
     for _, action in ipairs(self.reserved_for.action_queue) do
       if action.name == "queue" then
         if action.queue ~= self.queue or self.queue[1] ~= self.reserved_for then
+          self.world:gameLog("Warning: Trying to resolve door deadlock at ("
+              .. tostring(self.tile_x) .. ", " .. tostring(self.tile_y) .. ")")
           self.reserved_for = nil
           self:getRoom():tryAdvanceQueue()
         end
@@ -189,5 +192,7 @@ function Door:afterLoad(old, new)
       map:setCellFlags(self.tile_x, self.tile_y - 1, flags_to_set)
     end
   end
+  self:updateDynamicInfo()
+  Object.afterLoad(self, old, new)
 end
 return object

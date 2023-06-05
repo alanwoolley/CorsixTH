@@ -28,7 +28,7 @@ function DieAction:DieAction()
 end
 
 local action_die_tick; action_die_tick = permanent"action_die_tick"( function(humanoid)
-  local action = humanoid.action_queue[1]
+  local action = humanoid:getCurrentAction()
   local phase = action.phase
   local mirror = humanoid.last_move_direction == "east" and 0 or 1
   if phase == 0 then
@@ -69,7 +69,7 @@ local action_die_tick; action_die_tick = permanent"action_die_tick"( function(hu
 end)
 
 local action_die_tick_reaper; action_die_tick_reaper = permanent"action_die_tick_reaper"( function(humanoid)
-  local action = humanoid.action_queue[1]
+  local action = humanoid:getCurrentAction()
   local mirror = humanoid.last_move_direction == "east" and 0 or 1
   local phase = action.phase
 
@@ -102,8 +102,8 @@ local action_die_tick_reaper; action_die_tick_reaper = permanent"action_die_tick
     local mirror_grim = 0
 
     local spawn_scenarios = {
-      {"south", humanoid.tile_x, humanoid.tile_y + 4, 0, 1, "north", 0, -1, {{after_spawn_idle_direction = "east", hole_x_offset = -5, hole_y_offset = 2}, {hole_x_offset = 0, hole_y_offset = 3}} },
-      {"east", humanoid.tile_x + 4, humanoid.tile_y, 1, 0, "west",  -1,  0, {{hole_x_offset = 3, hole_y_offset = 0}} }
+      {"south", humanoid.tile_x, humanoid.tile_y + 4, 1, 0, "west", -1, 0, {{after_spawn_idle_direction = "east", hole_x_offset = -5, hole_y_offset = 2}, {hole_x_offset = 0, hole_y_offset = 3}} },
+      {"east", humanoid.tile_x + 4, humanoid.tile_y, 0, 1, "north", 0, -1, {{hole_x_offset = 3, hole_y_offset = 0}} }
     }
 
     ---
@@ -114,13 +114,22 @@ local action_die_tick_reaper; action_die_tick_reaper = permanent"action_die_tick
       hole_x, hole_y = humanoid.world.pathfinder:findIdleTile(spawn_scenario[2], spawn_scenario[3], 0)
 
       if hole_x and humanoid.world:canNonSideObjectBeSpawnedAt(hole_x, hole_y, "gates_to_hell", holes_orientation, 0, 0) then
-        if holes_orientation == "east" then
+        if holes_orientation == "south" then
           mirror_grim = 1
         end
         grim_use_tile_x = hole_x + spawn_scenario[4]
         grim_use_tile_y = hole_y + spawn_scenario[5]
         humanoid.hole_use_tile_x = hole_x + spawn_scenario[7]
         humanoid.hole_use_tile_y = hole_y + spawn_scenario[8]
+        -- tile can't be in a room and must be accessible by the patient
+        if not humanoid.world:getPathDistance(humanoid.tile_x, humanoid.tile_y, humanoid.hole_use_tile_x, humanoid.hole_use_tile_y)
+            or humanoid.world:getRoom(humanoid.hole_use_tile_x, humanoid.hole_use_tile_y) then
+          return false
+        end
+        -- ensure grim won't be in a room
+        if humanoid.world:getRoom(grim_use_tile_x, grim_use_tile_y) then
+          return false
+        end
         --Ensure that the lava hole is passable on at least one of its sides to prevent it from blocking 1 tile wide corridors:
         humanoid.world.map:setCellFlags(hole_x, hole_y, {passable = false})
         local hole_has_passable_side = humanoid.world:getPathDistance(grim_use_tile_x, grim_use_tile_y, humanoid.hole_use_tile_x, humanoid.hole_use_tile_y) == 4
@@ -133,7 +142,8 @@ local action_die_tick_reaper; action_die_tick_reaper = permanent"action_die_tick
         for _, find_grim_spawn_attempt in ipairs(spawn_scenario[9]) do
           grim_spawn_idle_direction = find_grim_spawn_attempt.after_spawn_idle_direction or spawn_scenario[6]
           grim_x, grim_y = humanoid.world.pathfinder:findIdleTile(hole_x + find_grim_spawn_attempt.hole_x_offset, hole_y + find_grim_spawn_attempt.hole_y_offset, 0)
-          if grim_x and not humanoid.world:getRoom(grim_x, grim_y) then
+          if grim_x and not humanoid.world:getRoom(grim_x, grim_y)
+              and humanoid.world:getPathDistance(grim_x, grim_y, grim_use_tile_x, grim_use_tile_y) then
             grim_cant_walk_to_use_tile = false
             break
           end
@@ -257,49 +267,13 @@ local function action_die_start(action, humanoid)
   local anims = humanoid.die_anims
   assert(anims, "Error: no death animation for humanoid ".. humanoid.humanoid_class)
   action.must_happen = true
-  -- TODO: Right now the angel version of death is the only possibility
-  -- The Grim Reaper should sometimes also have a go.
   local fall = anims.fall_east
 
   --If this isn't done their bald head will become bloated instead of suddenly having hair:
   if humanoid.disease.id == "baldness" then humanoid:setLayer(0,2) end
 
-  --[[Make the patient fall over: because this animation requires two tiles make sure there's
-  enough space for this animation--]]
-  local mirror_fall
-  local east_tile_usable = humanoid.world:isTileEmpty(humanoid.tile_x + 1, humanoid.tile_y, true)
-  local south_tile_usable = humanoid.world:isTileEmpty(humanoid.tile_x, humanoid.tile_y + 1, true)
-  --Are the preferred fall directions usable?
-  if preferred_fall_direction == "east" and east_tile_usable then
-    humanoid.last_move_direction = "east"
-    mirror_fall = 0
-  elseif preferred_fall_direction == "south" and south_tile_usable then
-    humanoid.last_move_direction = "south"
-    mirror_fall = 1
-  else
-    --If the preferred direction isn't usable try the other direction:
-    if east_tile_usable then
-      humanoid.last_move_direction = "east"
-      mirror_fall = 0
-    elseif south_tile_usable then
-      humanoid.last_move_direction = "south"
-      mirror_fall = 1
-    --[[If the patient's last move direction was east or south then there could be no fall space available so this else
-      closure makes them walk to an accessible adjacent tile so that they can then fall on to their current tile:]]--
-    else
-      -- Either the west or north tile will be accessible because this else closure can only be reached if the tiles adjacent to
-      -- the patient east and south are blocked and this game doesn't allow patients to become stuck by having all the tiles
-      -- adjacent to them become obstructed by objects and/or rooms:
-      if humanoid.world:isTileEmpty(humanoid.tile_x - 1, humanoid.tile_y, true) then
-        humanoid:walkTo(humanoid.tile_x - 1, humanoid.tile_y)
-      else
-        humanoid:walkTo(humanoid.tile_x, humanoid.tile_y - 1)
-      end
-      humanoid:queueAction(DieAction())
-      humanoid:finishAction()
-      return
-    end
-  end
+  local mirror_fall = preferred_fall_direction == "east" and 0 or 1
+  humanoid.last_move_direction = preferred_fall_direction
 
   humanoid:setAnimation(anims.fall_east, mirror_fall)
 

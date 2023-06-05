@@ -24,8 +24,8 @@ SOFTWARE.
 #define CORSIX_TH_RLE_H_
 #include "config.h"
 
-class LuaPersistReader;
-class LuaPersistWriter;
+class lua_persist_reader;
+class lua_persist_writer;
 
 //! Encoder for reducing the amount of space to store a sequence of integers
 /*!
@@ -39,96 +39,94 @@ class LuaPersistWriter;
       * Object - One or more records. Each object has an associated repeat
                  count.
 */
-class IntegerRunLengthEncoder
-{
-public:
-    IntegerRunLengthEncoder();
-    ~IntegerRunLengthEncoder();
+class integer_run_length_encoder {
+ public:
+  integer_run_length_encoder();
+  ~integer_run_length_encoder();
 
-    //! (Re-)initialise the encoder
-    /*!
-        Prepares the encoder for accepting a sequence of records.
+  //! (Re-)initialise the encoder
+  /*!
+      Prepares the encoder for accepting a sequence of records.
 
-        \param iRecordSize The number of integers in a record.
-    */
-    bool initialise(size_t iRecordSize);
+      \param iRecordSize The number of integers in a record.
+  */
+  bool initialise(size_t iRecordSize);
 
-    //! Supply the next integer in the input sequence to the encoder
-    void write(uint32_t iValue);
+  //! Supply the next integer in the input sequence to the encoder
+  void write(uint32_t iValue);
 
-    //! Inform the encoder that the input sequence has finished
-    /*!
-        finish() must be called prior to getOutput() or pumpOutput().
-        write() must not be called after finish() has been called.
-    */
-    void finish();
+  //! Inform the encoder that the input sequence has finished
+  /*!
+      finish() must be called prior to getOutput() or pumpOutput().
+      write() must not be called after finish() has been called.
+  */
+  void finish();
 
-    uint32_t* getOutput(size_t *pCount) const;
-    void pumpOutput(LuaPersistWriter *pWriter) const;
+  uint32_t* get_output(size_t* pCount) const;
+  void pump_output(lua_persist_writer* pWriter) const;
 
-private:
-    void _clean();
+ private:
+  void clean();
 
-    //! Reduce the amount of data in the buffer
-    /*!
-        \param bAll If true, will reduce m_iBufferSizeUsed to zero.
-                    If false, will reduce m_iBufferSizeUsed by some amount.
-    */
-    void _flush(bool bAll);
+  //! Reduce the amount of data in the buffer
+  /*!
+      \param bAll If true, will reduce buffer_size to zero.
+                  If false, will reduce buffer_size by some amount.
+  */
+  void flush(bool bAll);
 
-    bool _areRangesEqual(size_t iObjIdx1, size_t iObjIdx2, size_t iOffset, size_t iObjSize) const;
-    bool _output(size_t iObjSize, size_t iObjCount);
+  bool are_ranges_equal(size_t iObjIdx1, size_t iObjIdx2, size_t iOffset,
+                        size_t iObjSize) const;
+  bool move_object_to_output(size_t iObjSize, size_t iObjCount);
 
-    //! A circular fixed-size buffer holding the most recent input
-    uint32_t* m_pBuffer;
-    //! A variable-length array holding the output sequence
-    uint32_t* m_pOutput;
-    //! The number of integers in a record
-    size_t m_iRecordSize;
-    //! The maximum number of integers stored in the buffer
-    size_t m_iBufferSize;
-    //! The current number of integers stored in the buffer
-    size_t m_iBufferSizeUsed;
-    //! The index into m_pBuffer of the 1st integer
-    size_t m_iBufferOffset;
-    //! The maximum number of integers storable in the output (before the
-    //! output array has to be resized).
-    size_t m_iOutputSize;
-    //! The current number of integers stored in the output
-    size_t m_iOutputSizeUsed;
-    //! The number of integers in the current object (multiple of record size)
-    size_t m_iObjectSize;
-    //! The number of copies of the current object already seen and removed
-    //! from the buffer.
-    size_t m_iObjectCount;
+  //! A circular fixed-size buffer holding the most recent input
+  uint32_t* buffer;
+  //! A variable-length array holding the output sequence
+  uint32_t* output;
+  //! The number of integers in a record
+  size_t record_size;
+  //! The maximum number of integers stored in the buffer
+  size_t buffer_capacity;
+  //! The current number of integers stored in the buffer
+  size_t buffer_size;
+  //! The index into buffer of the 1st integer
+  size_t buffer_offset;
+  //! The maximum number of integers storable in the output (before the
+  //! output array has to be resized).
+  size_t output_capacity;
+  //! The current number of integers stored in the output
+  size_t output_size;
+  //! The number of integers in the current object (multiple of record size)
+  size_t object_size;
+  //! The number of copies of the current object already seen and removed
+  //! from the buffer.
+  size_t object_copies;
 };
 
-class IntegerRunLengthDecoder
-{
-public:
-    IntegerRunLengthDecoder();
-    ~IntegerRunLengthDecoder();
+class integer_run_length_decoder {
+ public:
+  integer_run_length_decoder();
+  ~integer_run_length_decoder();
 
-    bool initialise(size_t iRecordSize, LuaPersistReader *pReader);
-    bool initialise(size_t iRecordSize, const uint32_t *pInput, size_t iCount);
-    uint32_t read();
-    bool isFinished() const;
+  bool initialise(size_t iRecordSize, lua_persist_reader* pReader);
+  bool initialise(size_t iRecordSize, const uint32_t* pInput, size_t iCount);
+  uint32_t read();
+  bool is_finished() const;
 
-private:
-    void _clean();
+ private:
+  void clean();
 
-    uint32_t* m_pBuffer;
-    LuaPersistReader* m_pReader;
-    const uint32_t* m_pInput;
-    union
-    {
-        const uint32_t* m_pInputEnd;
-        size_t m_iNumReadsRemaining;
-    };
-    size_t m_iRepeatCount;
-    size_t m_iRecordSize;
-    size_t m_iObjectIndex;
-    size_t m_iObjectSize;
+  uint32_t* buffer;
+  lua_persist_reader* reader;
+  const uint32_t* input;
+  union {
+    const uint32_t* input_end;
+    size_t reads_remaining;
+  };
+  size_t object_copies;
+  size_t record_size;
+  size_t object_index;
+  size_t object_size;
 };
 
-#endif // CORSIX_TH_RLE_H_
+#endif  // CORSIX_TH_RLE_H_

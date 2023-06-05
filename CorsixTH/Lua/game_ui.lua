@@ -18,7 +18,8 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE. --]]
 
-dofile "ui"
+corsixth.require("ui")
+corsixth.require("announcer")
 
 --! Variant of UI for running games
 class "GameUI" (UI)
@@ -26,7 +27,9 @@ class "GameUI" (UI)
 ---@type GameUI
 local GameUI = _G["GameUI"]
 
-local TH = require "TH"
+local TH = require("TH")
+
+local Announcer = _G["Announcer"]
 
 -- The maximum distance to shake the screen from the origin during an
 -- earthquake with full intensity.
@@ -44,6 +47,7 @@ local multigesture_pinch_amplification_factor = 0.05
 --!param map_editor (bool) Whether the map is editable.
 function GameUI:GameUI(app, local_hospital, map_editor)
   self:UI(app)
+  self.app = app
 
   self.hospital = local_hospital
   self.tutorial = { chapter = 0, phase = 0 }
@@ -81,12 +85,11 @@ function GameUI:GameUI(app, local_hospital, map_editor)
   self.transparent_walls = false
   self.do_world_hit_test = true
 
-  self:setRandomAnnouncementTarget()
-  self.ticks_since_last_announcement = 0
-
   self.momentum = app.config.scrolling_momentum
   self.current_momentum = {x = 0.0, y = 0.0, z = 0.0}
   self.multigesturemove = {x = 0.0, y = 0.0}
+
+  self.recallpositions = {}
 
   self.speed_up_key_pressed = false
 
@@ -94,24 +97,76 @@ function GameUI:GameUI(app, local_hospital, map_editor)
   -- the effect from the implementation this value is a number between 0
   -- and 1.
   self.shake_screen_intensity = 0
+
+  self.announcer = Announcer(app)
 end
 
 function GameUI:setupGlobalKeyHandlers()
   UI.setupGlobalKeyHandlers(self)
 
-  self:addKeyHandler("escape", self, self.setEditRoom, false)
-  self:addKeyHandler("escape", self, self.showMenuBar)
-  self:addKeyHandler("z", self, self.keySpeedUp)
-  self:addKeyHandler("x", self, self.keyTransparent)
-  self:addKeyHandler({"shift", "a"}, self, self.toggleAdviser)
-  self:addKeyHandler({"ctrl", "d"}, self.app.world, self.app.world.dumpGameLog)
-  self:addKeyHandler({"ctrl", "t"}, self.app, self.app.dumpStrings)
-  self:addKeyHandler({"alt", "a"}, self, self.togglePlayAnnouncements)
-  self:addKeyHandler({"alt", "s"}, self, self.togglePlaySounds)
-  self:addKeyHandler({"alt", "m"}, self, self.togglePlayMusic)
+  -- Set the scrolling keys.
+  self.scroll_keys = {
+     [tostring(self.app.hotkeys["ingame_scroll_up"])] = {x = 0, y = -10},
+     [tostring(self.app.hotkeys["ingame_scroll_down"])] = {x = 0, y = 10},
+     [tostring(self.app.hotkeys["ingame_scroll_left"])] = {x = -10, y = 0},
+     [tostring(self.app.hotkeys["ingame_scroll_right"])] = {x = 10, y = 0},
+  }
+
+  -- This is the long version of the shift speed key.
+  -- i.e. if the "ingame_scroll_shift" key is "ctrl", then it will give us
+  --  "left ctrl" and "right ctrl" for reference against the rawchar in
+  --  "onKeyDown()" and "onKeyUp()"
+  self.shift_scroll_key_long = {}
+  self.shift_scroll_speed_pressed = false
+  local temp_table = {}
+  local shift_scroll_key_index = 1
+  if type(self.app.hotkeys["ingame_scroll_shift"]) == "string" then
+    temp_table = {self.app.hotkeys["ingame_scroll_shift"]}
+  elseif type(self.app.hotkeys["ingame_scroll_shift"]) == "table" then
+    temp_table = shallow_clone(self.app.hotkeys["ingame_scroll_shift"])
+  end
+  -- Go through the "ingame_scroll_shift" key table and see if it has any modifier names.
+  for _, v in pairs (temp_table) do
+    -- If it does then add long name version of them into the long key table.
+    if v == "ctrl" then
+      self.shift_scroll_key_long[shift_scroll_key_index] = "left ctrl"
+      shift_scroll_key_index = shift_scroll_key_index + 1
+      self.shift_scroll_key_long[shift_scroll_key_index] = "right ctrl"
+      shift_scroll_key_index = shift_scroll_key_index + 1
+    elseif v == "alt" then
+      self.shift_scroll_key_long[shift_scroll_key_index] = "left alt"
+      shift_scroll_key_index = shift_scroll_key_index + 1
+      self.shift_scroll_key_long[shift_scroll_key_index] = "right alt"
+      shift_scroll_key_index = shift_scroll_key_index + 1
+    elseif v == "shift" then
+      self.shift_scroll_key_long[shift_scroll_key_index] = "left shift"
+      shift_scroll_key_index = shift_scroll_key_index + 1
+      self.shift_scroll_key_long[shift_scroll_key_index] = "right shift"
+      shift_scroll_key_index = shift_scroll_key_index + 1
+    end
+  end
+
+  self:addKeyHandler("global_window_close", self, self.setEditRoom, false)
+  self:addKeyHandler("ingame_showmenubar", self, self.showMenuBar)
+  self:addKeyHandler("ingame_gamespeed_speedup", self, self.keySpeedUp)
+  self:addKeyHandler("ingame_setTransparent", self, self.keyTransparent)
+  self:addKeyHandler("ingame_toggleAdvisor", self, self.toggleAdviser)
+  self:addKeyHandler("ingame_poopLog", self.app.world, self.app.world.dumpGameLog)
+  self:addKeyHandler("ingame_poopStrings", self.app, self.app.dumpStrings)
+  self:addKeyHandler("ingame_toggleAnnouncements", self, self.togglePlayAnnouncements)
+  self:addKeyHandler("ingame_toggleSounds", self, self.togglePlaySounds)
+  self:addKeyHandler("ingame_toggleMusic", self, self.togglePlayMusic)
+
+  -- scroll to map position
+  for i = 0, 9 do
+    -- set camera view
+    self:addKeyHandler(string.format("ingame_storePosition_%d", i), self, self.setMapRecallPosition, i)
+    -- recall camera view
+    self:addKeyHandler(string.format("ingame_recallPosition_%d", i), self, self.recallMapPosition, i)
+  end
 
   if self.app.config.debug then
-    self:addKeyHandler("f11", self, self.showCheatsWindow)
+    self:addKeyHandler("ingame_showCheatWindow", self, self.showCheatsWindow)
   end
 end
 
@@ -194,7 +249,7 @@ function GameUI:draw(canvas)
   local dy = self.screen_offset_y +
       math.floor((0.5 - math.random()) * self.shake_screen_intensity * shake_screen_max_movement * 2)
   if canvas:scale(zoom) then
-    app.map:draw(canvas, dx, dy, math.floor(config.width / zoom), math.floor(config.height / zoom), 0, 0)
+    app.map:draw(canvas, dx, dy, math.ceil(config.width / zoom), math.ceil(config.height / zoom), 0, 0)
     canvas:scale(1)
   else
     self:setZoom(1)
@@ -253,26 +308,22 @@ function GameUI:resync(ui)
   self.key_to_button_remaps = ui.key_to_button_remaps
 end
 
-local scroll_keys = {
-  up    = {x =   0, y = -10},
-  right = {x =  10, y =   0},
-  down  = {x =   0, y =  10},
-  left  = {x = -10, y =   0},
-  ["keypad 8"] = {x =   0, y = -10},
-  ["keypad 6"] = {x =  10, y =   0},
-  ["keypad 2"] = {x =   0, y =  10},
-  ["keypad 4"] = {x = -10, y =   0},
-}
-
 function GameUI:updateKeyScroll()
   local dx, dy = 0, 0
-  for key, scr in pairs(scroll_keys) do
+  for key, scr in pairs(self.scroll_keys) do
     if self.buttons_down[key] then
       dx = dx + scr.x
       dy = dy + scr.y
     end
   end
+  --If there is any movement on the x or y axis...
   if dx ~= 0 or dy ~= 0 then
+    --Get the length of the scrolling vector.
+    local mag = (dx^2 + dy^2) ^ 0.5
+    --Then normalize the scrolling vector, after which multiply it by the scroll speed variable used in self.scroll_keys, which is 10 as of 14/10/18.
+    dx = (dx / mag) * 10
+    dy = (dy / mag) * 10
+    -- Set the scroll amount to be used.
     self.tick_scroll_amount = {x = dx, y = dy}
     return true
   else
@@ -296,7 +347,13 @@ function GameUI:onKeyDown(rawchar, modifiers, is_repeat)
     return true
   end
   local key = rawchar:lower()
-  if scroll_keys[key] then
+  -- If key is shift speed key...
+  for _, v in pairs(self.shift_scroll_key_long) do
+    if v == key then
+      self.shift_scroll_speed_pressed = true
+    end
+  end
+  if self.scroll_keys[key] then
     self:updateKeyScroll()
     return
   end
@@ -308,7 +365,12 @@ function GameUI:onKeyUp(rawchar)
   end
 
   local key = rawchar:lower()
-  if scroll_keys[key] then
+  for _, v in pairs(self.shift_scroll_key_long) do
+    if v == key then
+      self.shift_scroll_speed_pressed = false
+    end
+  end
+  if self.scroll_keys[key] then
     self:updateKeyScroll()
     return
   end
@@ -362,7 +424,8 @@ function GameUI:onCursorWorldPositionChange()
   local x = math.floor(self.screen_offset_x + self.cursor_x / zoom)
   local y = math.floor(self.screen_offset_y + self.cursor_y / zoom)
   local entity = nil
-  if self.do_world_hit_test and not self:hitTest(self.cursor_x, self.cursor_y) then
+  local overwindow = self:hitTest(self.cursor_x, self.cursor_y)
+  if self.do_world_hit_test and not overwindow then
     entity = self.app.map.th:hitTestObjects(x, y)
     if self.do_world_hit_test ~= true then
       -- limit to non-door objects in room
@@ -415,8 +478,17 @@ function GameUI:onCursorWorldPositionChange()
   wx = math.floor(wx)
   wy = math.floor(wy)
   local room
-  if wx > 0 and wy > 0 and wx < self.app.map.width and wy < self.app.map.height then
+  if not overwindow and wx > 0 and wy > 0 and wx < self.app.map.width and wy < self.app.map.height then
     room = self.app.world:getRoom(wx, wy)
+  end
+  -- Find the room associated with the current entity (Usually only applies to doors)
+  if entity and not room then
+    if entity.room then
+      room = entity.room
+    elseif entity.object_type and entity.object_type.id == "swing_door_left" then
+      -- Special case to catch the non-dominant side of a double-door
+      room = entity.master.room
+    end
   end
   if room ~= self.cursor_room then
     -- Unset queue mood for patients queueing the old room
@@ -475,6 +547,10 @@ end
 
 -- TODO: try to remove duplication with UI:onMouseMove
 function GameUI:onMouseMove(x, y, dx, dy)
+  if self.mouse_released then
+    return false
+  end
+
   local repaint = UpdateCursorPosition(self.app.video, x, y)
   if self.app.moviePlayer.playing then
     return false
@@ -555,7 +631,8 @@ function GameUI:onMouseMove(x, y, dx, dy)
     --map.th:setCell(highlight_x, highlight_y, 4, 0)
     highlight_x = nil
   end
-  if 1 <= wx and wx <= 128 and 1 <= wy and wy <= 128 then
+  local map_width, map_height = map.th:size()
+  if 1 <= wx and wx <= map_width and 1 <= wy and wy <= map_height then
     if map.th:getCellFlags(wx, wy).passable then
       --map.th:setCell(wx, wy, 4, 24 + 8 * 256)
       highlight_x = wx
@@ -590,10 +667,27 @@ function GameUI:onMouseUp(code, x, y)
     else -- No room chosen yet, but about to edit one.
       if button == "left" then -- Take the clicked one.
         local room = self.app.world:getRoom(self:ScreenToWorld(x, y))
-        if room and not room.crashed then
-          self:setCursor(self.waiting_cursor)
-          self.edit_room = room
-          room:tryToEdit()
+        if room then
+          if not room.crashed then
+            self:setCursor(self.waiting_cursor)
+            self.edit_room = room
+            room:tryToEdit()
+          else
+            if self.app.config.remove_destroyed_rooms then
+              local room_cost = room:calculateRemovalCost()
+              self:setEditRoom(false)
+              -- show confirmation dialog for removing the room
+              self:addWindow(UIConfirmDialog(self, false, _S.confirmation.remove_destroyed_room:format(room_cost),
+              --[[persistable:remove_destroyed_room_confirm_dialog]]function()
+                local world = room.world
+                UIEditRoom:removeRoom(false, room, world)
+                world:resetSideObjects()
+                world.rooms[room.id] = nil
+                self.hospital:spendMoney(room_cost, _S.transactions.remove_room)
+                end
+              ))
+            end
+          end
         end
       else -- right click, we don't want to edit a room after all.
         self:setEditRoom(false)
@@ -629,7 +723,7 @@ end
 --!param x (float) normalised x value of the gesture
 --!param y (float) normalised y value of the gesture
 --!return (boolean) event processed indicator
-function GameUI:onMultiGesture(numfingers, dTheta, dDist, x, y)
+function GameUI:onMultiGesture(numfingers, dTheta, dDist, x, y) -- luacheck: ignore 212 dTheta
   -- only deal with 2 finger events for now
   if numfingers == 2 then
     -- calculate magnitude of pinch
@@ -682,16 +776,29 @@ function GameUI:onMouseWheel(x, y)
   return UI.onMouseWheel(self, x, y)
 end
 
-function GameUI:setRandomAnnouncementTarget()
-  -- NB: Every tick is 30ms, so 2000 ticks is 1 minute
-  self.random_announcement_ticks_target = math.random(8000, 12000)
+--! Announcements to the player.
+--!param msgs (array of string) Messages to select from.
+--!param priority (optional valid AnnouncementPriority selection) Priority of announcement
+--!param chance_to_play (optional float in range (0, 1]) Fraction of times that the
+--    call actually says something.
+--!return (boolean) Whether a message was given to the user.
+function GameUI:playRandomAnnouncement(msgs, priority, chance_to_play, played_callback, played_callback_delay)
+  local max_rnd = #msgs
+  if chance_to_play and chance_to_play > 0 and chance_to_play < 1 then
+    -- Scale by the fraction.
+    max_rnd = math.floor(max_rnd / chance_to_play)
+  end
+
+  local index = (max_rnd == 1) and 1 or math.random(1, max_rnd)
+  if index <= #msgs then
+    self:playAnnouncement(msgs[index], priority, played_callback, played_callback_delay)
+    return true
+  end
+  return false
 end
 
-function GameUI:playAnnouncement(name, played_callback, played_callback_delay)
-  self.ticks_since_last_announcement = 0
-  if self.app.world:getLocalPlayerHospital():hasStaffedDesk() then
-    UI.playAnnouncement(self, name, played_callback, played_callback_delay)
-  end
+function GameUI:playAnnouncement(name, priority, played_callback, played_callback_delay)
+  self.announcer:playAnnouncement(name, priority, played_callback, played_callback_delay)
 end
 
 function GameUI:onTick()
@@ -714,15 +821,6 @@ function GameUI:onTick()
     end
     self.multigesturemove.x = 0.0
     self.multigesturemove.y = 0.0
-  end
-  if not self.app.world:isCurrentSpeed("Pause") then
-    local ticks_since_last_announcement = self.ticks_since_last_announcement
-    if ticks_since_last_announcement >= self.random_announcement_ticks_target then
-      self:playAnnouncement("rand*.wav")
-      self:setRandomAnnouncementTarget()
-    else
-      self.ticks_since_last_announcement = ticks_since_last_announcement + 1
-    end
   end
   if self.tick_scroll_amount or self.tick_scroll_amount_mouse then
     -- The scroll amount per tick gradually increases as the duration of the
@@ -758,7 +856,7 @@ function GameUI:onTick()
     -- By multiplying by 0.5, we allow for setting slower than normal
     -- scroll speeds, and ensure there is no behaviour change for players
     -- who do not modify their config file.
-    if self.app.key_modifiers.shift then
+    if self.shift_scroll_speed_pressed then
       mult = mult * self.app.config.shift_scroll_speed * 0.5
     else
       mult = mult * self.app.config.scroll_speed * 0.5
@@ -772,6 +870,9 @@ function GameUI:onTick()
   if self:onCursorWorldPositionChange() then
     repaint = true
   end
+
+  self.announcer:onTick()
+
   return repaint
 end
 
@@ -794,7 +895,7 @@ function GameUI.limitPointToDiamond(dx, dy, visible_diamond, do_limit)
     if do_limit then
       -- Determine the quadrant which the point lies in and accordingly set:
       --  (vx, vy) : a unit vector perpendicular to the diamond edge in the quadrant
-      --  (p1x, p1y), (p2x, p2y) : the two diamond verticies in the quadrant
+      --  (p1x, p1y), (p2x, p2y) : the two diamond vertices in the quadrant
       --  d : distance from the point to the line defined by the diamond edge (not the line segment itself)
       local vx, vy, d
       local p1x, p1y, p2x, p2y = 0, 0, 0, 0
@@ -899,7 +1000,7 @@ function UI:togglePlayAnnouncements()
   self.app:saveConfig()
 end
 
-function UI:togglePlayMusic(item)
+function UI:togglePlayMusic()
   if not self.app.audio.background_music then
     self.app.config.play_music = true
     self.app.audio:playRandomBackgroundTrack() -- play
@@ -1030,7 +1131,7 @@ tutorial_phases = {
   },
 }
 end
-tutorial_phases = setmetatable({}, {__index = function(t, k)
+tutorial_phases = setmetatable({}, {__index = function(_, k)
   make_tutorial_phases()
   return tutorial_phases[k]
 end})
@@ -1101,6 +1202,24 @@ function GameUI:startTutorial(chapter)
   self:tutorialStep(chapter, 0, 1)
 end
 
+--! Converts centre of screen coordinates to world tile positions and stores the values for later recall
+-- param index (integer) Position in recallpositions table
+function GameUI:setMapRecallPosition(index)
+  local cx, cy = self:ScreenToWorld(self.app.config.width / 2, self.app.config.height / 2)
+  self.recallpositions[index] = {x = cx, y = cy, z = self.zoom_factor}
+end
+
+--! Retrieves stored recall position and attempts to scroll to that position - will be limited to the bounds of the camera when zoomed out
+-- param index (integer) Position in recallpositions table
+function GameUI:recallMapPosition(index)
+  if self.recallpositions[index] ~= nil then
+    local sx, sy = self.app.map:WorldToScreen(self.recallpositions[index].x,  self.recallpositions[index].y)
+    local dx, dy = self.app.map:ScreenToWorld(self.app.config.width / 2, self.app.config.height / 2)
+    self:setZoom(self.recallpositions[index].z)
+    self:scrollMapTo(sx + dx, sy + dy)
+  end
+end
+
 function GameUI:setEditRoom(enabled)
   -- TODO: Make the room the cursor is over flash
   if enabled then
@@ -1110,7 +1229,7 @@ function GameUI:setEditRoom(enabled)
     -- If the actual editing hasn't started yet but is on its way,
     -- activate the room again.
     if class.is(self.edit_room, Room) and self.cursor == self.waiting_cursor then
-      self.edit_room.is_active = true
+      self.app.world:markRoomAsBuilt(self.edit_room)
     else
       -- If we are currently editing a room it may happen that we need to abort it.
       -- Also remove any dialog where the user is buying items.
@@ -1135,19 +1254,12 @@ function GameUI:afterLoad(old, new)
   if old < 23 then
     self.do_world_hit_test = not self:getWindow(UIPlaceObjects)
   end
-  if old < 28 then
-    self:setRandomAnnouncementTarget()
-    self.ticks_since_last_announcement = 0
-  end
   if old < 34 then
     self.adviser.queued_messages = {}
     self.adviser.phase = 0
     self.adviser.timer = nil
     self.adviser.frame = 1
     self.adviser.number_frames = 4
-  end
-  if old < 70 then
-    self:addKeyHandler({"shift", "a"}, self, self.toggleAdviser)
   end
   if old < 75 then
     self.current_momentum = { x = 0, y = 0 }
@@ -1156,17 +1268,22 @@ function GameUI:afterLoad(old, new)
   if old < 78 then
     self.current_momentum = { x = 0, y = 0, z = 0}
   end
-  if old < 81 then
-    self:removeKeyHandler("x", self, self.toggleWallsTransparent)
-    self:addKeyHandler("z", self, self.keySpeedUp)
-    self:addKeyHandler("x", self, self.keyTransparent)
-  end
   if old < 115 then
     self.shake_screen_intensity = 0
   end
   if old < 122 then
     self.multigesturemove = {x = 0.0, y = 0.0}
   end
+  if old < 129 then
+    self.recallpositions = {}
+  end
+  if old < 130 then
+    self.ticks_since_last_announcement = nil -- cleanup
+    self.announcer = Announcer(self.app)
+  end
+
+  self.announcer.playing = false
+
   return UI.afterLoad(self, old, new)
 end
 
@@ -1184,7 +1301,7 @@ end
 --! Offers a confirmation window to quit the game and return to main menu
 -- NB: overrides UI.quit, do NOT call it from here
 function GameUI:quit()
-  self:addWindow(UIConfirmDialog(self, _S.confirmation.quit, --[[persistable:gameui_confirm_quit]] function()
+  self:addWindow(UIConfirmDialog(self, false, _S.confirmation.quit, --[[persistable:gameui_confirm_quit]] function()
     self.app:loadMainMenu()
   end))
 end

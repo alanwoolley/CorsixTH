@@ -23,8 +23,9 @@ SOFTWARE.
 #ifndef CORSIX_TH_LUA_SDL_H_
 #define CORSIX_TH_LUA_SDL_H_
 
-#include "lua.hpp"
 #include <SDL.h>
+
+#include "lua.hpp"
 
 // SDL event codes used for delivering custom events to l_mainloop in
 // sdl_core.cpp
@@ -50,7 +51,9 @@ SOFTWARE.
 #define SDL_USEREVENT_FF_REFRESH (SDL_USEREVENT + 12)
 #define SDL_USEREVENT_SHOWJUKEBOX (SDL_USEREVENT + 13)
 
-int luaopen_sdl(lua_State *L);
+constexpr int usertick_period_ms = 30;
+
+int luaopen_sdl(lua_State* L);
 
 void set_fps_limit(int fps);
 
@@ -64,7 +67,7 @@ typedef struct {
 	char* originalFilesPath, *cthPath, *language;
 } Configuration;
 
-int l_load_music_async_callback(lua_State *L);
+int l_load_music_async_callback(lua_State* L);
 
 
-#endif // CORSIX_TH_LUA_SDL_H_
+#endif  // CORSIX_TH_LUA_SDL_H_

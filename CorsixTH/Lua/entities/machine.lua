@@ -18,7 +18,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE. --]]
 
-local TH = require "TH"
+local TH = require("TH")
 
 --! An `Object` which needs occasional repair (to prevent explosion).
 class "Machine" (Object)
@@ -26,14 +26,13 @@ class "Machine" (Object)
 ---@type Machine
 local Machine = _G["Machine"]
 
-function Machine:Machine(world, object_type, x, y, direction, etc)
-
+function Machine:Machine(hospital, object_type, x, y, direction, etc)
   self.total_usage = -1 -- Incremented in the constructor of Object.
-  self:Object(world, object_type, x, y, direction, etc)
+  self:Object(hospital, object_type, x, y, direction, etc)
 
   if object_type.default_strength then
     -- Only for the main object. The slave doesn't need any strength
-    local progress = world.ui.hospital.research.research_progress[object_type]
+    local progress = self.hospital.research.research_progress[object_type]
     self.strength = progress.start_strength
   end
 
@@ -42,29 +41,7 @@ function Machine:Machine(world, object_type, x, y, direction, etc)
   -- Change hover cursor once the room has been finished.
   self.waiting_for_finalize = true -- Waiting until the room is completed (reset by new-room callback).
 
-  local orientation = object_type.orientations[direction]
-  local handyman_position = orientation.handyman_position
-  if handyman_position then
-  -- If there are many possible handyman tiles, choose one that is accessible from the use_position.
-    if type(handyman_position[1]) == "table" then
-      for _, position in ipairs(handyman_position) do
-        local hx, hy = x + position[1], y + position[2]
-        local ux, uy = x + orientation.use_position[1], y + orientation.use_position[2]
-        if world.pathfinder:findDistance(hx, hy, ux, uy) then
-          -- Also make sure the tile is not in another room or in the corridor.
-          local room = world:getRoom(hx, hy)
-          if room and room == self:getRoom() then
-            self.handyman_position = {position[1], position[2]}
-            break
-          end
-        end
-      end
-    else
-      self.handyman_position = {handyman_position[1], handyman_position[2]}
-    end
-  else
-    self.handyman_position = {orientation.use_position[1], orientation.use_position[2]}
-  end
+  self:setHandymanRepairPosition(direction)
 end
 
 function Machine:notifyNewRoom(room)
@@ -81,6 +58,12 @@ end
 --! Calculates the number of times the machine can be used before crashing (unless repaired first)
 function Machine:getRemainingUses()
   return self.strength - self.times_used
+end
+
+--! Returns true if a machine is smoking/needs repair
+function Machine:isBreaking()
+  local threshold = self:getRemainingUses()
+  return threshold < 4
 end
 
 --! Set whether the smoke animation should be showing
@@ -122,9 +105,31 @@ function Machine:machineUsed(room)
   local threshold = self:getRemainingUses()
   -- Find a queued task for a handyman coming to repair this machine
   local taskIndex = self.hospital:getIndexOfTask(self.tile_x, self.tile_y, "repairing")
-
-  -- Too late it is about to explode
+  local num_extinguishers = 0
+  local explosion_chance
+  local explode = false
+  -- Room is set to explode
   if threshold < 1 then
+    -- If a fire extinguisher in the room, room has chance not to explode
+    for object, _ in pairs(room.objects) do
+      if object.object_type.id == "extinguisher" and num_extinguishers < 4 then
+        num_extinguishers = num_extinguishers + 1
+      end
+    end
+    if num_extinguishers == 0 or threshold < -3 then
+      -- If no extinguisher in room, or machine used 5 times over its strength always explode
+      explode = true
+    else
+      -- Explosion chance increases 20% with every use over strength, and reduced by 5% for every additional extinguisher (up to 3 extra) in the room bar the first one
+      explosion_chance = (2 / self.strength) + (threshold * -0.2) - (num_extinguishers * 0.05) + 0.05
+      -- Cap it until guaranteed explosion
+      explosion_chance = explosion_chance > 0.95 and 0.95 or explosion_chance
+      explosion_chance = explosion_chance < 0.05 and 0.05 or explosion_chance
+      explode = math.random() < explosion_chance
+    end
+  end
+  -- Room failed to be saved, or no extinguishers were present
+  if explode then
     -- Clean up any task of handyman coming to repair the machine
     self.hospital:removeHandymanTask(taskIndex, "repairing")
     -- Blow up the room
@@ -144,14 +149,20 @@ function Machine:machineUsed(room)
     -- Clear the icon showing a handyman is coming to repair the machine
     self:setRepairing(nil)
     return true
-  -- Else if urgent repair needed
+  -- Else if urgent repair needed or room didn't explode
   elseif threshold < 4 then
     -- If the job of repairing the machine isn't queued, queue it now (higher priority)
     if taskIndex == -1 then
       local call = self.world.dispatcher:callForRepair(self, true, false, true)
       self.hospital:addHandymanTask(self, "repairing", 2, self.tile_x, self.tile_y, call)
+      self.hospital:announceRepair(room)
     else -- Otherwise the task is already queued. Increase the priority to above that of machines with at least 4 uses left
-      self.hospital:modifyHandymanTaskPriority(taskIndex, 2, "repairing")
+       -- Upgrades task from low (1) priority to high (2) priority
+       -- This does not lock the room, as happens when the task call starts at high priority
+      if self.hospital:getHandymanTaskPriority(taskIndex, "repairing") == 1 then
+        self.hospital:modifyHandymanTaskPriority(taskIndex, 2, "repairing")
+        self.hospital:announceRepair(room)
+      end
     end
   -- Else if repair is needed, but not urgently
   elseif threshold < 6 then
@@ -176,11 +187,8 @@ function Machine:calculateSmoke(room)
   -- How many uses this machine has left until it explodes
   local threshold = self:getRemainingUses()
 
-  -- If now exploding, clear any smoke
-  if threshold < 1 then
-    setSmoke(self, false)
-  -- Else if urgent repair needed
-  elseif threshold < 4 then
+  -- Machines needing urgent repair show smoke
+  if threshold < 4 then
     -- Display smoke, up to three animations per machine
     -- i.e. < 4 one plume, < 3 two plumes or < 2 three plumes of smoke
     setSmoke(self, true)
@@ -229,7 +237,9 @@ function Machine:createHandymanActions(handyman)
   end
 
   local meander_loop_callback = --[[persistable:handyman_meander_repair_loop_callback]] function()
-    if not self.user then
+    -- Wait until the machine is not in use and not about to be used
+    local patient = self:getRoom():getPatient()
+    if not self.user and (not patient or patient:isLeaving()) then
       -- The machine is ready to be repaired.
       -- The following statement will finish the meander action in the handyman's
       -- action queue.
@@ -253,7 +263,11 @@ function Machine:createHandymanActions(handyman)
 end
 
 --! Replace this machine (make it pretend it's brand new)
-function Machine:machineReplaced()
+--!param cost (int) Cost to replace the machine
+function Machine:replaceMachine(cost)
+  -- Pay for the new machine
+  self.hospital:spendMoney(cost, _S.transactions.machine_replacement)
+
   -- Reset usage stats
   self.total_usage = 0
   self.times_used = 0
@@ -344,11 +358,20 @@ function Machine:updateDynamicInfo(only_update)
     self.total_usage = self.total_usage + 1
   end
   if self.strength then
-    self:setDynamicInfo("text", {
-      self.object_type.name,
-      _S.dynamic_info.object.strength:format(self.strength),
-      _S.dynamic_info.object.times_used:format(self.times_used),
-    })
+    if self.world.ui.app.config.new_machine_extra_info then
+      local hosp = self.world:getLocalPlayerHospital()
+      self:setDynamicInfo("text", {
+        self.object_type.name,
+        _S.dynamic_info.object.strength_extra_info:format(self.strength, hosp.research.research_progress[self.object_type].start_strength),
+        _S.dynamic_info.object.times_used:format(self.times_used),
+      })
+    else
+      self:setDynamicInfo("text", {
+        self.object_type.name,
+        _S.dynamic_info.object.strength:format(self.strength),
+        _S.dynamic_info.object.times_used:format(self.times_used),
+      })
+    end
   end
 end
 
@@ -394,6 +417,7 @@ function Machine:afterLoad(old, new)
       room.hospital:removeHandymanTask(taskIndex, "repairing")
     end
   end
+  self:updateDynamicInfo(true)
   return Object.afterLoad(self, old, new)
 end
 
@@ -406,6 +430,64 @@ function Machine:tick()
   return Object.tick(self)
 end
 
+--[[ Gets the state of a machine
+
+! In addition to the object implementation this includes total_usage
+!return (table) state
+]]
+function Machine:getState()
+  local state = Object.getState(self)
+  state.total_usage = self.total_usage
+
+  return state
+end
+
+--[[ Sets the state of a machine
+
+! Adds total_usage
+!param state (table) table holding the state
+!return (void)
+]]
+function Machine:setState(state)
+  Object.setState(self, state)
+  if state then
+    self.total_usage = state.total_usage
+  end
+end
+
+--[[ Sets the handyman use position of a machine
+
+! Calculate handyman use position based on object orientation
+! or the normal use position if one not available
+!param direction (string) orientation of object
+!return (void)
+]]
+function Machine:setHandymanRepairPosition(direction)
+  local orientation = self.object_type.orientations[direction]
+  local handyman_position = orientation.handyman_position
+  if handyman_position then
+  -- If there are many possible handyman tiles, choose one that is accessible from the use_position.
+    if type(handyman_position[1]) == "table" then
+      for _, position in ipairs(handyman_position) do
+        local hx, hy = self.tile_x + position[1], self.tile_y + position[2]
+        local ux, uy = self.tile_x + orientation.use_position[1], self.tile_y + orientation.use_position[2]
+        if self.world.pathfinder:findDistance(hx, hy, ux, uy) then
+          -- Also make sure the tile is not in another room or in the corridor.
+          local room = self.world:getRoom(hx, hy)
+          if room and room == self:getRoom() then
+            self.handyman_position = {position[1], position[2]}
+            break
+          end
+        end
+      end
+    else
+      self.handyman_position = {handyman_position[1], handyman_position[2]}
+    end
+  else
+    self.handyman_position = {orientation.use_position[1], orientation.use_position[2]}
+  end
+end
+
 -- Dummy callbacks for savegame compatibility
-local callbackNewRoom = --[[persistable:machine_build_callback]] function(room) end
+local callbackNewRoom = --[[persistable:machine_build_callback]] function() end
 local repair_loop_callback = --[[persistable:handyman_repair_loop_callback]] function() end

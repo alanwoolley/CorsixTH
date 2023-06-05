@@ -20,6 +20,7 @@ SOFTWARE. --]]
 
 local room = {}
 room.id = "gp"
+room.vip_must_visit = false
 room.level_config_id = 7
 room.class = "GPRoom"
 room.name = _S.rooms_short.gps_office
@@ -169,7 +170,7 @@ function GPRoom:sendPatientToNextDiagnosisRoom(patient)
     -- The very rare case where the patient has visited all his/her possible diagnosis rooms
     -- There's not much to do then... Send home
     patient:goHome("kicked")
-    patient:updateDynamicInfo(_S.dynamic_info.patient.actions.no_diagnoses_available)
+    patient:setDynamicInfoText(_S.dynamic_info.patient.actions.no_diagnoses_available)
   else
     self.staff_member:setMood("reflexion", "activate") -- Show the uncertainty mood over the doctor
     local next_room_id = math.random(1, #patient.available_diagnosis_rooms)
@@ -200,9 +201,9 @@ function GPRoom:onHumanoidLeave(humanoid)
 end
 
 function GPRoom:roomFinished()
-  if not self.hospital:hasStaffOfCategory("Doctor") and
+  if self.hospital:countStaffOfCategory("Doctor") == 0 and
       not self.world.ui.start_tutorial then
-    self.world.ui.adviser:say(_A.room_requirements.gps_office_need_doctor)
+    self.hospital:giveAdvice({_A.room_requirements.gps_office_need_doctor})
   end
   return Room.roomFinished(self)
 end

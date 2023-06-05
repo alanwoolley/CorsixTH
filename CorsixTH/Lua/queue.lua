@@ -36,7 +36,7 @@ local Queue = _G["Queue"]
 --! Constructor of a queue.
 function Queue:Queue()
   self.reported_size = 0   -- Number of real patients
-  self.expected = {}       -- Expected patients
+  self.expected = {}       -- Expected humanoids
   self.callbacks = {}
   self.expected_count = 0  -- Number of expected patients
   self.visitor_count = 0
@@ -45,20 +45,27 @@ function Queue:Queue()
 end
 
 --! A humanoid is expected in a queue.
---!param humanoid New patient that is expected.
-function Queue:expect(humanoid)
-  if not self.expected[humanoid] and not class.is(humanoid, Vip) then
-    self.expected[humanoid] = true
-    self.expected_count = self.expected_count + 1
+--!param humanoid - any humanoid expected for the room
+--!param callback - register a callback for when queue is 'destroyed'
+function Queue:expect(humanoid, callback)
+  if not self.expected[humanoid] then
+    self.expected[humanoid] = callback
+    -- only count patients in the expected count
+    if class.is(humanoid, Patient) then
+      self.expected_count = self.expected_count + 1
+    end
   end
 end
 
 --! A humanoid is canceled as expected in a queue.
---!param humanoid Patient that is not coming to this queue.
+--!param humanoid - Humanoid that is not coming to this queue.
 function Queue:unexpect(humanoid)
   if self.expected[humanoid] then
     self.expected[humanoid] = nil
-    self.expected_count = self.expected_count - 1
+    -- only count patients in the expected count
+    if class.is(humanoid, Patient) then
+      self.expected_count = self.expected_count - 1
+    end
   end
 end
 
@@ -88,7 +95,7 @@ end
 --! For a true patient queue count, use Queue:reportedSize.
 --!return (int) Number of various people in the queue.
 function Queue:size()
-  -- Rememeber, the size includes people waiting to leave and staff waiting to enter
+  -- Remember, the size includes people waiting to leave and staff waiting to enter
   -- For just the patients waiting to enter, use Queue:reportedSize()
   -- Most of the time, size() == reportedSize(), so it won't be immediately obvious
   -- if you're using the wrong method, but from time to time, staff or exiting
@@ -142,49 +149,40 @@ function Queue:setPriorityForSameRoom(entity)
   self.same_room_priority = entity
 end
 
+local function _isLeaving(queue, humanoid)
+  return queue.same_room_priority and queue.same_room_priority:getRoom() == humanoid:getRoom()
+end
+
+
+local function _humanoidQueuePriority(queue, humanoid)
+  if _isLeaving(queue, humanoid) then
+    return 1
+  elseif class.is(humanoid, Staff) then
+    return 2
+  elseif humanoid.is_emergency or class.is(humanoid, Vip) or class.is(humanoid, Inspector) then
+    return 3
+  else
+    return 4
+  end
+end
+
+local reported_priority_threshold = 2
+
 function Queue:push(humanoid, callbacks_on)
   local index = #self + 1
-  local increment_reported_size = true
-  if self.same_room_priority then
-    -- If humanoid in the priority room, then position them in the queue before
-    -- humanoids not in the room (because if they are in the room and in the
-    -- queue, then they are trying to leave the room).
-    local room = self.same_room_priority:getRoom()
-    if humanoid:getRoom() == room then
-      while index > 1 do
-        local before = self[index - 1]
-        if before:getRoom() == room then
-          break
-        end
-        index = index - 1
-      end
-      increment_reported_size = false
+  local priority = _humanoidQueuePriority(self, humanoid)
+
+  while index > 1 do
+    if _humanoidQueuePriority(self, self[index - 1]) <= priority then
+      break
     end
+    index = index - 1
   end
-  if class.is(humanoid, Staff) then
-    -- Give staff priority over patients
-    while index > 1 do
-      local before = self[index - 1]
-      if class.is(before, Staff) then
-        break
-      end
-      index = index - 1
-    end
-    increment_reported_size = false
-  end
-  -- Emergencies and any VIP's get put before all the other patients, but AFTER currently queued emergencies.
-  if humanoid.is_emergency or class.is(humanoid, Vip) or class.is(humanoid, Inspector) then
-    while index > 1 do
-      local before = self[index - 1]
-      if before.is_emergency then
-        break
-      end
-      index = index - 1
-    end
-  end
-  if increment_reported_size then
+
+  if priority > reported_priority_threshold then
     self.reported_size = self.reported_size + 1
   end
+
   self.callbacks[humanoid] = callbacks_on
   table.insert(self, index, humanoid)
   for i = index + 1, #self do
@@ -294,19 +292,57 @@ function Queue:move(index, new_index)
   end
 end
 
---! Called when reception desk is destroyed, or when a room is destroyed from a crashed machine.
-function Queue:rerouteAllPatients(action)
-  for _, humanoid in ipairs(self) do
-    -- slight delay so the desk is really destroyed before rerouting
-    humanoid:setNextAction(IdleAction():setCount(1))
-    -- Don't queue the same action table, but clone it for each patient.
-    local clone = {}
-    for k, v in pairs(action) do clone[k] = v end
-    humanoid:queueAction(clone)
+--! Move an entering patient in the queue at position 'index' to position 'new_index'.
+--! Persons between 'index' and 'new_index' move one place to 'index'.
+--! Values are relative to the reported humanoids in the queue
+--!param index (int) Index number of the person to move.
+--!param new_index (int) Destination of the person being moved.
+--!param new_index (string) 'front' or 'back' as relative markers
+function Queue:movePatient(index, new_index)
+  local first_patient_index = self:size() - self:reportedSize() + 1
+  if type(new_index) == "string" then
+    if new_index == 'front' then
+      new_index = first_patient_index
+    else
+      new_index = self:size()
+    end
+  else
+    new_index = first_patient_index + new_index
   end
-  for humanoid in pairs(self.expected) do
-    humanoid:setNextAction(IdleAction():setCount(1))
-    humanoid:queueAction(action)
+  self:move(first_patient_index + index - 1, new_index)
+end
+
+--! Called when reception desk is destroyed, or when a room is destroyed from a crashed machine.
+--!param room_id Id of the room to reroute to, 'nil' for reception.
+function Queue:rerouteAllPatients(room_id)
+  for _, humanoid in ipairs(self) do
+    -- check by class type as staff/vips shouldn't get a SeekRoomAction
+    if class.is(humanoid, Patient) then
+      -- slight delay so the desk is really destroyed before rerouting
+      humanoid:setNextAction(IdleAction():setCount(1))
+
+      local action
+      if room_id then
+        action = SeekRoomAction(room_id)
+      else
+        action = SeekReceptionAction()
+      end
+      humanoid:queueAction(action)
+
+    elseif class.is(humanoid, Staff) then
+      -- likewise believe we need action here to stop
+      humanoid:setNextAction(IdleAction():setCount(1))
+      humanoid:queueAction(MeanderAction())
+    else
+      -- other humanoids don't enter rooms
+      humanoid:setNextAction(MeanderAction())
+    end
+  end
+  for humanoid, callback in pairs(self.expected) do
+    -- call the callback if registered as door is closing
+    if callback then
+      callback.callback()
+    end
     self:unexpect(humanoid)
   end
 end

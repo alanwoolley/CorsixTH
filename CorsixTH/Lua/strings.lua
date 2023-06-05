@@ -18,8 +18,8 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE. --]]
 
-local lfs = require "lfs"
-local TH = require "TH"
+local lfs = require("lfs")
+local TH = require("TH")
 
 --! Layer which handles the loading of localised text.
 class "Strings"
@@ -39,11 +39,10 @@ function Strings:init()
   -- Load (but do not execute) everything from the language directory
   -- Note that files are loaded with loadfile_envcall
   self.language_chunks = {}
-  local ourpath = debug.getinfo(1, "S").source:sub(2, -12)
   local pathsep = package.config:sub(1,1)
-  local path = ourpath .. "languages" .. pathsep
+  local path = self.app:getFullPath({"Lua", "languages"}, true)
   for file in lfs.dir(path) do
-    if file:match"%.lua$" then
+    if file:match("%.lua$") then
       local result, err = loadfile_envcall(path .. file)
       if not result then
         print("Error loading languages" .. pathsep ..  file .. ":\n" .. tostring(err))
@@ -66,7 +65,7 @@ function Strings:init()
   self.chunk_to_names = {}
   for chunk, filename in pairs(self.language_chunks) do
     -- To allow the file to set global variables without causing an error, it
-    -- is given an infinite table as an environment. Reading a non-existant
+    -- is given an infinite table as an environment. Reading a non-existent
     -- key from an infinite table returns another infinite table, rather than
     -- the default value of nil.
     local infinite_table_mt
@@ -89,8 +88,8 @@ function Strings:init()
         -- Use the first name for display purposes (case-dependent!).
         if names[1] ~= "original_strings" then
           self.languages[#self.languages + 1] = names[1]
-          -- Also save the second name for internal purposes.
-          self.languages_english[#self.languages_english + 1] = names[2]
+          -- Also save the second name for tooltips and internal purposes.
+          self.languages_english[names[1]] = names[2]
         end
         -- Associate every passed name with this file, case-independently
         for _, name in pairs(names) do
@@ -127,7 +126,7 @@ end
 local shadows = setmetatable({}, {__mode = "k"})
 
 -- Metatable which is used for all tables returned by Strings:load()
--- The end effect is to raise errors on accesses to non-existant strings
+-- The end effect is to raise errors on accesses to non-existent strings
 -- (unless no_restriction is set to true), to add a special string called
 -- "__random" to each table (which always resolves to a random string from
 -- the table), and to prevent editing or adding to a string table.
@@ -140,7 +139,7 @@ local strings_metatable = function(no_restriction) return {
     end
     if key ~= "__random" then
       if no_restriction then return nil end
-      error("Non-existant string: " .. tostring(key), 2)
+      error("Non-existent string: " .. tostring(key), 2)
     end
     local candidates = {}
     for _, v in pairs(t) do
@@ -159,7 +158,7 @@ local strings_metatable = function(no_restriction) return {
   end,
 } end
 
--- no_restriction disables errors on access to non-existant strings (for debug purposes)
+-- no_restriction disables errors on access to non-existent strings (for debug purposes)
 -- no_inheritance disables inheritance except original_strings (for debug purposes)
 function Strings:load(language, no_restriction, no_inheritance)
   assert(language ~= "original_strings", "Original strings can not be loaded directly. Please select a proper language.")
@@ -191,7 +190,7 @@ function Strings:load(language, no_restriction, no_inheritance)
     end,
     ipairs = ipairs,
     pairs = pairs,
-    -- Calling the Langauage() function should have no effect any more
+    -- Calling the Language() function should have no effect any more
     Language = function()
       language_called = true
     end,
@@ -294,7 +293,7 @@ end
 function Strings:_loadPrivate(language, env, ...)
   local chunk = self.language_to_chunk[language:lower()]
   if not chunk then -- If selected language could not be found, try to revert to English
-    print_table(self.language_to_chunk)
+    print(serialize(self.language_to_chunk, {detect_cycles=true, pretty=true}))
     print("Language '" .. language .. "' could not be found. Reverting to English.")
     chunk = self.language_to_chunk["english"]
     if not chunk then -- If english could not be found, raise an error
@@ -642,11 +641,11 @@ case(0xA4, 0xA5) -- n-tilde
 local case_pattern = "\195[\128-\191]" -- Unicode range [0xC0, 0xFF] as UTF-8
 
 local orig_upper = string.upper
-function string.upper(s)
+function string.upper(s) -- luacheck: ignore 122
   return orig_upper(s:gsub(case_pattern, lower_to_upper))
 end
 
 local orig_lower = string.lower
-function string.lower(s)
+function string.lower(s) -- luacheck: ignore 122
   return orig_lower(s:gsub(case_pattern, upper_to_lower))
 end

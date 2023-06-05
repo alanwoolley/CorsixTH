@@ -102,6 +102,11 @@ function UIStaffRise:UIStaffRise(ui, staff, rise_amount)
   end
 end
 
+-- Staff raise requests pause game
+function UIStaffRise:mustPause()
+  return true
+end
+
 function UIStaffRise:getStaffPosition(dx, dy)
   local staff = self.staff
   local x, y = self.ui.app.map:WorldToScreen(staff.tile_x, staff.tile_y)
@@ -119,7 +124,7 @@ function UIStaffRise:draw(canvas, x, y)
   profile:drawFace(canvas, x + 99, y + 47, self.face_parts) -- Portrait
   self.ui.app.map:draw(canvas, px, py, 71, 81, x + 16, y + 44) -- Viewport
 
-  font:draw(canvas, profile.name, x + 20, y + 20) -- Name
+  font:draw(canvas, profile:getFullName(), x + 20, y + 20) -- Name
   font:draw(canvas, "$" .. profile.wage, x + 60, y + 178) -- Wage
 
   -- Ability
@@ -147,10 +152,9 @@ function UIStaffRise:drawDoctorAttributes(canvas)
 
   -- Junior / Doctor / Consultant marker
   local marker_x = x + 98
-  if profile.is_junior then
-  elseif profile.is_consultant then
+  if profile.is_consultant then
     marker_x = marker_x + 52
-  else
+  elseif not profile.is_junior then
     marker_x = marker_x + 22
   end
 
@@ -172,24 +176,18 @@ function UIStaffRise:fireStaff()
   self.staff.message_callback = nil
   self.staff:fire()
   self:close()
-  local world = self.ui.app.world
-  if world and world:isCurrentSpeed("Pause") then
-    world:setSpeed(world.prev_speed)
-  end
 end
 
 function UIStaffRise:increaseSalary()
   self.staff.message_callback = nil
   self.staff:increaseWage(self.rise_amount)
   self.staff.quitting_in = nil
+  self.ui:playSound("bonusal2.wav")
   self:close()
-  local world = self.ui.app.world
-  if world and world:isCurrentSpeed("Pause") then
-    world:setSpeed(world.prev_speed)
-  end
 end
 
 function UIStaffRise:afterLoad(old, new)
+  Window.afterLoad(self, old, new)
   if not self.black_font then
     self.black_font = self.ui.app.gfx:loadFont("QData", "Font00V")
   end

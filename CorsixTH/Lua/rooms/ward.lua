@@ -20,6 +20,7 @@ SOFTWARE. --]]
 
 local room = {}
 room.id = "ward"
+room.vip_must_visit = true
 room.level_config_id = 9
 room.class = "WardRoom"
 room.name = _S.rooms_short.ward
@@ -56,6 +57,7 @@ local WardRoom = _G["WardRoom"]
 function WardRoom:WardRoom(...)
   self:Room(...)
   self.staff_member_set = {}
+  self.healing_amount = 0 -- The size of progress towards a diagnostic step
 end
 
 function WardRoom:roomFinished()
@@ -75,9 +77,8 @@ function WardRoom:roomFinished()
     Nurse = desks,
   }
   self.maximum_patients = beds
-  if not self.hospital:hasStaffOfCategory("Nurse") then
-    self.world.ui.adviser
-    :say(_A.room_requirements.ward_need_nurse)
+  if self.hospital:countStaffOfCategory("Nurse", 1) == 0 then
+    self.hospital:giveAdvice({_A.room_requirements.ward_need_nurse})
   end
   Room.roomFinished(self)
 end
@@ -114,7 +115,7 @@ function WardRoom:doStaffUseCycle(humanoid)
   end
 
   local num_meanders = math.random(2, 4)
-  local meanders_loop = --[[persistable:ward_meander_loop_callback]] function(action)
+  local meanders_loop = --[[persistable:ward_meander_loop_callback]] function()
     num_meanders = num_meanders - 1
     if num_meanders == 0 then
       self:doStaffUseCycle(humanoid)
@@ -123,67 +124,68 @@ function WardRoom:doStaffUseCycle(humanoid)
   humanoid:queueAction(MeanderAction():setLoopCallback(meanders_loop))
 end
 
+function WardRoom:updateHealingAmount()
+  local patient_count = 1
+  local nurse_factor = 0
+  for humanoid in pairs(self.humanoids) do
+    if not humanoid:isLeaving() then
+      if class.is(humanoid, Patient) then
+        patient_count = patient_count + 1
+      elseif humanoid.humanoid_class == "Nurse" and not humanoid.fired then
+        nurse_factor = nurse_factor + 0.5 + humanoid:getServiceQuality()
+      end
+    end
+  end
+  if nurse_factor > 0 then
+    -- Difficulty of healing - 10% faster on easier, 10% slower on hard mode
+    local difficulty_factor = 0.8 + self.world.map:getDifficulty() * 0.1
+    self.healing_amount = nurse_factor / math.log(patient_count) / difficulty_factor
+  else
+    self.healing_amount = 0
+  end
+end
 
--- TODO the nurse should not leave the ward if there are beds in use, therefore prevent her from being picked up
--- and have a system that stops patients entering the ward if she is in need of taking a break or being called elsewhere.
+
 function WardRoom:commandEnteringPatient(patient)
-  local staff = next(self.staff_member_set) or self.staff_member
   local bed, pat_x, pat_y = self.world:findFreeObjectNearToUse(patient, "bed")
   self:setStaffMembersAttribute("dealing_with_patient", nil)
   if not bed then
     patient:setNextAction(self:createLeaveAction())
     patient:queueAction(self:createEnterAction(patient))
-    print("Warning: A patient was called into the ward even though there are no free beds.")
-  else
-    bed.reserved_for = patient
-    self:countWorkingNurses()
-    local length = (math.random(200, 800) * (1.5 - staff.profile.skill))  / self.nursecount -- reduce time in ward if there is more than one nurse on duty
-    local --[[persistable:ward_loop_callback]] function loop_callback(action)
-    -- TODO Perhaps it should take longer if there are more used beds!
-      if length <= 0 then
-        action.prolonged_usage = false
-      end
-      length = length - 1
-    end
-    local after_use = --[[persistable:ward_after_use]] function()
-      self:dealtWithPatient(patient)
-    end
-    patient:walkTo(pat_x, pat_y)
-    patient:queueAction(UseObjectAction(bed):setProlongedUsage(true):setLoopCallback(loop_callback)
-        :setAfterUse(after_use))
+    self.world:gameLog("Warning: A patient was called into the ward even though there are no free beds.")
+    return Room.commandEnteringPatient(self, patient)
   end
+
+  bed.reserved_for = patient
+  -- Old callback kept for persistence in savegame version 155, April 2021
+  local --[[persistable:ward_loop_callback]] function _(action)
+    if length <= 0 then -- luacheck: ignore 113
+      action.prolonged_usage = false
+    end
+    length = length - 1 -- luacheck: ignore 111 113
+  end
+  -- New callback
+  local --[[persistable:ward_loop_callback2]] function loop_callback(action)
+    action.remaining_work = action.remaining_work - self.healing_amount
+    if action.remaining_work <= 0 then -- The patient is diagnosed or healed
+      action.prolonged_usage = false
+    end
+  end
+
+  local after_use = --[[persistable:ward_after_use]] function()
+    self:dealtWithPatient(patient)
+  end
+  patient:walkTo(pat_x, pat_y)
+  local bed_action = UseObjectAction(bed):setProlongedUsage(true)
+      :setLoopCallback(loop_callback):setAfterUse(after_use)
+  bed_action.remaining_work = math.random(150, 600)
+  patient:queueAction(bed_action)
 
   return Room.commandEnteringPatient(self, patient)
 end
 
--- Returns the staff member with the minimum amount of skill. Perhaps we should consider tiredness too
-function WardRoom:getStaffMember()
-  local staff
-  for staff_member, _ in pairs(self.staff_member_set) do
-    if staff and not staff.fired then
-      if staff.profile.skill > staff_member.profile.skill then
-        staff = staff_member
-      end
-    else
-      staff = staff_member
-    end
-  end
-  return staff
-end
-
 function WardRoom:setStaffMember(staff)
   self.staff_member_set[staff] = true
-end
-
-function WardRoom:countWorkingNurses()
-  local staff = next(self.staff_member_set)
-  self.nursecount = 0
-  for staff_member, _ in pairs(self.staff_member_set) do
-    if staff then
-      staff = staff_member
-      self.nursecount = self.nursecount + 1
-    end
-  end
 end
 
 function WardRoom:setStaffMembersAttribute(attribute, value)
@@ -195,6 +197,12 @@ end
 function WardRoom:onHumanoidLeave(humanoid)
   self.staff_member_set[humanoid] = nil
   Room.onHumanoidLeave(self, humanoid)
+  self:updateHealingAmount()
+end
+
+function WardRoom:onHumanoidEnter(humanoid)
+  Room.onHumanoidEnter(self, humanoid)
+  self:updateHealingAmount()
 end
 
 function WardRoom:afterLoad(old, new)

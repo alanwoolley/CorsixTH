@@ -30,9 +30,8 @@ function UIStaffManagement:UIStaffManagement(ui)
   self:UIFullscreen(ui)
   local gfx = ui.app.gfx
   if not pcall(function()
-    self.background = gfx:loadRaw("Staff01V", 640, 480)
-    local palette = gfx:loadPalette("QData", "Staff01V.pal")
-    palette:setEntry(255, 0xFF, 0x00, 0xFF) -- Make index 255 transparent
+    self.background = gfx:loadRaw("Staff01V", 640, 480, "QData", "QData", "Staff01V.pal", true)
+    local palette = gfx:loadPalette("QData", "Staff01V.pal", true)
     self.panel_sprites = gfx:loadSpriteTable("QData", "Staff02V", true, palette)
     self.title_font = gfx:loadFont("QData", "Font01V", false, palette)
     self.face_parts = ui.app.gfx:loadRaw("Face01V", 65, 1350, nil, "Data", "MPalette.dat")
@@ -55,7 +54,7 @@ function UIStaffManagement:UIStaffManagement(ui)
   self:addPanel(0, 603, 443):makeButton(0, 0, 26, 26, 10, self.close):setTooltip(_S.tooltip.staff_list.close)
 
   -- Top categories
-  local --[[persistable:staff_management_category]] function category(name, state, btn)
+  local --[[persistable:staff_management_category]] function category(name)
     self:setCategory(name)
   end
   self.categories = {
@@ -67,9 +66,10 @@ function UIStaffManagement:UIStaffManagement(ui)
   -- Other buttons
   self:addPanel(0, 12, 86):makeButton(0, 0, 31, 74, 2, self.scrollUp):setTooltip(_S.tooltip.staff_list.prev_person)
   self:addPanel(0, 12, 274):makeButton(0, 0, 31, 74, 3, self.scrollDown):setTooltip(_S.tooltip.staff_list.next_person)
-  self:addPanel(0, 319, 372):makeButton(0, 0, 112, 39, 7, self.payBonus):setTooltip(_S.tooltip.staff_list.bonus)
-  self:addPanel(0, 319, 418):makeButton(0, 0, 112, 39, 8, self.increaseSalary):setTooltip(_S.tooltip.staff_list.pay_rise)
-  self:addPanel(0, 438, 372):makeButton(0, 0, 45, 85, 9, self.fire):setTooltip(_S.tooltip.staff_list.sack)
+  -- Disable the default sounds on the the following three buttons as their sounds are implemented in the callback.
+  self:addPanel(0, 319, 372):makeButton(0, 0, 112, 39, 7, self.payBonus):setTooltip(_S.tooltip.staff_list.bonus):setSound()
+  self:addPanel(0, 319, 418):makeButton(0, 0, 112, 39, 8, self.increaseSalary):setTooltip(_S.tooltip.staff_list.pay_rise):setSound()
+  self:addPanel(0, 438, 372):makeButton(0, 0, 45, 85, 9, self.fire):setTooltip(_S.tooltip.staff_list.sack):setSound()
 
   -- "Arrow" to show title of doctors
   self.arrow = self:addPanel(12, 259, 397)
@@ -133,11 +133,15 @@ function UIStaffManagement:UIStaffManagement(ui)
 
   self:setCategory("Doctor")
 
+  self:registerKeyHandlers()
+end
+
+function UIStaffManagement:registerKeyHandlers()
   -- Hotkeys.
-  self:addKeyHandler("left", self.previousCategory)
-  self:addKeyHandler("right", self.nextCategory)
-  self:addKeyHandler("up", self.previousStaff)
-  self:addKeyHandler("down", self.nextStaff)
+  self:addKeyHandler("ingame_scroll_left", self.previousCategory)
+  self:addKeyHandler("ingame_scroll_right", self.nextCategory)
+  self:addKeyHandler("ingame_scroll_up", self.previousStaff)
+  self:addKeyHandler("ingame_scroll_down", self.nextStaff)
 end
 
 function UIStaffManagement:updateTooltips()
@@ -170,9 +174,8 @@ function UIStaffManagement:updateStaffList(staff_member_removed)
     Handyman = {},
     Receptionist = {},
   }
-  staff_members.Surgeon = staff_members.Doctor
   for _, staff in ipairs(hosp.staff) do
-    local list = staff_members[staff.humanoid_class]
+    local list = staff_members[staff.profile.humanoid_class]
     list[#list + 1] = staff
     -- The selected staff might have been moved because someone else was removed from the list.
     if selected_staff == staff then
@@ -221,7 +224,7 @@ end
 -- Function to select a given staff member.
 -- Includes switching to correct category and page.
 function UIStaffManagement:selectStaff(staff)
-  self:setCategory(staff.humanoid_class == "Surgeon" and "Doctor" or staff.humanoid_class)
+  self:setCategory(staff.profile.humanoid_class)
   for i, s in ipairs(self.staff_members[self.category]) do
     if s == staff then
       self:selectIndex(i)
@@ -274,7 +277,8 @@ function UIStaffManagement:draw(canvas, x, y)
       local row_no = i - (self.page-1)*10
       self.row_blankers[row_no].visible = false
       titles:draw(canvas, row_no + 10*(self.page-1), x + 58, y + 63 + row_no*27)
-      titles:draw(canvas, staff.profile.name,        x + 88, y + 63 + row_no*27)
+      titles:draw(canvas, staff.profile:getFullName(),
+          x + 88, y + 63 + row_no*27)
       titles:draw(canvas, "$" .. staff.profile.wage, x + 230, y + 63 + row_no*27, 80, 0)
 
       -- Draw the morale, tiredness and skill for this staff member
@@ -332,7 +336,8 @@ function UIStaffManagement:draw(canvas, x, y)
   self.portrait_back.visible = false
   -- If a staff member is selected, draw picture, skill etc
   if self.selected_staff then
-    local profile = self.staff_members[self.category][self.selected_staff].profile
+    local staff = self.staff_members[self.category][self.selected_staff]
+    local profile = staff.profile
     -- Draw the red rectangle TODO: Make a neater function in C?
     local red = canvas:mapRGB(221, 83, 0)
     local y_pos = self.selected_staff - (self.page - 1)*10
@@ -349,8 +354,10 @@ function UIStaffManagement:draw(canvas, x, y)
     profile:drawFace(canvas, x + 68, y + 377, self.face_parts)
 
     -- 10 % increase in salary or a bonus:
+    local max_salary = self.hospital.world.map.level_config.payroll.MaxSalary
+    local new_salary = math.min(math.floor(profile.wage * 1.1), max_salary)
     titles:draw(canvas, "$" .. math_floor(profile.wage*0.1), x + 377, y + 387, 45, 0)
-    titles:draw(canvas, "$" .. math_floor(profile.wage*0.1 + profile.wage), x + 377, y + 432, 45, 0)
+    titles:draw(canvas, "$" .. new_salary, x + 377, y + 432, 45, 0)
 
     -- Attention to detail
     local attention_bar_width = math_floor(profile.attention_to_detail * 40 + 0.5)
@@ -533,19 +540,26 @@ function UIStaffManagement:payBonus()
     staff:changeAttribute("happiness", 0.5)
     self.hospital:spendMoney(math_floor(staff.profile.wage*0.1), _S.transactions.personal_bonus)
     self.ui:playSound("cashreg.wav")
+    return
   end
+  self.ui:playSound("wrong2.wav")
 end
 
 function UIStaffManagement:increaseSalary()
   if self.selected_staff then
     local staff = self.staff_members[self.category][self.selected_staff]
-    staff:increaseWage(math_floor(staff.profile.wage*0.1))
+    if staff:increaseWage(math_floor(staff.profile.wage * 0.1)) then
+      self.ui:playSound("bonusal2.wav")
+      return
+    end
   end
+  self.ui:playSound("wrong2.wav")
 end
 
 function UIStaffManagement:fire()
   if self.selected_staff then
-    self.ui:addWindow(UIConfirmDialog(self.ui, _S.confirmation.sack_staff, --[[persistable:staff_management_confirm_sack]] function()
+    self.ui:playSound(self.default_button_sound)
+    self.ui:addWindow(UIConfirmDialog(self.ui, false, _S.confirmation.sack_staff, --[[persistable:staff_management_confirm_sack]] function()
       local current_category = self.staff_members[self.category]
       current_category[self.selected_staff]:fire()
       -- Close the staff window if open
@@ -556,10 +570,29 @@ function UIStaffManagement:fire()
       -- Update the staff list
       self:updateStaffList(current_category[self.selected_staff])
     end)) -- End of confirmation dialog
+  else
+    self.ui:playSound("wrong2.wav")
   end
 end
 
 function UIStaffManagement:close()
   UIFullscreen.close(self)
   self.ui:getWindow(UIBottomPanel):updateButtonStates()
+end
+
+function UIStaffManagement:afterLoad(old, new)
+  self:registerKeyHandlers()
+
+  if old < 175 then
+    self:close()
+  end
+  if old < 176 then
+    local gfx = TheApp.gfx
+    self.background = gfx:loadRaw("Staff01V", 640, 480, "QData", "QData", "Staff01V.pal", true)
+    local palette = gfx:loadPalette("QData", "Staff01V.pal", true)
+    self.panel_sprites = gfx:loadSpriteTable("QData", "Staff02V", true, palette)
+    self.title_font = gfx:loadFont("QData", "Font01V", false, palette)
+  end
+
+  UIFullscreen.afterLoad(self, old, new)
 end

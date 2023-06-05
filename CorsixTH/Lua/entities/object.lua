@@ -18,7 +18,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE. --]]
 
-local TH = require "TH"
+local TH = require("TH")
 
 local ignore_next = false
 
@@ -39,7 +39,9 @@ function Object:getDrawingLayer()
   return 4
 end
 
-function Object:Object(world, object_type, x, y, direction, etc)
+function Object:Object(hospital, object_type, x, y, direction, etc)
+  assert(class.is(hospital, Hospital), "First argument is not a Hospital instance.")
+
   local th = TH.animation()
   self:Entity(th)
 
@@ -53,8 +55,8 @@ function Object:Object(world, object_type, x, y, direction, etc)
 
   self.ticks = object_type.ticks
   self.object_type = object_type
-  self.world = world
-  self.hospital = world:getLocalPlayerHospital()
+  self.hospital = hospital
+  self.world = hospital.world
   self.user = false
   self.times_used = -1 -- Incremented in the call on the next line
   self:updateDynamicInfo()
@@ -120,8 +122,8 @@ function Object.slaveMixinClass(class_method_table)
   local super_constructor = super[class.name(super)]
 
   -- Constructor
-  class_method_table[name] = function(self, world, object_type, x, y, direction, ...)
-    super_constructor(self, world, object_type, x, y, direction, ...)
+  class_method_table[name] = function(self, hospital, object_type, x, y, direction, ...)
+    super_constructor(self, hospital, object_type, x, y, direction, ...)
     if object_type.slave_id then
       local orientation = object_type.orientations
       orientation = orientation and orientation[direction]
@@ -129,7 +131,7 @@ function Object.slaveMixinClass(class_method_table)
         x = x + orientation.slave_position[1]
         y = y + orientation.slave_position[2]
       end
-      self.slave = world:newObject(object_type.slave_id, x, y, direction, ...)
+      self.slave = hospital.world:newObject(object_type.slave_id, x, y, direction, ...)
       self.slave.master = self
     end
   end
@@ -246,9 +248,9 @@ end
 
 --! Get the primary tile which the object is attached to for rendering
 --[[! For objects which attach to a single tile for rendering, this method will
-return the X and Y Lua world co-ordinates of that tile. For objects which split
+return the X and Y Lua world coordinates of that tile. For objects which split
 their rendering over multiple tiles, one of them is arbitrarily designated as
-the primary tile, and its co-ordinates are returned.
+the primary tile, and its coordinates are returned.
 ]]
 function Object:getRenderAttachTile()
   local x, y = self.tile_x, self.tile_y
@@ -264,8 +266,12 @@ function Object:getRenderAttachTile()
   return x, y
 end
 
-function Object:updateDynamicInfo()
-  self.times_used = self.times_used + 1
+--! Updates the object's dynamic info
+--!param only_update (bool) If true, do not increase times_used.
+function Object:updateDynamicInfo(only_update)
+  if not only_update then
+    self.times_used = self.times_used + 1
+  end
   local object = self.object_type
   if object.dynamic_info then
     self:setDynamicInfo("text", {object.name, "", _S.dynamic_info.object.times_used:format(self.times_used)})
@@ -298,7 +304,7 @@ end
 function Object:setTile(x, y)
   local function coordinatesAreInFootprint(object_footprint, xpos, ypos)
     for _, xy in ipairs(object_footprint) do
-      if(xy[1] == xpos and xy[2] == ypos) then
+      if xy[1] == xpos and xy[2] == ypos then
         return true
       end
     end
@@ -306,10 +312,7 @@ function Object:setTile(x, y)
   end
 
   local function isEmpty(table)
-    for _, _ in pairs(table) do
-      return false
-    end
-    return true
+    return next(table) == nil
   end
 
   local function getComplementaryPassableFlag(passable_flag)
@@ -625,7 +628,7 @@ end
 !param button (string) Which button was clicked.
 !param data (table) If some data should be retained after moving an object it is in this table.
 ]]
-function Object:onClick(ui, button, data)
+function Object:onClick(ui, button, data) -- luacheck: ignore 212 keep args from parent class
   local window = ui:getWindow(UIEditRoom)
   if button == "right" or (button == "left" and window and window.in_pickup_mode) then
     -- This flag can be used if for example some things should only happen as long as the
@@ -740,6 +743,14 @@ function Object:afterLoad(old, new)
       self:setTile(self.tile_x, self.tile_y)
     end
   end
+  if old < 173 then
+    -- Fix bug with couch not being fully passable
+    if self.object_type.id == "couch" then
+      self:initOrientation(self.direction)
+      self:setTile(self.tile_x, self.tile_y)
+    end
+  end
+  self:updateDynamicInfo(true)
   return Entity.afterLoad(self, old, new)
 end
 
@@ -864,5 +875,30 @@ function Object.processTypeDefinition(object_type)
         end
       end
     end
+  end
+end
+
+--[[ Gets the state of an object
+
+! The state can be later used to set the state of this object. This is
+useful when we would destroy and create a new object that should represent
+the same object.
+
+!return (table) state
+]]
+function Object:getState()
+  return {times_used = self.times_used}
+end
+
+--[[ Sets the state of an object
+
+! This is a complement to a pair function. IT will use the generated state
+table to update it's state.
+!param state (table) table holding the state
+!return (void)
+]]
+function Object:setState(state)
+  if state then
+    self.times_used = state.times_used
   end
 end

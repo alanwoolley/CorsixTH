@@ -20,24 +20,28 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-#pragma once
+#ifndef ANIMVIEW_APP_H_
+#define ANIMVIEW_APP_H_
+
+#include "config.h"
 // For compilers that support precompilation, includes "wx/wx.h".
 #include "wx/wxprec.h"
 
 #ifdef __BORLANDC__
-    #pragma hdrstop
+#pragma hdrstop
 #endif
 
 // for all others, include the necessary headers (this file is usually all you
 // need because it includes almost all "standard" wxWidgets headers)
 #ifndef WX_PRECOMP
-    #include "wx/wx.h"
+#include "wx/wx.h"
 #endif
 // ----------------------------
 
-class ThemeHospitalAnimViewApp : public wxApp
-{
-    virtual bool OnInit();
+class ThemeHospitalAnimViewApp : public wxApp {
+  bool OnInit() override;
 };
 
 DECLARE_APP(ThemeHospitalAnimViewApp)
+
+#endif

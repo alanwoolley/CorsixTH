@@ -18,7 +18,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE. --]]
 
-local TH = require "TH"
+local TH = require("TH")
 local ipairs, math_floor
     = ipairs, math.floor
 
@@ -67,7 +67,6 @@ function UIPlaceObjects:UIPlaceObjects(ui, object_list, pay_for)
   end
   self:addPanel(114,   0, 90) -- Dialog mid-piece
   self:addPanel(115,   0, 100):makeButton(9, 8, 41, 42, 116, self.cancel):setSound("no4.wav"):setTooltip(_S.tooltip.place_objects_window.cancel)
-  self:addKeyHandler("escape", self.cancel)
   self.purchase_button =
   self:addPanel(117,  50, 100):makeButton(1, 8, 41, 42, 118, self.purchaseItems):setTooltip(_S.tooltip.place_objects_window.buy_sell)
     :setDisabledSprite(127):enable(false) -- Disabled purchase items button
@@ -86,9 +85,14 @@ function UIPlaceObjects:UIPlaceObjects(ui, object_list, pay_for)
   self.num_slots = 0
 
   self:addObjects(object_list, pay_for)
-  self:addKeyHandler("space", self.tryNextOrientation)
-
   ui:setWorldHitTest(false)
+  UIPlaceObjects.registerKeyHandlers(self)
+end
+
+function UIPlaceObjects:registerKeyHandlers()
+  self:addKeyHandler("global_cancel", self.cancel)
+  self:addKeyHandler("global_cancel_alt", self.cancel)
+  self:addKeyHandler("ingame_rotateobject", self.tryNextOrientation)
 end
 
 -- changes the window size and buttons to num_slots slots
@@ -459,7 +463,7 @@ function UIPlaceObjects:onMouseUp(button, x, y)
     repaint = true
   elseif button == "left" then
     if #self.objects > 0 then
-      if 0 <= x and x < self.width and 0 <= y and y < self.height then
+      if 0 <= x and x < self.width and 0 <= y and y < self.height then -- luacheck: ignore 542
         -- Click within window - do nothing
       elseif self.object_cell_x and self.object_cell_y and self.object_blueprint_good then
         self:placeObject()
@@ -506,12 +510,17 @@ function UIPlaceObjects:placeObject(dont_close_if_empty)
     if real_obj.strength then
       real_obj:calculateSmoke(room)
     end
+    if class.is(real_obj, Machine) then
+      real_obj:setHandymanRepairPosition(self.object_orientation)
+    end
   else
     local object_footprint = object.object.orientations[self.object_orientation].footprint
     self.world:prepareFootprintTilesForBuild(object_footprint, self.object_cell_x, self.object_cell_y)
     real_obj = self.world:newObject(object.object.id,
         self.object_cell_x, self.object_cell_y, self.object_orientation)
+    real_obj:setState(object.state)
   end
+
   if room then
     room.objects[real_obj] = true
   end
@@ -690,7 +699,13 @@ function UIPlaceObjects:setBlueprintCell(x, y)
     end
     if self.object_anim and object.class ~= "SideObject" then
       if allgood then
-        allgood = not world:wouldNonSideObjectBreakPathfindingIfSpawnedAt(x, y, object, self.object_orientation, roomId)
+        if world:wouldNonSideObjectBreakPathfindingIfSpawnedAt(x, y, object, self.object_orientation, roomId) then
+          if self.ui.app.config.allow_blocking_off_areas then
+            print("Blocking off areas is allowed at " .. x .. ", " .. y .. ".")
+          else
+            allgood = false
+          end
+        end
       end
       if ATTACH_BLUEPRINT_TO_TILE then
         self.object_anim:setTile(map, x, y)
@@ -714,7 +729,11 @@ function UIPlaceObjects:setBlueprintCell(x, y)
         if not world.pathfinder:findDistance(x, y, checked_x, checked_y) then
           --we need to check if the failure to get the distance is due to the presence of an object in the adjacent tile
           if map:getCellFlags(checked_x, checked_y)["passable"] then
-            allgood = false
+            if self.ui.app.config.allow_blocking_off_areas then
+              print("Blocking off areas is allowed at " .. x .. ", " .. y .. ".")
+            else
+              allgood = false
+            end
           end
         end
         flags[passable_flag] = true
@@ -819,4 +838,9 @@ function UIPlaceObjects:selectObjectType(object_type)
       return
     end
   end
+end
+
+function UIPlaceObjects:afterLoad(old, new)
+  Window.afterLoad(self, old, new)
+  UIPlaceObjects.registerKeyHandlers(self)
 end

@@ -43,7 +43,7 @@ local col_caption = {
 }
 
 function UICustomise:UICustomise(ui, mode)
-  self:UIResizable(ui, 320, 280, col_bg)
+  self:UIResizable(ui, 340, 300, col_bg)
 
   local app = ui.app
   self.mode = mode
@@ -57,76 +57,87 @@ function UICustomise:UICustomise(ui, mode)
 
   -- Window parts definition
   -- Title
-  self:addBevelPanel(80, 10, 160, 20, col_caption):setLabel(_S.customise_window.caption)
+  self:addBevelPanel(85, 10, 170, 20, col_caption):setLabel(_S.customise_window.caption)
     .lowered = true
 
   -- Movies, global switch
-  self:addBevelPanel(20, 40, 135, 20, col_shadow, col_bg, col_bg)
+  local audio_status = app:isAudioEnabled()
+  self:addBevelPanel(15, 40, 165, 20, col_shadow, col_bg, col_bg)
     :setLabel(_S.customise_window.movies):setTooltip(_S.tooltip.customise_window.movies).lowered = true
   self.movies_panel =
-    self:addBevelPanel(160, 40, 135, 20, col_bg):setLabel(app.config.movies and _S.customise_window.option_on or _S.customise_window.option_off)
+    self:addBevelPanel(185, 40, 140, 20, col_bg):setLabel(app.config.movies and audio_status and _S.customise_window.option_on or _S.customise_window.option_off)
   self.movies_button = self.movies_panel:makeToggleButton(0, 0, 140, 20, nil, self.buttonMoviesGlobal)
-    :setToggleState(app.config.movies):setTooltip(_S.tooltip.customise_window.movies)
+    :setToggleState(app.config.movies and audio_status):setTooltip(_S.tooltip.customise_window.movies)
+  self.movies_button.enabled = audio_status
 
   -- Intro movie
-  self:addBevelPanel(20, 65, 135, 20, col_shadow, col_bg, col_bg)
+  self:addBevelPanel(15, 65, 165, 20, col_shadow, col_bg, col_bg)
     :setLabel(_S.customise_window.intro):setTooltip(_S.tooltip.customise_window.intro).lowered = true
   self.intro_panel =
-    self:addBevelPanel(160, 65, 135, 20, col_bg):setLabel(app.config.play_intro and _S.customise_window.option_on or _S.customise_window.option_off)
+    self:addBevelPanel(185, 65, 140, 20, col_bg):setLabel(app.config.play_intro and audio_status and _S.customise_window.option_on or _S.customise_window.option_off)
   self.intro_button = self.intro_panel:makeToggleButton(0, 0, 140, 20, nil, self.buttonIntro)
-    :setToggleState(app.config.play_intro):setTooltip(_S.tooltip.customise_window.intro)
+    :setToggleState(app.config.play_intro and audio_status):setTooltip(_S.tooltip.customise_window.intro)
+  self.intro_button.enabled = audio_status
 
   -- Allow user actions when paused
-  self:addBevelPanel(20, 90, 135, 20, col_shadow, col_bg, col_bg)
+  self:addBevelPanel(15, 90, 165, 20, col_shadow, col_bg, col_bg)
     :setLabel(_S.customise_window.paused):setTooltip(_S.tooltip.customise_window.paused).lowered = true
   self.paused_panel =
-    self:addBevelPanel(160, 90, 135, 20, col_bg):setLabel(app.config.allow_user_actions_while_paused and _S.customise_window.option_on or _S.customise_window.option_off)
+    self:addBevelPanel(185, 90, 140, 20, col_bg):setLabel(app.config.allow_user_actions_while_paused and _S.customise_window.option_on or _S.customise_window.option_off)
   self.paused_button = self.paused_panel:makeToggleButton(0, 0, 140, 20, nil, self.buttonPaused)
     :setToggleState(app.config.allow_user_actions_while_paused):setTooltip(_S.tooltip.customise_window.paused)
 
   -- Volume down is opening casebook
-  self:addBevelPanel(20, 115, 135, 20, col_shadow, col_bg, col_bg)
+  self:addBevelPanel(15, 115, 165, 20, col_shadow, col_bg, col_bg)
     :setLabel(_S.customise_window.volume):setTooltip(_S.tooltip.customise_window.volume).lowered = true
   self.volume_panel =
-    self:addBevelPanel(160, 115, 135, 20, col_bg):setLabel(app.config.volume_opens_casebook and _S.customise_window.option_on or _S.customise_window.option_off)
+    self:addBevelPanel(185, 115, 140, 20, col_bg):setLabel(app.config.volume_opens_casebook and _S.customise_window.option_on or _S.customise_window.option_off)
   self.volume_button = self.volume_panel:makeToggleButton(0, 0, 140, 20, nil, self.buttonVolume)
     :setToggleState(app.config.volume_opens_casebook):setTooltip(_S.tooltip.customise_window.volume)
 
   -- Alien DNA from emergencies only/must stand/can knock on doors
-  self:addBevelPanel(20, 140, 135, 20, col_shadow, col_bg, col_bg)
+  self:addBevelPanel(15, 140, 165, 20, col_shadow, col_bg, col_bg)
     :setLabel(_S.customise_window.aliens):setTooltip(_S.tooltip.customise_window.aliens).lowered = true
   self.aliens_panel =
-    self:addBevelPanel(160, 140, 135, 20, col_bg):setLabel(app.config.alien_dna_only_by_emergency and _S.customise_window.option_on or _S.customise_window.option_off)
+    self:addBevelPanel(185, 140, 140, 20, col_bg):setLabel(app.config.alien_dna_only_by_emergency and _S.customise_window.option_on or _S.customise_window.option_off)
   self.aliens_button = self.aliens_panel:makeToggleButton(0, 0, 140, 20, nil, self.buttonAliens)
     :setToggleState(app.config.alien_dna_only_by_emergency):setTooltip(_S.tooltip.customise_window.aliens)
 
   -- Allow female patients with Fractured Bones
-  self:addBevelPanel(20, 165, 135, 20, col_shadow, col_bg, col_bg)
+  self:addBevelPanel(15, 165, 165, 20, col_shadow, col_bg, col_bg)
     :setLabel(_S.customise_window.fractured_bones):setTooltip(_S.tooltip.customise_window.fractured_bones).lowered = true
   self.fractured_bones_panel =
-    self:addBevelPanel(160, 165, 135, 20, col_bg):setLabel(app.config.disable_fractured_bones_females and _S.customise_window.option_on or _S.customise_window.option_off)
+    self:addBevelPanel(185, 165, 140, 20, col_bg):setLabel(app.config.disable_fractured_bones_females and _S.customise_window.option_on or _S.customise_window.option_off)
   self.fractured_bones_button = self.fractured_bones_panel:makeToggleButton(0, 0, 140, 20, nil, self.buttonFractured_bones)
     :setToggleState(app.config.disable_fractured_bones_females):setTooltip(_S.tooltip.customise_window.fractured_bones)
 
   -- Allow average contents when building rooms
-  self:addBevelPanel(20, 190, 135, 20, col_shadow, col_bg, col_bg)
+  self:addBevelPanel(15, 190, 165, 20, col_shadow, col_bg, col_bg)
     :setLabel(_S.customise_window.average_contents):setTooltip(_S.tooltip.customise_window.average_contents).lowered = true
   self.average_contents_panel =
-    self:addBevelPanel(160, 190, 135, 20, col_bg):setLabel(app.config.enable_avg_contents and _S.customise_window.option_on or _S.customise_window.option_off)
+    self:addBevelPanel(185, 190, 140, 20, col_bg):setLabel(app.config.enable_avg_contents and _S.customise_window.option_on or _S.customise_window.option_off)
   self.average_contents_button = self.average_contents_panel:makeToggleButton(0, 0, 140, 20, nil, self.buttonAverage_contents)
     :setToggleState(app.config.enable_avg_contents):setTooltip(_S.tooltip.customise_window.average_contents)
 
+  -- Allow removal of destroyed rooms
+  self:addBevelPanel(15, 215, 165, 20, col_shadow, col_bg, col_bg)
+    :setLabel(_S.customise_window.remove_destroyed_rooms):setTooltip(_S.tooltip.customise_window.remove_destroyed_rooms).lowered = true
+  self.destroyed_rooms_panel =
+    self:addBevelPanel(185, 215, 140, 20, col_bg):setLabel(app.config.remove_destroyed_rooms and _S.customise_window.option_on or _S.customise_window.option_off)
+  self.destroyed_rooms_button = self.destroyed_rooms_panel:makeToggleButton(0, 0, 140, 20, nil, self.buttonDestroyed_rooms)
+    :setToggleState(app.config.remove_destroyed_rooms):setTooltip(_S.tooltip.customise_window.remove_destroyed_rooms)
+
   -- "Back" button
-  self:addBevelPanel(20, 220, 280, 40, col_bg):setLabel(_S.customise_window.back)
-    :makeButton(0, 0, 280, 40, nil, self.buttonBack):setTooltip(_S.tooltip.customise_window.back)
+  self:addBevelPanel(15, 245, 310, 40, col_bg):setLabel(_S.customise_window.back)
+    :makeButton(0, 0, 310, 40, nil, self.buttonBack):setTooltip(_S.tooltip.customise_window.back)
 end
 
-function UICustomise:buttonAudioGlobal(checked)
+function UICustomise:buttonAudioGlobal()
   local window = UIAudio(self.ui, "menu")
   self.ui:addWindow(window)
 end
 
-function UICustomise:buttonMoviesGlobal(checked)
+function UICustomise:buttonMoviesGlobal()
   local app = self.ui.app
   app.config.movies = not app.config.movies
   self.movies_button:toggle()
@@ -135,7 +146,7 @@ function UICustomise:buttonMoviesGlobal(checked)
   app:saveConfig()
 end
 
-function UICustomise:buttonIntro(checked)
+function UICustomise:buttonIntro()
   local app = self.ui.app
   app.config.play_intro = not app.config.play_intro
   self.intro_button:toggle()
@@ -144,7 +155,7 @@ function UICustomise:buttonIntro(checked)
   app:saveConfig()
 end
 
-function UICustomise:buttonPaused(checked)
+function UICustomise:buttonPaused()
   local app = self.ui.app
   app.config.allow_user_actions_while_paused = not app.config.allow_user_actions_while_paused
   self.paused_button:toggle()
@@ -153,7 +164,7 @@ function UICustomise:buttonPaused(checked)
   app:saveConfig()
 end
 
-function UICustomise:buttonVolume(checked)
+function UICustomise:buttonVolume()
   local app = self.ui.app
   app.config.volume_opens_casebook = not app.config.volume_opens_casebook
   self.volume_button:toggle()
@@ -162,7 +173,7 @@ function UICustomise:buttonVolume(checked)
   app:saveConfig()
 end
 
-function UICustomise:buttonAliens(checked)
+function UICustomise:buttonAliens()
   local app = self.ui.app
   app.config.alien_dna_only_by_emergency = not app.config.alien_dna_only_by_emergency
   app.config.alien_dna_must_stand = not app.config.alien_dna_must_stand
@@ -175,7 +186,7 @@ function UICustomise:buttonAliens(checked)
   self.ui:addWindow(UIInformation(self.ui, err))
 end
 
-function UICustomise:buttonFractured_bones(checked)
+function UICustomise:buttonFractured_bones()
   local app = self.ui.app
   app.config.disable_fractured_bones_females = not app.config.disable_fractured_bones_females
   self.fractured_bones_button:toggle()
@@ -186,11 +197,20 @@ function UICustomise:buttonFractured_bones(checked)
   self.ui:addWindow(UIInformation(self.ui, err))
 end
 
-function UICustomise:buttonAverage_contents(checked)
+function UICustomise:buttonAverage_contents()
   local app = self.ui.app
   app.config.enable_avg_contents = not app.config.enable_avg_contents
   self.average_contents_button:toggle()
   self.average_contents_panel:setLabel(app.config.enable_avg_contents and _S.customise_window.option_on or _S.customise_window.option_off)
+  app:saveConfig()
+  self:reload()
+end
+
+function UICustomise:buttonDestroyed_rooms()
+  local app = self.ui.app
+  app.config.remove_destroyed_rooms = not app.config.remove_destroyed_rooms
+  self.destroyed_rooms_button:toggle()
+  self.destroyed_rooms_panel:setLabel(app.config.remove_destroyed_rooms and _S.customise_window.option_on or _S.customise_window.option_off)
   app:saveConfig()
   self:reload()
 end

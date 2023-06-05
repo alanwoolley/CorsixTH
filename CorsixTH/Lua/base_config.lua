@@ -25,15 +25,24 @@ local configuration = {
   -----------------------------------------------------------
   --      New configuration values added in CorsixTH       --
   -----------------------------------------------------------
+  -- Interest rate and overdraft interest rate differential values will
+  --  be divided by 10,000
   town = {
-    InterestRate = 0.01,
+    InterestRate = 100,
     StartCash = 40000,
+    StartRep = 500,
+    OverdraftDiff = 200,
   },
 
   -- New value, but should only be defined if starting staff is included.
   --start_staff = {
   --  {Doctor = 0, Shrink = 0, Skill = 0},
   --},
+
+  -- Maximum salary value, staff will no longer become unhappy at this stage
+  payroll = {
+    MaxSalary = 2000,
+  },
 
   -----------------------------------------------------------
   --           Original configuration values               --
@@ -133,23 +142,24 @@ local configuration = {
   },
 
   towns = {
-    {StartCash = 40000, InterestRate = 100}, -- Level 1
-    {StartCash = 40000, InterestRate = 200}, --  Level 2
-    {StartCash = 50000, InterestRate = 300}, --  Level 3
-    {StartCash = 50000, InterestRate = 400}, --  Level 4
-    {StartCash = 50000, InterestRate = 500}, --  Level 5
-    {StartCash = 50000, InterestRate = 600}, --  Level 6
-    {StartCash = 50000, InterestRate = 700}, --  Level 7
-    {StartCash = 60000, InterestRate = 700}, --  Level 8
-    {StartCash = 60000, InterestRate = 800}, --  Level 9
-    {StartCash = 60000, InterestRate = 800}, --  Level 10
-    {StartCash = 70000, InterestRate = 900}, --  Level 11
-    {StartCash = 70000, InterestRate = 900}, --  Level 12
-    {StartCash = 70000, InterestRate = 900}, --  Level 12
+    {StartCash = 40000, InterestRate = 100, StartRep = 500, OverdraftDiff = 200}, --  Level 1
+    {StartCash = 40000, InterestRate = 200, StartRep = 500, OverdraftDiff = 200}, --  Level 2
+    {StartCash = 50000, InterestRate = 300, StartRep = 500, OverdraftDiff = 200}, --  Level 3
+    {StartCash = 50000, InterestRate = 400, StartRep = 500, OverdraftDiff = 200}, --  Level 4
+    {StartCash = 50000, InterestRate = 500, StartRep = 500, OverdraftDiff = 200}, --  Level 5
+    {StartCash = 50000, InterestRate = 600, StartRep = 500, OverdraftDiff = 200}, --  Level 6
+    {StartCash = 50000, InterestRate = 700, StartRep = 500, OverdraftDiff = 200}, --  Level 7
+    {StartCash = 60000, InterestRate = 700, StartRep = 500, OverdraftDiff = 200}, --  Level 8
+    {StartCash = 60000, InterestRate = 800, StartRep = 500, OverdraftDiff = 200}, --  Level 9
+    {StartCash = 60000, InterestRate = 800, StartRep = 500, OverdraftDiff = 200}, --  Level 10
+    {StartCash = 70000, InterestRate = 900, StartRep = 500, OverdraftDiff = 200}, --  Level 11
+    {StartCash = 70000, InterestRate = 900, StartRep = 500, OverdraftDiff = 200}, --  Level 12
+    {StartCash = 70000, InterestRate = 900, StartRep = 500, OverdraftDiff = 200}, --  Level 12
   },
   popn = {
     [0] = {Month = 0, Change = 4}, -- Standard: 4 patients the first month.
     [1] = {Month = 1, Change = 1}, -- Then increase by one per month.
+    [2] = {Month = 27, Change = 0}, -- Cap at 30, or population will go crazy.
   },
   expertise = {
     {StartPrice = 100, Known = 1, RschReqd = 0}, -- GENERAL_PRACTICE
@@ -211,7 +221,7 @@ local configuration = {
     {StartCost = 2500, StartAvail = 0, WhenAvail = 0, StartStrength = 8, AvailableForLevel = 0}, --  9 Inflator Machine
     {StartCost = 150, StartAvail = 1, WhenAvail = 0, StartStrength = 10, AvailableForLevel = 1}, --  10 Snooker Table
     {StartCost = 150, StartAvail = 1, WhenAvail = 0, StartStrength = 10, AvailableForLevel = 1}, --  11 New Receptionists Station
-    {StartCost = 5, StartAvail = 1, WhenAvail = 0, StartStrength = 10, AvailableForLevel = 1}, --  12 Build Room Tressle Table
+    {StartCost = 5, StartAvail = 1, WhenAvail = 0, StartStrength = 10, AvailableForLevel = 1}, --  12 Build Room Trestle Table
     {StartCost = 1000, StartAvail = 0, WhenAvail = 0, StartStrength = 13, AvailableForLevel = 0}, --  13 Cardiogram
     {StartCost = 5000, StartAvail = 0, WhenAvail = 0, StartStrength = 12, AvailableForLevel = 0}, --  14 Scanner
     {StartCost = 3000, StartAvail = 1, WhenAvail = 0, StartStrength = 10, AvailableForLevel = 1}, --  15 Scanner Console
@@ -345,6 +355,30 @@ local configuration = {
     {Value = 0}, -- I_PREGNANT
     {Value = 6}, -- I_TRANSPARENCY
   },
+  -- New feature, by default non-visual illnesses were always available
+  -- at the start
+  non_visuals_available = {
+    [0] = {Value = 0}, -- I_UNCOMMON_COLD
+    {Value = 0}, -- I_BROKEN_WIND
+    {Value = 0}, -- I_SPARE_RIBS
+    {Value = 0}, -- I_KIDNEY_BEANS
+    {Value = 0}, -- I_BROKEN_HEART
+    {Value = 0}, -- I_RUPTURED_NODULES
+    {Value = 0}, -- I_MULTIPLE_TV_PERSONALITIES
+    {Value = 0}, -- I_INFECTIOUS_LAUGHTER
+    {Value = 0}, -- I_CORRUGATED_ANKLES
+    {Value = 0}, -- I_CHRONIC_NOSEHAIR
+    {Value = 0}, -- I_3RD_DEGREE_SIDEBURNS
+    {Value = 0}, -- I_FAKE_BLOOD
+    {Value = 0}, -- I_GASTRIC_EJECTIONS
+    {Value = 0}, -- I_THE_SQUITS
+    {Value = 0}, -- I_IRON_LUNGS
+    {Value = 0}, -- I_SWEATY_PALMS
+    {Value = 0}, -- I_HEAPED_PILES
+    {Value = 0}, -- I_GUT_ROT
+    {Value = 0}, -- I_GOLF_STONES
+    {Value = 0}, -- I_UNEXPECTED_SWELLING
+  },
 
   win_criteria = {
     [0] = {Criteria = 0, MaxMin = 0, Value = 0, Group = 0, Bound = 0},
@@ -372,21 +406,21 @@ local configuration = {
     [0] = {StartMonth = 0, EndMonth = 0, Min = 0, Max = 0, Illness = 0, PercWin = 0, Bonus = 0},
   },
   computer = {
-    [0] = {Playing = 0}, -- ORAC
-    {Playing = 0}, -- COLOSSUS
-    {Playing = 0}, -- HAL
-    {Playing = 0}, -- MULTIVAC
-    {Playing = 0}, -- HOLLY
-    {Playing = 0}, -- DEEP THOUGHT
-    {Playing = 0}, -- ZEN
-    {Playing = 0}, -- SKYNET
-    {Playing = 0}, -- MARVIN
-    {Playing = 0}, -- CEREBRO
-    {Playing = 0}, -- MOTHER
-    {Playing = 0}, -- JAYNE
-    {Playing = 0}, -- CORSIX
-    {Playing = 0}, -- ROUJIN
-    {Playing = 0}, -- EDVIN
+    [0] = {Playing = 0, Name = "ORAC"},
+    {Playing = 0, Name = "COLOSSUS"},
+    {Playing = 0, Name = "HAL"},
+    {Playing = 0, Name = "MULTIVAC"},
+    {Playing = 0, Name = "HOLLY"},
+    {Playing = 0, Name = "DEEP THOUGHT"},
+    {Playing = 0, Name = "ZEN"},
+    {Playing = 0, Name = "SKYNET"},
+    {Playing = 0, Name = "MARVIN"},
+    {Playing = 0, Name = "CEREBRO"},
+    {Playing = 0, Name = "MOTHER"},
+    {Playing = 0, Name = "JAYNE"},
+    {Playing = 0, Name = "CORSIX"},
+    {Playing = 0, Name = "ROUJIN"},
+    {Playing = 0, Name = "EDVIN"},
   },
   awards_trophies = {
 
@@ -427,9 +461,11 @@ local configuration = {
     PlantBonus = 5,
     -- Bonus - MIN 0 MAX 255 (REP BONUS)
     TrophyStaffHappinessBonus = 5,
+    -- Bonus to money for curing every patient, no deaths or send-homes (MONEY BONUS)
+    TrophyAllCuredBonus = 20000,
     -- Bonus to money for NO DEATHS in the year (MONEY BONUS)
     TrophyDeathBonus = 10000,
-    -- Bonus to money for approximately 100% Cure Rate in the year (MONEY BONUS)
+    -- Bonus to money for over 90% Cure Rate in the year (MONEY BONUS)
     TrophyCuresBonus = 6000,
     -- Bonus to reputation for pleasing VIPs in the year (REPUTATION BONUS)
     TrophyMayorBonus = 5,
@@ -494,6 +530,8 @@ local configuration = {
     CuresBonus = 2000,
     -- MIN -32000 MAX +32000 - MONEY
     CuresPenalty = -3000,
+    -- MIN -32000 MAX +32000 - MONEY
+    AllCuresBonus = 5000,
     -- MIN -32000 MAX +32000 - MONEY
     DeathsBonus = 3000,
     -- MIN -32000 MAX +32000 - MONEY

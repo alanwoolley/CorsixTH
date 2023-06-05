@@ -18,8 +18,9 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE. --]]
 
-local lfs = require "lfs"
-local TH = require "TH"
+local lfs = require("lfs")
+local TH = require("TH")
+local iso_fs = TH.iso_fs()
 local lfsext = TH.lfsExt()
 
 --! A tree node representing a directory in the physical file-system.
@@ -37,7 +38,10 @@ function DirTreeNode:isValidFile(name)
   if FileTreeNode.isValidFile(self, name) and
       lfs.attributes(self:childPath(name), "mode") == "directory" then
     -- Make sure that we are allowed to read the directory.
-    local status, _ = pcall(lfs.dir, self:childPath(name))
+    local status, _, dir_obj = pcall(lfs.dir, self:childPath(name))
+    if status then
+      dir_obj:close()
+    end
     return status
   end
 end
@@ -67,10 +71,28 @@ function InstallDirTreeNode:createNewNode(path)
   return InstallDirTreeNode(path)
 end
 
+--! Test whether this file node is a directory or iso file.
+--
+--!return (bool) true if directory or iso, false otherwise
+function InstallDirTreeNode:isValidFile(name)
+  -- Check parent criteria and that it's a directory.
+  if FileTreeNode.isValidFile(self, name) then
+    return DirTreeNode.isValidFile(self, name) or FileSystem:isIso(name)
+  end
+  return false
+end
+
+
 function InstallDirTreeNode:select()
   -- Do nothing as an override. getHighlightColour solves this instead.
 end
 
+--! Check whether this node is a valid install selection.
+--
+-- Sets self.is_valid_directory to true if the selection is valid.
+--
+--!return (colour) A highlight colour if the node is a valid selection, or nil
+-- otherwise.
 function InstallDirTreeNode:getHighlightColour(canvas)
   local highlight_colour = self.highlight_colour
   if highlight_colour == nil then
@@ -80,20 +102,12 @@ function InstallDirTreeNode:getHighlightColour(canvas)
       -- Assume root-level things are not TH directories, unless we've already
       -- got a list of their children.
       highlight_colour = nil
-    elseif self:getChildCount() >= 3 then
-      local ngot = 0
-      local things_to_check = {"data", "levels", "qdata"}
-      for _, thing in ipairs(things_to_check) do
-        if not self.children[thing:lower()] then
-          break
-        else
-          ngot = ngot + 1
-        end
-      end
-      if ngot == 3 then
-        highlight_colour = canvas:mapRGB(0, 255, 0)
-        self.is_valid_directory = true
-      end
+    elseif self:getChildCount() >= 3 and TheApp:isThemeHospitalPath(self.path) then
+      highlight_colour = canvas:mapRGB(0, 255, 0)
+      self.is_valid_directory = true
+    elseif FileSystem:isIso(self.path) and iso_fs:setRoot(self.path) then
+      highlight_colour = canvas:mapRGB(0, 255, 0)
+      self.is_valid_directory = true
     end
     self.highlight_colour = highlight_colour
   end
@@ -146,7 +160,8 @@ function UIDirectoryBrowser:UIDirectoryBrowser(ui, mode, instruction, treenode_c
   else
     self.font = ui.app.gfx:loadBuiltinFont()
     self:setDefaultPosition(0.05, 0.5)
-    self:addKeyHandler("escape", self.exit)
+    self:addKeyHandler("global_cancel", self.exit)
+    self:addKeyHandler("global_cancel_alt", self.exit)
     self.exit_button:setLabel(_S.install.exit, self.font):makeButton(0, 0, 100, 18, nil, self.exit)
   end
 

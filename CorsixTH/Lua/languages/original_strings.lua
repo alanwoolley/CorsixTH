@@ -648,8 +648,8 @@ adviser = {
     patient_abducted              = S[11][111], -- what the heck is this? I never got that far in the original...
     patient_leaving_too_expensive = S[11][118],
 
-    pay_rise                      = S[11][ 29], -- TODO only in tutorial / first time?
-    handyman_adjust               = S[11][ 71], -- TODO only in tutorial / first time?
+    pay_rise                      = S[11][ 29], -- Once only
+    handyman_adjust               = S[11][ 71], -- Once only
     fax_received                  = S[11][136], -- Once only
 
     vip_arrived                   = S[21][  9], -- %s (name of VIP)
@@ -1142,9 +1142,9 @@ trophy_room = {
       S[55][ 7],
     },
   },
-  all_cured = {         -- not implemented
+  all_cured = {
     awards = {
-      S[27][29],          -- for 100% treat rate (does that mean none sent home or killed?)
+      S[27][29],          -- for 100% treat rate (none sent home or killed)
     },
     trophies = {
       S[27][30],          -- for 100% cure rate
@@ -2059,32 +2059,22 @@ fax = {
     rep_boost  = S[44][194],
     rep_loss   = S[44][195],
 
-    remarks = {
-      super = {
-        S[44][196],
-        S[44][197],
-        S[44][198],
-      },
-      good = {
-        S[44][199],
-        S[44][200],
-        S[44][201],
-      },
-      mediocre = {
-        S[44][202],
-        S[44][203],
-        S[44][204],
-      },
-      bad = {
-        S[44][205],
-        S[44][206],
-        S[44][207],
-      },
-      very_bad = {
-        S[44][208],
-        S[44][209],
-        S[44][210],
-      },
+    remarks = { -- Ordered from best to worst
+        [1] = S[44][196],
+        [2] = S[44][197],
+        [3] = S[44][198],
+        [4] = S[44][199],
+        [5] = S[44][200],
+        [6] = S[44][201],
+        [7] = S[44][202],
+        [8] = S[44][203],
+        [9] = S[44][204],
+        [10] = S[44][205],
+        [11] = S[44][206],
+        [12] = S[44][207],
+        [13] = S[44][208],
+        [14] = S[44][209],
+        [15] = S[44][210],
     },
   },
 

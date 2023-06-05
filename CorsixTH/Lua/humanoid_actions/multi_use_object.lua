@@ -69,7 +69,7 @@ function MultiUseObjectAction:setLayer3(layer3)
   return self
 end
 
-local TH = require "TH"
+local TH = require("TH")
 
 local orient_mirror = {
   north = "west",
@@ -171,20 +171,17 @@ local function action_multi_use_phase(action, humanoid, phase)
   end
   humanoid:setAnimation(anim, action.mirror_flags)
 
-  local offset = object.object_type.orientations
-  if offset then
-    local tx, ty
-    offset = offset[object.direction]
-    if offset.use_animate_from_use_position then
-      tx, ty = object.tile_x + offset.use_position[1], object.tile_y + offset.use_position[2]
-    else
-      tx, ty = object:getRenderAttachTile()
-    end
-    offset = offset.animation_offset
-    humanoid:setTilePositionSpeed(tx, ty, offset[1], offset[2])
+  -- Compute the position of the animated humanoid.
+  local tx, ty
+  local obj_orient = object.object_type.orientations[object.direction]
+  if obj_orient.use_animate_from_use_position then
+    tx = object.tile_x + obj_orient.use_position[1]
+    ty = object.tile_y + obj_orient.use_position[2]
   else
-    humanoid:setTilePositionSpeed(object.tile_x, object.tile_y, 0, 0)
+    tx, ty = object:getRenderAttachTile()
   end
+  local offset = obj_orient.animation_offset
+  humanoid:setTilePositionSpeed(tx, ty, offset[1], offset[2])
 
   humanoid.user_of = object
   local length = humanoid.world:getAnimLength(anim)
@@ -246,7 +243,7 @@ local function copy_layers(dest, src)
 end
 
 action_multi_use_object_tick = permanent"action_multi_use_object_tick"( function(humanoid)
-  local action = humanoid.action_queue[1]
+  local action = humanoid:getCurrentAction()
   local use_with = action.use_with
   local object = action.object
   local phase = action.phase
@@ -300,8 +297,8 @@ action_multi_use_object_tick = permanent"action_multi_use_object_tick"( function
     end
 
     use_with.th:makeVisible()
-    use_with.action_queue[1].on_interrupt = action.idle_interrupt
-    use_with.action_queue[1].must_happen = action.idle_must_happen
+    use_with:getCurrentAction().on_interrupt = action.idle_interrupt
+    use_with:getCurrentAction().must_happen = action.idle_must_happen
     local spec = object.object_type.orientations[object.direction]
     local pos = spec.finish_use_position or spec.use_position
     humanoid:setTilePositionSpeed(object.tile_x + pos[1], object.tile_y + pos[2])
@@ -339,19 +336,19 @@ local function action_multi_use_object_start(action, humanoid)
       return
     end
   end
-  if use_with.action_queue[1].name ~= "idle" then
+  if use_with:getCurrentAction().name ~= "idle" then
     humanoid:queueAction(IdleAction():setCount(2), 0)
     return
   else
-    action.idle_interrupt = use_with.action_queue[1].on_interrupt
-    action.idle_must_happen = use_with.action_queue[1].must_happen
-    use_with.action_queue[1].on_interrupt = nil
-    use_with.action_queue[1].must_happen = true
+    action.idle_interrupt = use_with:getCurrentAction().on_interrupt
+    action.idle_must_happen = use_with:getCurrentAction().must_happen
+    use_with:getCurrentAction().on_interrupt = nil
+    use_with:getCurrentAction().must_happen = true
   end
   action.must_happen = true
   if action.prolonged_usage then
     action.on_interrupt = action_multi_use_object_interrupt
-    use_with.action_queue[1].on_interrupt = --[[persistable:action_multi_use_object_use_with_interrupt]] function()
+    use_with:getCurrentAction().on_interrupt = --[[persistable:action_multi_use_object_use_with_interrupt]] function()
       if action.on_interrupt then
         action:on_interrupt()
         action.on_interrupt = nil

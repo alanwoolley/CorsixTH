@@ -1,20 +1,24 @@
 version: '{build}'
-image: Visual Studio 2017
+image: Visual Studio 2019
 pull_requests:
   do_not_increment_build_number: true
 init:
-environment:
-  matrix:
-  - GENERATOR: Visual Studio 15 2017 Win64
 cache:
   - vcpkg -> CMake/VcpkgDeps.cmake, scripts/build_vcpkg_deps.ps1
 configuration: Release
 before_build:
-  - cmd: cmake -G "%GENERATOR%" -DUSE_VCPKG_DEPS=ON
+  - cmd: cmake -G "Visual Studio 16 2019" -DUSE_VCPKG_DEPS=ON -DVCPKG_TARGET_TRIPLET=x64-windows-release -DENABLE_UNIT_TESTS=ON .
 build:
   project: CorsixTH_Top_Level.sln
   verbosity: minimal
+
+test_script:
+  - cd CorsixTH
+  - cmd: ctest -VV -C Release
+  - cd ..
+
 after_build:
+- curl -L -o %APPVEYOR_BUILD_FOLDER%/CorsixTH/Release/FluidR3.sf3 https://github.com/Jacalz/fluid-soundfont/raw/master/SF3/FluidR3.sf3
 - cp -R %APPVEYOR_BUILD_FOLDER%/CorsixTH/Lua %APPVEYOR_BUILD_FOLDER%/CorsixTH/Release/Lua
 - cp -R %APPVEYOR_BUILD_FOLDER%/CorsixTH/Bitmap %APPVEYOR_BUILD_FOLDER%/CorsixTH/Release/Bitmap
 - cp -R %APPVEYOR_BUILD_FOLDER%/CorsixTH/Levels %APPVEYOR_BUILD_FOLDER%/CorsixTH/Release/Levels

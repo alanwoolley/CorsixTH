@@ -21,24 +21,28 @@ SOFTWARE.
 */
 
 #include "config.h"
+
+#include <array>
+#include <cstdio>
+#include <cstring>
+#include <fstream>
+#include <string>
+
+#include "iso_fs.h"
 #include "lua.hpp"
+#include "lua_rnc.h"
 #include "../logging.h"
 #include "../commands.h"
 #include "main.h"
 
-extern "C" {
 int luaopen_lpeg(lua_State *L);
-int luaopen_random(lua_State *L);
-}
-#include "rnc.h"
-#include "th_lua.h"
 #include "lua_sdl.h"
-#include "jit_opt.h"
 #include "persist_lua.h"
-#include "iso_fs.h"
-#include "lfs.h"
-#include <cstring>
-#include <cstdio>
+#include "th_lua.h"
+
+#ifdef CORSIX_TH_SEARCH_LOCAL_DATADIRS
+#include "../../libs/whereami/whereami.h"
+#endif
 
 // Config file checking
 #ifndef CORSIX_TH_USE_PACK_PRAGMAS
@@ -48,208 +52,192 @@ int luaopen_random(lua_State *L);
 
 extern JavaVM* jvm;
 
-int CorsixTH_lua_main_no_eval(lua_State *L)
-{
-    // assert(_VERSION == LUA_VERSION)
-    size_t iLength;
-    lua_getglobal(L, "_VERSION");
-    const char* sVersion = lua_tolstring(L, -1, &iLength);
-    if(iLength != std::strlen(LUA_VERSION) || std::strcmp(sVersion, LUA_VERSION) != 0)
-    {
-        lua_pushliteral(L, "Linked against a version of Lua different to the "
-            "one used when compiling.\nPlease recompile CorsixTH against the "
-            "same Lua version it is linked against.");
-		sendCommand(jvm,COMMAND_GAME_LOAD_ERROR);
-        return lua_error(L);
+extern "C" {
+int luaopen_random(lua_State* L);
+}
+
+namespace {
+
+inline void preload_lua_package(lua_State* L, const char* name,
+                                lua_CFunction fn) {
+  luaT_execute(
+      L, std::string("package.preload.").append(name).append(" = ...").c_str(),
+      fn);
+}
+
+// relace me with C++17 std::filesystem::exists
+inline bool file_exists(const char* f) {
+  std::ifstream file(f);
+  return file.is_open();
+}
+
+inline bool file_exists(const std::string& f) { return file_exists(f.c_str()); }
+
+std::string search_script_file(lua_State* L) {
+  // 1. Check for --interpreter
+  int iNArgs = lua_gettop(L);
+  for (int i = 1; i <= iNArgs; ++i) {
+    if (lua_type(L, i) == LUA_TSTRING) {
+      size_t iLen;
+      const char* sCmd = lua_tolstring(L, i, &iLen);
+      if (iLen > 14 && std::memcmp(sCmd, "--interpreter=", 14) == 0)
+        return sCmd + 14;
     }
-    lua_pop(L, 1);
+  }
 
-    // math.random* = Mersenne twister variant
-    luaT_cpcall(L, luaopen_random, nullptr);
-
-    // package.preload["jit.opt"] = load(jit_opt_lua)
-    // package.preload["jit.opt_inline"] = load(jit_opt_inline_lua)
-    lua_getglobal(L, "package");
-    lua_getfield(L, -1, "preload");
-    luaL_loadbuffer(L, (const char*)jit_opt_lua, sizeof(jit_opt_lua),
-        "jit/opt.luac");
-    lua_setfield(L, -2, "jit.opt");
-    luaL_loadbuffer(L, (const char*)jit_opt_inline_lua,
-        sizeof(jit_opt_inline_lua), "jit/opt_inline.luac");
-    lua_setfield(L, -2, "jit.opt_inline");
-    lua_pop(L, 2);
-
-    // if registry._LOADED.jit then
-    // require"jit.opt".start()
-    // else
-    // print "Notice: ..."
-    // end
-    // (this could be done in Lua rather than here, but ideally the optimiser
-    // should be turned on before any Lua code is loaded)
-    lua_getfield(L, LUA_REGISTRYINDEX, "_LOADED");
-    lua_getfield(L, -1, "jit");
-    if(lua_type(L, -1) == LUA_TNIL)
-    {
-        lua_pop(L, 2);
+#ifdef CORSIX_TH_SEARCH_LOCAL_DATADIRS
+  // 2. Find CorsixTH.lua in working dir and program dir
+  static constexpr std::array<const char*, 4> asSearchDirs{
+      "./",
+      "CorsixTH/",
+      "Contents/Resources/",
+      "../Resources/",
+  };
+  std::string strProgramDir = "";
+  {
+    int iProgramPathLength = wai_getExecutablePath(nullptr, 0, nullptr);
+    if (iProgramPathLength != 0) {
+      char* sProgramDir = new char[iProgramPathLength + 1];
+      int iProgramDirLength;
+      int iProgramPathLengthReal = wai_getExecutablePath(
+          sProgramDir, iProgramPathLength, &iProgramDirLength);
+      if (iProgramPathLengthReal != iProgramPathLength ||
+          iProgramPathLength <= iProgramDirLength) {
+        if (iProgramPathLengthReal != iProgramPathLength)
+          std::fprintf(stderr,
+                       "Path length of CorsixTH binary changed?!?! "
+                       "Old: %d, new: %d.\n",
+                       iProgramPathLength, iProgramPathLengthReal);
+        else
+          std::fprintf(stderr,
+                       "Path to CorsixTH looks like a directory?!?! "
+                       "Path is: '%s'.\n",
+                       sProgramDir);
+        std::fprintf(stderr, "Please report this incident!\n");
+        std::fflush(stderr);
+        exit(255);
+      }
+      // replace me with C++17 std::filesystem::path::preferred_separator
+      sProgramDir[iProgramDirLength] = '/';
+      sProgramDir[iProgramDirLength + 1] = '\0';
+      strProgramDir = sProgramDir;
+      delete[] sProgramDir;
     }
-    else
-    {
-        lua_pop(L, 2);
-        lua_getglobal(L, "require");
-        lua_pushliteral(L, "jit.opt");
-        lua_call(L, 1, 1);
-        lua_getfield(L, -1, "start");
-        lua_call(L, 0, 0);
-        lua_pop(L, 1);
+  }
+  for (auto sSearchDir : asSearchDirs) {
+    std::string strPathInWorkingDir =
+        std::string(sSearchDir) + CORSIX_TH_INTERPRETER_NAME;
+    if (file_exists(strPathInWorkingDir)) return strPathInWorkingDir;
+    if (!strProgramDir.empty()) {
+      std::string strPathInProgramDir = strProgramDir + strPathInWorkingDir;
+      if (file_exists(strPathInProgramDir)) return strPathInProgramDir;
     }
+  }
+#endif
 
-    // Fill in package.preload table so that calls to require("X") from Lua
-    // will call the appropriate luaopen_X function in C.
-#define PRELOAD(name, fn) \
-    luaT_execute(L, "package.preload." name " = ...", fn)
-    PRELOAD("rnc", luaopen_rnc);
-    PRELOAD("TH", luaopen_th);
-    PRELOAD("ISO_FS", luaopen_iso_fs);
-    PRELOAD("persist", luaopen_persist);
-    PRELOAD("sdl", luaopen_sdl);
+  // 3. Check CORSIX_TH_INTERPRETER_PATH
+  if (file_exists(CORSIX_TH_INTERPRETER_PATH))
+    return CORSIX_TH_INTERPRETER_PATH;
+
+  return "";
+}
+
+}  // namespace
+
+int lua_main_no_eval(lua_State* L) {
+  // assert(_VERSION == LUA_VERSION)
+  size_t iLength;
+  lua_getglobal(L, "_VERSION");
+  const char* sVersion = lua_tolstring(L, -1, &iLength);
+  if (iLength != std::strlen(LUA_VERSION) ||
+      std::strcmp(sVersion, LUA_VERSION) != 0) {
+    lua_pushliteral(
+        L,
+        "Linked against a version of Lua different to the one used "
+        "when compiling.\nPlease recompile CorsixTH against the same "
+        "Lua version it is linked against.");
+    sendCommand(jvm, COMMAND_GAME_LOAD_ERROR);
+    return lua_error(L);
+  }
+  lua_pop(L, 1);
+
+  // math.random* = Mersenne twister variant
+  luaT_cpcall(L, luaopen_random, nullptr);
+
+  // Fill in package.preload table so that calls to require("X") from Lua
+  // will call the appropriate luaopen_X function in C.
+  preload_lua_package(L, "rnc", luaopen_rnc);
+  preload_lua_package(L, "TH", luaopen_th);
+  preload_lua_package(L, "persist", luaopen_persist);
+  preload_lua_package(L, "sdl", luaopen_sdl);
     // These have been removed from CorsixTH trunk but are required for Android
     PRELOAD("lfs", luaopen_lfs);
     PRELOAD("lpeg", luaopen_lpeg);
-#undef PRELOAD
 
-    // require "debug" (Harmless in Lua 5.1, useful in 5.2 for compatbility)
-    luaT_execute(L, "require \"debug\"");
+  // require "debug" (Harmless in Lua 5.1, useful in 5.2 for compatibility)
+  luaT_execute(L, "require \"debug\"");
 
-    // Check for --interpreter and run that instead of CorsixTH.lua
-    bool bGotScriptFile = false;
-    int iNArgs = lua_gettop(L);
-    for(int i = 1; i <= iNArgs; ++i)
-    {
-        if(lua_type(L, i) == LUA_TSTRING)
-        {
-            size_t iLen;
-            const char* sCmd = lua_tolstring(L, i, &iLen);
-            if(iLen > 14 && std::memcmp(sCmd, "--interpreter=", 14) == 0)
-            {
-                lua_getglobal(L, "assert");
-                lua_getglobal(L, "loadfile");
-                lua_pushlstring(L, sCmd + 14, iLen - 14);
-                bGotScriptFile = true;
-                break;
-            }
-        }
-    }
-
-    JNIEnv* jEnv;
-
-    	jvm->AttachCurrentThread(&jEnv, NULL);
-
-    	jclass cls = jEnv->FindClass("uk/co/armedpineapple/cth/SDLActivity");
-    	jmethodID method = jEnv->GetStaticMethodID(cls, "nativeGetGamePath",
-    			"()Ljava/lang/String;");
-
-    	jstring jpath = (jstring) jEnv->CallStaticObjectMethod(cls, method);
-
-    	const char* path = jEnv->GetStringUTFChars(jpath, 0);
-
-
-    // Code to try several variations on finding CorsixTH.lua:
-    // CorsixTH.lua
-    // CorsixTH/CorsixTH.lua
-    // ../CorsixTH.lua
-    // ../CorsixTH/CorsixTH.lua
-    // ../../CorsixTH.lua
-    // ../../CorsixTH/CorsixTH.lua
-    // ../../../CorsixTH.lua
-    // ../../../CorsixTH/CorsixTH.lua
-    // It is simpler to write this in Lua than in C.
-	std::string	sLuaCorsixTHLua(
-    "local name, sep, code = \"CorsixTH.lua\", package.config:sub(1, 1)\n"
-    "local root = (... or \"\"):match(\"^(.*[\"..sep..\"])\") or \"\"\n"
-					"code = loadfile(\"");
-	sLuaCorsixTHLua.append(path);
-	sLuaCorsixTHLua.append("\"..name)\n"
-					"if code then return code end\n"
-#ifdef __APPLE__ // Darrell: Search inside the bundle first.
-                 // There's probably a better way of doing this.
-#if defined(IS_CORSIXTH_APP)
-    "code = loadfile(\"CorsixTH.app/Contents/Resources/\"..name)\n"
-    "if code then return code end\n"
-#endif
-#endif
-    "for num_dotdot = 0, 3 do\n"
-    "  for num_dir = 0, 1 do\n"
-    "    code = loadfile(root..(\"..\"..sep):rep(num_dotdot)..\n"
-    "                    (\"CorsixTH\"..sep):rep(num_dir)..name)\n"
-    "    if code then return code end \n"
-    "  end \n"
-    "end \n"
-    "return loadfile(name)");
-
-	jEnv->ReleaseStringUTFChars(jpath, path);
-
-
-    // return assert(loadfile"CorsixTH.lua")(...)
-    if(!bGotScriptFile)
-    {
-        lua_getglobal(L, "assert");
-        luaL_loadbuffer(L, sLuaCorsixTHLua.c_str(), sLuaCorsixTHLua.length(),
-            "@main.cpp (l_main bootstrap)");
-        if(lua_gettop(L) == 2)
-            lua_pushnil(L);
-        else
-            lua_pushvalue(L, 1);
-    }
-    lua_call(L, 1, 2);
-    lua_call(L, 2, 1);
-    lua_insert(L, 1);
-    return lua_gettop(L);
-}
-
-int CorsixTH_lua_main(lua_State *L)
-{
-    lua_call(L, CorsixTH_lua_main_no_eval(L) - 1, LUA_MULTRET);
-    return lua_gettop(L);
-}
-
-int CorsixTH_lua_stacktrace(lua_State *L)
-{
-    // err = tostring(err)
-    lua_settop(L, 1);
-    lua_getglobal(L, "tostring");
-    lua_insert(L, 1);
-    lua_call(L, 1, 1);
-
-    // err = <description> .. err
-    lua_pushliteral(L, "An error has occurred in CorsixTH:\n");
-    lua_insert(L, 1);
-    lua_concat(L, 2);
-
-    // return debug.traceback(err, 2)
-    lua_getglobal(L, "debug");
-    lua_getfield(L, -1, "traceback");
-    lua_pushvalue(L, 1);
-    lua_pushinteger(L, 2);
-    lua_call(L, 2, 1);
-
-    return 1;
-}
-
-int CorsixTH_lua_panic(lua_State *L)
-{
-    std::fprintf(stderr, "A Lua error has occurred in CorsixTH outside of protected "
-        "mode!!\n");
+  auto scriptFilePath = search_script_file(L);
+  if (scriptFilePath.empty()) {
+    std::fprintf(stderr,
+                 "CorsixTH cannot find CorsixTH.lua. If you want use a custom "
+                 "location, specify it by --interpreter=FILE\n");
     std::fflush(stderr);
+    exit(1);
+  }
 
-    if(lua_type(L, -1) == LUA_TSTRING)
-        std::fprintf(stderr, "%s\n", lua_tostring(L, -1));
-    else
-        std::fprintf(stderr, "%p\n", lua_topointer(L, -1));
-    std::fflush(stderr);
+  lua_getglobal(L, "assert");
+  lua_getglobal(L, "loadfile");
+  lua_pushstring(L, scriptFilePath.c_str());
 
-    // A stack trace would be nice, but they cannot be done in a panic.
+  lua_call(L, 1, 2);
+  lua_call(L, 2, 1);
+  lua_insert(L, 1);
+  return lua_gettop(L);
+}
+
+int lua_main(lua_State* L) {
+  lua_call(L, lua_main_no_eval(L) - 1, LUA_MULTRET);
+  return lua_gettop(L);
+}
+
+int lua_stacktrace(lua_State* L) {
+  // err = tostring(err)
+  lua_settop(L, 1);
+  lua_getglobal(L, "tostring");
+  lua_insert(L, 1);
+  lua_call(L, 1, 1);
+
+  // err = <description> .. err
+  lua_pushliteral(L, "An error has occurred in CorsixTH:\n");
+  lua_insert(L, 1);
+  lua_concat(L, 2);
+
+  // return debug.traceback(err, 2)
+  lua_getglobal(L, "debug");
+  lua_getfield(L, -1, "traceback");
+  lua_pushvalue(L, 1);
+  lua_pushinteger(L, 2);
+  lua_call(L, 2, 1);
+
+  return 1;
+}
+
+int lua_panic(lua_State* L) {
+  std::fprintf(stderr,
+               "A Lua error has occurred in CorsixTH outside of protected "
+               "mode!\n");
+  std::fflush(stderr);
+
+  if (lua_type(L, -1) == LUA_TSTRING)
+    std::fprintf(stderr, "%s\n", lua_tostring(L, -1));
+  else
+    std::fprintf(stderr, "%p\n", lua_topointer(L, -1));
+  std::fflush(stderr);
+
+  // A stack trace would be nice, but they cannot be done in a panic.
 
 	sendCommand(jvm,COMMAND_GAME_LOAD_ERROR);
 
-    return 0;
+  return 0;
 }
