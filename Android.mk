@@ -23,12 +23,6 @@ LOCAL_C_INCLUDES := $(LOCAL_PATH)/$(SDL_PATH)/include \
 					$(LOCAL_PATH)/$(CTH_ASSETS) \
 					$(LOCAL_PATH)/$(SDL_GFX_PATH) \
 					$(LOCAL_PATH)/$(LUA_PATH) \
-					$(LOCAL_PATH)/$(FFMPEG_PATH) \
-					$(LOCAL_PATH)/$(FFMPEG_PATH)/libavcodec \
-					$(LOCAL_PATH)/$(FFMPEG_PATH)/libavformat \
-					$(LOCAL_PATH)/$(FFMPEG_PATH)/libavutil \
-					$(LOCAL_PATH)/$(FFMPEG_PATH)/libswresample \
-					$(LOCAL_PATH)/$(FFMPEG_PATH)/libswscale \
 					../LFS
 					
 LOCAL_CFLAGS := -DPLAY_MOD 
@@ -68,10 +62,10 @@ LOCAL_SRC_FILES := $(CORSIX_TH_SRC)/../appmain.cpp \
 			$(SDL_PATH)/src/main/android/SDL_android_main.cpp
 
 LOCAL_SHARED_LIBRARIES := libLUA SDL2 SDL2_mixer
-LOCAL_STATIC_LIBRARIES := libfreetype2 libSDL2_gfx libLFS libLPEG libavformat libavcodec libswscale libavutil libswscale libswresample liblodepng
+LOCAL_STATIC_LIBRARIES := libc++_static libfreetype2 libSDL2_gfx libLFS libLPEG libavformat libavcodec libswscale libavutil libswscale libswresample liblodepng
 
 LOCAL_LDLIBS := -llog -lGLESv2 -lz
-LOCAL_CPPFLAGS :=-D__STDC_CONSTANT_MACROS -std=c++11
+LOCAL_CPPFLAGS := -std=c++17
 LOCAL_CPP_FEATURES += exceptions
 
 include $(BUILD_SHARED_LIBRARY)

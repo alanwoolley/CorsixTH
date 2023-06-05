@@ -36,6 +36,8 @@ SOFTWARE.
 #include "main.h"
 
 int luaopen_lpeg(lua_State *L);
+int luaopen_lfs(lua_State *L);
+
 #include "lua_sdl.h"
 #include "persist_lua.h"
 #include "th_lua.h"
@@ -170,9 +172,9 @@ int lua_main_no_eval(lua_State* L) {
   preload_lua_package(L, "TH", luaopen_th);
   preload_lua_package(L, "persist", luaopen_persist);
   preload_lua_package(L, "sdl", luaopen_sdl);
-    // These have been removed from CorsixTH trunk but are required for Android
-    PRELOAD("lfs", luaopen_lfs);
-    PRELOAD("lpeg", luaopen_lpeg);
+  // These have been removed from CorsixTH trunk but are required for Android
+  preload_lua_package(L, "lfs", luaopen_lfs);
+  preload_lua_package(L, "lpeg", luaopen_lpeg);
 
   // require "debug" (Harmless in Lua 5.1, useful in 5.2 for compatibility)
   luaT_execute(L, "require \"debug\"");

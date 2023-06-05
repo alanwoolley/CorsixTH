@@ -23,6 +23,25 @@ SOFTWARE.
 #ifndef CORSIX_TH_CONFIG_H_
 #define CORSIX_TH_CONFIG_H_
 
+/** Interpreter script searching options **/
+// Whether to search in some possible local dirs according to a fixed list,
+// relative to current working dir or program dir
+#define CORSIX_TH_SEARCH_LOCAL_DATADIRS
+
+// Name of the script, usually 'CorsixTH.lua'
+#define CORSIX_TH_INTERPRETER_NAME "CorsixTH.lua"
+
+// A final path (with file name) to search
+#define CORSIX_TH_INTERPRETER_PATH "CorsixTH/CorsixTH.lua"
+
+/** Windows Platform SDK usage **/
+// When compiling on Windows, the platform SDK should be used. However, when
+// using the SDL rendering engine, the platform SDK is not used for anything
+// critical, and so its use can be avoided if necessary.
+#ifdef _WIN32
+#define CORSIX_TH_USE_WIN32_SDK
+#endif
+
 /** Rendering engine choice **/
 // SDL - Multiplatform, but suboptimal on some platforms
 // DirectX 9 - Windows only, but always has HW accellerated (alpha) blitting
@@ -59,22 +78,17 @@ SOFTWARE.
 // any music.
 #define CORSIX_TH_USE_SDL_MIXER
 
+/** Movie options **/
+// FFmpeg
+// If this library is not present on your system, then you can comment out the
+// next line and the game will not have movies.
+#define CORSIX_TH_USE_FFMPEG
+
 /** Font options **/
 // FreeType2 can be used for font support beyond the CP437 bitmap fonts which
 // come with Theme Hospital. It must be used if translations like Russian or
 // Chinese are desired.
 #define CORSIX_TH_USE_FREETYPE2
-
-/** MOVIES! **/
-#define CORSIX_TH_USE_FFMPEG
-
-/** Environment detection **/
-#if defined(__amd64__) || defined(__IA64__) || defined(__x86_64__) || \
-    defined(__x86_64) || defined(_M_IA64) ||  defined(_IA64) || \
-    defined(_M_X64) || defined(_WIN64) || defined(__ia64__) || \
-    defined(__amd64) || defined (_LP64) || defined(__ia64)
-#define CORSIX_TH_64BIT
-#endif
 
 #ifdef _MSC_VER
 #define CORSIX_TH_USE_PACK_PRAGMAS 1
@@ -85,23 +99,31 @@ SOFTWARE.
 #endif
 
 /** Standard includes **/
-#include <stddef.h>
-#define CORSIX_TH_HAS_STDINT_H
-#define CORSIX_TH_HAS_MALLOC_H
-#define CORSIX_TH_HAS_ALLOCA_H
-#ifdef CORSIX_TH_HAS_STDINT_H
-#include <stdint.h>
-#else
-// Some compilers (e.g. MSVC) don't have stdint.h, so define the bits we use
-// from stdint.h
-typedef   signed __int8   int8_t;
-typedef   signed __int16  int16_t;
-typedef   signed __int32  int32_t;
-typedef   signed __int64  int64_t;
-typedef unsigned __int8  uint8_t;
-typedef unsigned __int16 uint16_t;
-typedef unsigned __int32 uint32_t;
-typedef unsigned __int64 uint64_t;
-#endif // CORSIX_TH_HAS_STDINT
+#include <cstddef>
+#include <cstdint>
+
+// We bring in the most common stddef and stdint types to avoid typing
+// clang-format off
+using std::int8_t;
+using std::int16_t;
+using std::int32_t;
+using std::int64_t;
+using std::size_t;
+using std::uint8_t;
+using std::uint16_t;
+using std::uint32_t;
+using std::uint64_t;
+// clang-format on
+
+/** Visual Leak Detector **/
+// In Visual Studio, Visual Leak Detector can be used to find memory leaks.
+//#define CORSIX_TH_USE_VLD
+
+/** Report operating system **/
+#define CORSIX_TH_OS "linux"
+
+/** Report system architecture **/
+#define CORSIX_TH_ARCH ""
+
 
 #endif // CORSIX_TH_CONFIG_H_

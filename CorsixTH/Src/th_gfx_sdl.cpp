@@ -714,7 +714,6 @@ void render_target::set_cursor_position(int iX, int iY) {
   cursor_y = iY;
 }
 
-bool render_target::take_screenshot(const char* sFile) {
 Uint32 getpixel(SDL_Surface *surface,int x,int y){
   int bpp = surface->format->BytesPerPixel;
   Uint8 *p = (Uint8 *)surface->pixels + y * surface->pitch + x * bpp;
@@ -735,7 +734,7 @@ Uint32 getpixel(SDL_Surface *surface,int x,int y){
   }
 }
 
-void THRenderTarget::savePNG(const char* sFile, SDL_Surface* rgbSurface, int w, int h) {
+void render_target::savePNG(const char* sFile, SDL_Surface* rgbSurface, int w, int h) {
 
     	Uint32 color=0;
 

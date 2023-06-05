@@ -360,7 +360,7 @@ int SDL_main(int argc, char** argv, JavaVM* vm, jobject configuration) {
 					"Cannot open Lua state.\n");
 			return 0;
 		}
-		lua_atpanic(L, CorsixTH_lua_panic);
+		lua_atpanic(L, lua_panic);
 		luaL_openlibs(L);
 
 		// Register C functions
@@ -377,8 +377,8 @@ int SDL_main(int argc, char** argv, JavaVM* vm, jobject configuration) {
 		lua_register(L, "gamesaveupdated", gamesaveupdated);
 
 		lua_settop(L, 0);
-		lua_pushcfunction(L, CorsixTH_lua_stacktrace);
-		lua_pushcfunction(L, CorsixTH_lua_main);
+		lua_pushcfunction(L, lua_stacktrace);
+		lua_pushcfunction(L, lua_main);
 
 		// Move command line parameters onto the Lua stack
 		lua_checkstack(L, argc);
@@ -394,7 +394,7 @@ int SDL_main(int argc, char** argv, JavaVM* vm, jobject configuration) {
 				fprintf(stderr, "An error has occured in CorsixTH:\n"
 						"Uncaught non-string Lua error\n");
 			}
-			lua_pushcfunction(L, Bootstrap_lua_error_report);
+			lua_pushcfunction(L, bootstrap_lua_error_report);
 			lua_insert(L, -2);
 			if (lua_pcall(L, 1, 0, 0) != 0) {
 				fprintf(stderr, "%s\n", lua_tostring(L, -1));
