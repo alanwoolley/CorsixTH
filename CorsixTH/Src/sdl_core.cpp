@@ -154,16 +154,6 @@ static void l_pushtableint(lua_State *L, const char* k, int v) {
 	lua_settable(L, -3);
 }
 
-void set_fps_limit(int newfps) {
-
-	fps = newfps;
-	if (fps != 0) {
-		SDL_initFramerate(&fps_manager);
-		SDL_setFramerate(&fps_manager, newfps);
-	}
-	printf("New framerate limit is %i \n", newfps);
-}
-
 int l_mainloop(lua_State *L) {
   luaL_checktype(L, 1, LUA_TTHREAD);
   lua_State* dispatcher = lua_tothread(L, 1);
@@ -525,4 +515,14 @@ int luaopen_sdl(lua_State* L) {
   load_extra(L, "wm", luaopen_sdl_wm);
 
   return 1;
+}
+
+void set_fps_limit(int newfps) {
+
+    fps = newfps;
+    if (fps != 0) {
+        SDL_initFramerate(&fps_manager);
+        SDL_setFramerate(&fps_manager, newfps);
+    }
+    printf("New framerate limit is %i \n", newfps);
 }

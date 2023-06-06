@@ -35,9 +35,6 @@ SOFTWARE.
 #include "../commands.h"
 #include "main.h"
 
-int luaopen_lpeg(lua_State *L);
-int luaopen_lfs(lua_State *L);
-
 #include "lua_sdl.h"
 #include "persist_lua.h"
 #include "th_lua.h"
@@ -51,6 +48,9 @@ int luaopen_lfs(lua_State *L);
 #error "config.h is out of date - please rerun CMake"
 #endif
 // End of config file checking
+
+#include <lfs.h>
+#include "LPEG/lpeg.h"
 
 extern JavaVM* jvm;
 

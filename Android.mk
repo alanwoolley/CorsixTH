@@ -23,7 +23,9 @@ LOCAL_C_INCLUDES := $(LOCAL_PATH)/$(SDL_PATH)/include \
 					$(LOCAL_PATH)/$(CTH_ASSETS) \
 					$(LOCAL_PATH)/$(SDL_GFX_PATH) \
 					$(LOCAL_PATH)/$(LUA_PATH) \
-					../LFS
+					../LFS \
+					$(LOCAL_PATH)/libs/whereami \
+					$(LOCAL_PATH)/libs/rnc
 					
 LOCAL_CFLAGS := -DPLAY_MOD 
 
@@ -49,7 +51,6 @@ LOCAL_SRC_FILES := $(CORSIX_TH_SRC)/../appmain.cpp \
 			$(CORSIX_TH_SRC)/th_lua_ui.cpp \
 			$(CORSIX_TH_SRC)/th_sound.cpp \
 			$(CORSIX_TH_SRC)/th_gfx_font.cpp \
-			$(CORSIX_TH_SRC)/rnc.cpp \
 			$(CORSIX_TH_SRC)/iso_fs.cpp \
 			$(CORSIX_TH_SRC)/persist_lua.cpp \
 			$(CORSIX_TH_SRC)/sdl_core.cpp \
@@ -58,8 +59,14 @@ LOCAL_SRC_FILES := $(CORSIX_TH_SRC)/../appmain.cpp \
 			$(CORSIX_TH_SRC)/xmi2mid.cpp \
 			$(CORSIX_TH_SRC)/th_lua_movie.cpp \
 			$(CORSIX_TH_SRC)/th_lua_lfs_ext.cpp \
+			$(CORSIX_TH_SRC)/th_lua_iso.cpp \
 			$(CORSIX_TH_SRC)/th_movie.cpp \
-			$(SDL_PATH)/src/main/android/SDL_android_main.cpp
+			$(CORSIX_TH_SRC)/lua_rnc.cpp \
+			$(SDL_PATH)/src/main/android/SDL_android_main.cpp \
+			libs/rnc/rnc.cpp \
+			libs/whereami/whereami.h \
+			libs/whereami/whereami.c
+
 
 LOCAL_SHARED_LIBRARIES := libLUA SDL2 SDL2_mixer
 LOCAL_STATIC_LIBRARIES := libc++_static libfreetype2 libSDL2_gfx libLFS libLPEG libavformat libavcodec libswscale libavutil libswscale libswresample liblodepng
