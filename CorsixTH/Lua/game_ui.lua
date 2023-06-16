@@ -36,10 +36,10 @@ local Announcer = _G["Announcer"]
 local shake_screen_max_movement = 50 --pixels
 
 -- 0.002 is about 5 pixels on a 1920 pixel display
-local multigesture_pinch_sensitivity_factor = 1
+local multigesture_pinch_sensitivity_factor = 0.002
 -- combined with the above, multiplying by 100 means minimum current_momentum.z for any detected pinch
 -- will result in a call to adjustZoom in the onTick method
-local multigesture_pinch_amplification_factor = 0.05
+local multigesture_pinch_amplification_factor = 25
 
 --! Game UI constructor.
 --!param app (Application) Application object.
@@ -57,15 +57,21 @@ function GameUI:GameUI(app, local_hospital, map_editor)
   else
     self.adviser = UIAdviser(self)
     self.bottom_panel = UIBottomPanel(self)
-    self.menu_button = UIMenuButton(self)
-    self:addWindow(self.menu_button)
     self.bottom_panel:addWindow(self.adviser)
     self:addWindow(self.bottom_panel)
+
+    -- Android: Add menu button
+    self.android_menu_button = UIAndroidMenuButton(self)
+    self:addWindow(self.android_menu_button)
+
   end
 
+  -- Android: Don't show the menu bar
   -- UI widgets
-  self.menu_bar = UIMenuBar(self, self.map_editor)
-  self:addWindow(self.menu_bar)
+--   self.menu_bar = UIMenuBar(self, self.map_editor)
+--   self:addWindow(self.menu_bar)
+
+
 
   local scr_w = app.config.width
   local scr_h = app.config.height
@@ -644,6 +650,7 @@ function GameUI:onMouseMove(x, y, dx, dy)
 end
 
 function GameUI:onMouseUp(code, x, y)
+  self.buttons_down.mouse_middle = false
   if self.app.moviePlayer.playing then
     return UI.onMouseUp(self, code, x, y)
   end
@@ -724,15 +731,14 @@ end
 --!param y (float) normalised y value of the gesture
 --!return (boolean) event processed indicator
 function GameUI:onMultiGesture(numfingers, dTheta, dDist, x, y) -- luacheck: ignore 212 dTheta
+  print ("onMultiGesture: " .. tostring(numfingers) .. ", theta: " .. tostring(dTheta) .. ", dDist: " .. tostring(dDist) .. ", x: " .. tostring(x) .. ", y: " .. tostring(y))
   -- only deal with 2 finger events for now
   if numfingers == 2 then
     -- calculate magnitude of pinch
     local mag = math.abs(dDist)
-    if mag > multigesture_pinch_sensitivity_factor and self.current_momentum.x < 1 and self.current_momentum.y < 1 then
+    if mag > multigesture_pinch_sensitivity_factor then
       -- pinch action - constant needs to be tweaked
       self.current_momentum.z = self.current_momentum.z + dDist * multigesture_pinch_amplification_factor
-      return true
-    else
       if self.current_momentum.z > 0.5 then
         return
       end
@@ -746,8 +752,8 @@ function GameUI:onMultiGesture(numfingers, dTheta, dDist, x, y) -- luacheck: ign
       else
         local dx = normx - self.multigesturemove.x
         local dy = normy - self.multigesturemove.y
-        self.current_momentum.x = self.current_momentum.x - dx/1000
-        self.current_momentum.y = self.current_momentum.y - dy/1000
+        self.current_momentum.x = self.current_momentum.x - dx/4
+        self.current_momentum.y = self.current_momentum.y - dy/4
         self.multigesturemove.x = normx
         self.multigesturemove.y = normy
       end

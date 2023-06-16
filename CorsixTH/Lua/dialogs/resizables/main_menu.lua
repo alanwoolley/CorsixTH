@@ -24,6 +24,8 @@ class "UIMainMenu" (UIResizable)
 ---@type UIMainMenu
 local UIMainMenu = _G["UIMainMenu"]
 
+local TH = require("TH")
+
 local col_bg = {
   red = 154,
   green = 146,
@@ -175,7 +177,8 @@ function UIMainMenu:buttonLoadGame()
 end
 
 function UIMainMenu:buttonSettings()
-  showsettings()
+  -- Android hook: Open the settings view
+  TH.showSettings()
 end
 
 function UIMainMenu:buttonOptions()

@@ -600,7 +600,6 @@ function World:tickEarthquake()
       self.ui:beginShakeScreen(1)
     end
 
-    startvibration(3)
     -- Play the earthquake sound. It has different names depending on language used though.
     if TheApp.audio:soundExists("quake2.wav") then
       self.ui:playSound("quake2.wav")
@@ -926,9 +925,6 @@ function World:setSpeed(speed)
     self.user_actions_allowed = TheApp.config.allow_user_actions_while_paused
   elseif self:getCurrentSpeed() == "Pause" then
     self.user_actions_allowed = true
-    if self.next_earthquake.active then
-        startvibration(3)
-    end
   end
 
   local currentSpeed = self:getCurrentSpeed()

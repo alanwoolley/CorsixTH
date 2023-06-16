@@ -31,8 +31,6 @@ SOFTWARE.
 #include "iso_fs.h"
 #include "lua.hpp"
 #include "lua_rnc.h"
-#include "../logging.h"
-#include "../commands.h"
 #include "main.h"
 
 #include "lua_sdl.h"
@@ -52,7 +50,7 @@ SOFTWARE.
 #include <lfs.h>
 #include "LPEG/lpeg.h"
 
-extern JavaVM* jvm;
+//extern JavaVM* jvm;
 
 extern "C" {
 int luaopen_random(lua_State* L);
@@ -158,7 +156,7 @@ int lua_main_no_eval(lua_State* L) {
         "Linked against a version of Lua different to the one used "
         "when compiling.\nPlease recompile CorsixTH against the same "
         "Lua version it is linked against.");
-    sendCommand(jvm, COMMAND_GAME_LOAD_ERROR);
+    //sendCommand(jvm, COMMAND_GAME_LOAD_ERROR);
     return lua_error(L);
   }
   lua_pop(L, 1);
@@ -239,7 +237,7 @@ int lua_panic(lua_State* L) {
 
   // A stack trace would be nice, but they cannot be done in a panic.
 
-	sendCommand(jvm,COMMAND_GAME_LOAD_ERROR);
+	//sendCommand(jvm,COMMAND_GAME_LOAD_ERROR);
 
   return 0;
 }

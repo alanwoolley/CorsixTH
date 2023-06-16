@@ -675,7 +675,6 @@ function Object:onClick(ui, button, data) -- luacheck: ignore 212 keep args from
     window:setOrientation(direction)
     self.orientation_before = self.direction
     ui:playSound("pickup.wav")
-    startvibration(2);
   end
 end
 

@@ -30,10 +30,7 @@ LOCAL_C_INCLUDES := $(LOCAL_PATH)/$(SDL_PATH)/include \
 LOCAL_CFLAGS := -DPLAY_MOD 
 
 # Add your application source files here...
-LOCAL_SRC_FILES := $(CORSIX_TH_SRC)/../appmain.cpp \
-			$(CORSIX_TH_SRC)/../logging.cpp \
-			$(CORSIX_TH_SRC)/../commands.cpp \
-			$(CORSIX_TH_SRC)/main.cpp \
+LOCAL_SRC_FILES := $(CORSIX_TH_SRC)/main.cpp \
 			$(CORSIX_TH_SRC)/bootstrap.cpp \
 			$(CORSIX_TH_SRC)/th_lua.cpp \
 			$(CORSIX_TH_SRC)/th.cpp \
@@ -62,10 +59,13 @@ LOCAL_SRC_FILES := $(CORSIX_TH_SRC)/../appmain.cpp \
 			$(CORSIX_TH_SRC)/th_lua_iso.cpp \
 			$(CORSIX_TH_SRC)/th_movie.cpp \
 			$(CORSIX_TH_SRC)/lua_rnc.cpp \
-			$(SDL_PATH)/src/main/android/SDL_android_main.cpp \
+			$(CORSIX_TH_SRC)/../appmain.cpp \
 			libs/rnc/rnc.cpp \
 			libs/whereami/whereami.h \
-			libs/whereami/whereami.c
+			libs/whereami/whereami.c \
+			Android/logger.cpp \
+			Android/androidevents.cpp \
+			Android/androidhooks.cpp
 
 
 LOCAL_SHARED_LIBRARIES := libLUA SDL2 SDL2_mixer

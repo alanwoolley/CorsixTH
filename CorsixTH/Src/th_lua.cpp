@@ -27,6 +27,7 @@ SOFTWARE.
 #include "bootstrap.h"
 #include "th.h"
 #include "th_lua_internal.h"
+#include "Android/androidhooks.h"
 
 void lua_register_anims(const lua_register_state* pState);
 void lua_register_gfx(const lua_register_state* pState);
@@ -244,6 +245,9 @@ int luaopen_th(lua_State* L) {
   add_lua_function(pState, l_load_strings, "LoadStrings");
   add_lua_function(pState, l_get_compile_options, "GetCompileOptions");
   add_lua_function(pState, bootstrap_lua_resources, "GetBuiltinFont");
+
+  // Android functions
+  registerAndroidLuaFunctions(pState);
 
   // Classes
   lua_register_map(pState);

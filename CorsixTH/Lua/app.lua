@@ -37,6 +37,7 @@ class "App"
 local App = _G["App"]
 
 function App:App()
+  print "App Starting"
   self.command_line = {}
   self.config = {}
   self.hotkeys = {}
@@ -168,6 +169,10 @@ function App:init()
   if compile_opts.os then
     self.os = compile_opts.os
   end
+
+  -- ANDROID: store the original width and height
+  self.config.originalWidth = self.config.width
+  self.config.originalHeight = self.config.height
 
   local modes = {}
   self.fullscreen = false
@@ -898,6 +903,7 @@ function App:fixConfig()
   end
 
   for key, value in pairs(self.config) do
+    print ("Config: " .. key .. " - value: " .. tostring(value))
     -- Trim whitespace from beginning and end string values - it shouldn't be
     -- there (at least in any current configuration options).
     if type(value) == "string" then
@@ -932,6 +938,7 @@ function App:fixConfig()
 end
 
 function App:saveConfig()
+  print "Saving Config"
   -- Load lines from config file
   local config_file = self.command_line["config-file"] or "config.txt"
   local fi = io.open(config_file, "r")
