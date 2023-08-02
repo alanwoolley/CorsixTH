@@ -39,8 +39,8 @@ function UIAndroidMenu:UIAndroidMenu(ui)
     self.panel_sprites = self.app.gfx:loadSpriteTable("Bitmap", "android", true, self.app.gfx:loadPalette("Bitmap", "android.pal"))
     self.pause_button = self:addPanel( 3,   0, 0):makeToggleButton(0, 0, 81, 54, 4, self.onPausedPressed, nil, nil)
     self.speed_button = self:addPanel(speed_sprite_index_offset + self.speed,   0, 54):makeButton(0, 0, 81, 54, speed_sprite_index_offset + self.speed, self.onSpeedClicked, nil, nil)
-    self.save_button = self:addPanel( 5,   0, 108):makeButton(0, 0, 81, 54, 6, nil, nil, nil)
-    self.load_button = self:addPanel( 1,   0, 162):makeButton(0, 0, 81, 54, 2, nil, nil, nil)
+    self.save_button = self:addPanel( 5,   0, 108):makeButton(0, 0, 81, 54, 6, self.onSavePressed, nil, nil)
+    self.load_button = self:addPanel( 1,   0, 162):makeButton(0, 0, 81, 54, 2, self.onLoadPressed, nil, nil)
     self.settings = self:addPanel( 14,   0, 216):makeButton(0, 0, 81, 54, 15, self.onSettingsPressed, nil, nil)
     self.restart = self:addPanel( 18,   0, 270):makeButton(0, 0, 81, 54, 19, self.onRestartPressed, nil, nil)
     self.exit = self:addPanel( 16,   0, 324):makeButton(0, 0, 81, 54, 17, self.onExitPressed, nil, nil)
@@ -76,4 +76,12 @@ end
 
 function UIAndroidMenu:onSettingsPressed()
     TH.showSettings()
+end
+
+function UIAndroidMenu:onLoadPressed()
+    TH.showLoad()
+end
+
+function UIAndroidMenu:onSavePressed()
+    TH.showSave()
 end

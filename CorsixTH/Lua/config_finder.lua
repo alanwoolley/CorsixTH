@@ -92,14 +92,11 @@ local config_defaults = {
   that can only be changed here. Currently the player name is at the bottom of the list
   for the config as it this is where it always ends up when the file is recreated.
   The following list is in the same order.
-  scroll_region_size = 20,
-  scroll_speed = 15,
+  ]]
   fullscreen = false,
   width = 800,
   height = 600,
   language = [[English]],
-  theme_hospital_install = [[F:\ThemeHospital\hospital]],
--- unicode_font
   audio = true,
   free_build_mode = false,
   play_sounds = true,
@@ -176,6 +173,7 @@ if fi and TheApp then
   for key, value in pairs(config_defaults) do
     local ind = string.find(file_contents, "\n" .. "%s*" .. key .. "%s*=")
     if not ind then
+      print ("MISSING KEY: " .. key)
       needs_rewrite = true
     else
       ind = ind + (string.find(file_contents, key, ind) - ind) + string.len(key)

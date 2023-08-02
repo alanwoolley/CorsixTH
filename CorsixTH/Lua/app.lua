@@ -126,6 +126,7 @@ function App:init()
   -- Prereq 1: Config file (for screen width / height / TH folder)
   -- Note: These errors cannot be translated, as the config file specifies the language
   local conf_path = self.command_line["config-file"] or "config.txt"
+  print ("Config path: " .. conf_path)
   local conf_chunk, conf_err = loadfile_envcall(conf_path)
   if not conf_chunk then
     error("Unable to load the config file. Please ensure that CorsixTH " ..
@@ -135,6 +136,7 @@ function App:init()
   else
     conf_chunk(self.config)
   end
+
   self:fixConfig()
   corsixth.require("filesystem")
   local good_install_folder, error_message = self:checkInstallFolder()
@@ -1666,8 +1668,9 @@ function App:getVersion(version)
   end
 end
 
-function App:save(filename)
-  return SaveGameFile(filename)
+function App:save(filepath)
+  print ("Saving: " .. filepath)
+  return SaveGameFile(filepath)
 end
 -- Omit the usual file extension so this file cannot be seen from the normal load and save screen and cannot be overwritten
 function App:quickSave()
@@ -1677,15 +1680,14 @@ function App:quickSave()
 end
 
 function App:load(filepath)
-  print ("Loading : " .. filepath)
+  print ("Loading: " .. filepath)
   if self.world then
     self:worldExited()
   end
 
   self.video:setBlueFilterActive(false)
 
-  
-  return LoadGameFile(self.savegame_dir .. filepath)
+  return LoadGameFile(filepath)
 end
 
 function App:quickLoad()
@@ -1760,7 +1762,30 @@ function App:updateConfig(newconfig)
   self:saveConfig()
 end
 
+--! Function to check the loaded game is compatible with the program
+--!param save_version (num)
+--!param gfx_set (string) What graphics set is used
+--!return true if compatible, otherwise false
+function App:checkCompatibility(save_version, gfx_set)
+  local app_version = self.savegame_version
+  local err
 
+  -- First check the graphics set matches with the game files
+  if (gfx_set == "demo" and not self.using_demo_files) then
+    err = _S.errors.compatibility_error.demo_in_full
+  elseif (gfx_set == "full" and self.using_demo_files) then
+    err = _S.errors.compatibility_error.full_in_demo
+
+    -- if that's all good, check the save and app version
+  elseif app_version >= save_version or self.config.debug then
+    return true
+  else -- savegame newer than application
+    err = _S.errors.compatibility_error.new_in_old
+  end
+
+  UILoadGame:loadError(err)
+  return false
+end
 
 --! Restarts the current level (offers confirmation window first)
 function App:restart()

@@ -37,6 +37,7 @@ SOFTWARE.
 #include <memory>
 #include <new>
 #include <stdexcept>
+#include <thread>
 
 #include "th_map.h"
 #include "lodepng.h"
@@ -734,37 +735,54 @@ Uint32 getpixel(SDL_Surface *surface,int x,int y){
   }
 }
 
+void writeToPng(const char* sFile, std::vector<unsigned char> image, int width, int height) {
+  lodepng::State state;
+  state.encoder.zlibsettings.nicematch = 258; //Set this to the max possible, otherwise it can hurt compression
+  state.encoder.zlibsettings.lazymatching = 1; //Definitely use lazy matching for better compression
+  state.encoder.zlibsettings.windowsize = 32768; //Use maximum possible window size for best compression
+
+  //encode and save
+  std::vector<unsigned char> buffer;
+  lodepng::encode(buffer, image.empty() ? 0 : &image[0], width, height, state);
+  lodepng::save_file(buffer, sFile);
+}
+
 void render_target::savePNG(const char* sFile, SDL_Surface* rgbSurface, int w, int h) {
+  const int widthBorder = 75;
+  const int heightBorder = 75;
+  const double screenshotAreaRatio = 0.75;
+  const int screenshotAreaW = (w - (2*widthBorder)) * screenshotAreaRatio;
+  const int screenshotAreaH = (h - (2*heightBorder)) * screenshotAreaRatio;
 
-    	Uint32 color=0;
+  const int targetWidth = 120;
+  const int targetHeight = 80;
+  const int outputWidth =  std::min(screenshotAreaW, screenshotAreaH * targetWidth / targetHeight);
+  const int outputHeight = std::min(screenshotAreaH, screenshotAreaW * targetHeight / targetWidth);
 
-    	SDL_PixelFormat *fmt = rgbSurface->format;
-    	Uint32 rmask=fmt->Rmask,rshift=fmt->Rshift,rloss=fmt->Rloss;
-    	Uint32 gmask=fmt->Gmask,gshift=fmt->Gshift,gloss=fmt->Gloss;
-    	Uint32 bmask=fmt->Bmask,bshift=fmt->Bshift,bloss=fmt->Bloss;
+  int top = (h - outputHeight) / 2;
+  int left = (w - outputWidth) / 2;
 
-    	std::vector<unsigned char> image;
-    	image.resize(w * h * 4);
-    	for(int y = 0; y < h; y++) {
-          for(int x = 0; x < w; x++){
-            color = getpixel(rgbSurface,x,y);
-            image[4 * w * y + 4 * x + 0] = (unsigned char)((color&rmask)>>rshift)<<rloss;
-            image[4 * w * y + 4 * x + 1] = (unsigned char)((color&gmask)>>gshift)<<gloss;
-            image[4 * w * y + 4 * x + 2] = (unsigned char)((color&bmask)>>bshift)<<bloss;
-            image[4 * w * y + 4 * x + 3] = (unsigned char)255;
-          }
-    	}
+  Uint32 color=0;
 
-        lodepng::State state;
-    	//create encoder and set settings and info (optional)
-    	state.encoder.zlibsettings.windowsize = 2048;
+  SDL_PixelFormat *fmt = rgbSurface->format;
+  Uint32 rmask=fmt->Rmask,rshift=fmt->Rshift,rloss=fmt->Rloss;
+  Uint32 gmask=fmt->Gmask,gshift=fmt->Gshift,gloss=fmt->Gloss;
+  Uint32 bmask=fmt->Bmask,bshift=fmt->Bshift,bloss=fmt->Bloss;
 
-    	//encode and save
-    	std::vector<unsigned char> buffer;
-    	lodepng::encode(buffer, image.empty() ? 0 : &image[0], w, h, state);
-    	lodepng::save_file(buffer, sFile);
+  std::vector<unsigned char> image;
+  image.resize(outputWidth * outputHeight * 4);
+  for(int y = 0; y < outputHeight; y++) {
+    for(int x = 0; x < outputWidth; x++){
+      color = getpixel(rgbSurface,left+x,top+y);
+      image[4 * outputWidth * y + 4 * x + 0] = (unsigned char)((color&rmask)>>rshift)<<rloss;
+      image[4 * outputWidth * y + 4 * x + 1] = (unsigned char)((color&gmask)>>gshift)<<gloss;
+      image[4 * outputWidth * y + 4 * x + 2] = (unsigned char)((color&bmask)>>bshift)<<bloss;
+      image[4 * outputWidth * y + 4 * x + 3] = (unsigned char)255;
+    }
+  }
 
-
+  std::thread pngThread(&writeToPng, sFile, image, outputWidth, outputHeight);
+  pngThread.detach();
 }
 
 bool render_target::take_screenshot(const char* sFile) {
@@ -787,9 +805,10 @@ bool render_target::take_screenshot(const char* sFile) {
     SDL_UnlockSurface(pRgbSurface);
 
     if (readStatus != -1) {
-            //SDL_SaveBMP(pRgbSurface, sFile);
-            // Use PNG for Android
-            savePNG(sFile, pRgbSurface, width, height);
+      //SDL_SaveBMP(pRgbSurface, sFile);
+
+      // ANDROID: Use PNG for Android
+      savePNG(sFile, pRgbSurface, width, height);
     }
   }
 

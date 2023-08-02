@@ -271,7 +271,8 @@ int l_mainloop(lua_State *L) {
           nargs = 2;
           break;
         default:
-          if (int androidResult = handleAndroidEvents(e, dispatcher) >= 0) {
+          int androidResult = handleAndroidEvents(e, dispatcher);
+          if (androidResult >= 0) {
             nargs = androidResult;
           } else {
             nargs = 0;

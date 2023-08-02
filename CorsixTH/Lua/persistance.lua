@@ -21,6 +21,8 @@ SOFTWARE. --]]
 local persist = require("persist")
 local saved_permanents = {}
 
+local TH = require("TH")
+
 strict_declare_global "permanent"
 strict_declare_global "unpermanent"
 
@@ -240,16 +242,16 @@ function SaveGame()
   }
   state.map:prepareForSave()
   
-  -- Remove menu button and restore menu bar
-  TheApp.ui:removeWindow(TheApp.ui.menu_button)
+  -- ANDROID: Remove menu button and restore menu bar
+  TheApp.ui:removeWindow(TheApp.ui.android_menu_button)
   TheApp.ui:addWindow(TheApp.ui.menu_bar)
   
   --local status, res = xpcall(function()
   local result, err, obj = persist.dump(state, MakePermanentObjectsTable(false))
   state.map:afterSave()
   
-  -- Put the menu button back
-  TheApp.ui:addWindow(TheApp.ui.menu_button)
+  -- ANDROID: Put the menu button back
+  TheApp.ui:addWindow(TheApp.ui.android_menu_button)
   TheApp.ui:removeWindow(TheApp.ui.menu_bar)
   
   if not result then
@@ -268,16 +270,20 @@ function SaveGameFile(filename)
   local f = TheApp:writeToFileOrTmp(filename, "wb")
   f:write(data)
   f:close()
+
+  -- ANDROID: Update the database with the relevant fields
   local ss = TheApp.ui:makeScreenshot()
   local lname = TheApp.map.level_number
 
   if not tonumber(lname) then
   	lname = TheApp.map.level_name
+  else
+    lname = "Level " .. lname
   end
 
   local rep = TheApp.world:getLocalPlayerHospital().reputation
   local balance = TheApp.world:getLocalPlayerHospital().balance
-  gamesaveupdated(filename, rep, balance, lname, ss)
+  TH.updateSaveGameDatabase(filename, rep, balance, lname, ss)
 end
 
 --! Compatibility function to work out the game's graphics set
@@ -337,14 +343,6 @@ function LoadGame(data)
   if not TheApp.ui:checkForMustPauseWindows() and TheApp.world:isUserActionProhibited() then
     TheApp.video:setBlueFilterActive(true)
   end
-  
-  --Add menu button and hide menu bar
-  if (TheApp.ui.menu_button == nil) then
-    TheApp.ui.menu_button = UIMenuButton(TheApp.ui)
-  end
-  TheApp.ui:addWindow(TheApp.ui.menu_button)
-  TheApp.ui:removeWindow(TheApp.ui.menu_bar)
-  
 end
 
 function LoadGameFile(filename)

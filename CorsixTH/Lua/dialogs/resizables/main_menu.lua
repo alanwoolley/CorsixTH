@@ -173,7 +173,8 @@ function UIMainMenu:buttonContinueGame()
 end
 
 function UIMainMenu:buttonLoadGame()
-  showloaddialog()
+-- Android hook: Open the load dialog
+  TH.showLoad()
 end
 
 function UIMainMenu:buttonSettings()

@@ -63,15 +63,13 @@ function GameUI:GameUI(app, local_hospital, map_editor)
     -- Android: Add menu button
     self.android_menu_button = UIAndroidMenuButton(self)
     self:addWindow(self.android_menu_button)
-
   end
 
-  -- Android: Don't show the menu bar
+  -- ANDROID: Don't show the menu bar. Create it so that we can add it back into saved games for
+  -- portability to other platforms, but don't show it.
   -- UI widgets
---   self.menu_bar = UIMenuBar(self, self.map_editor)
+     self.menu_bar = UIMenuBar(self, self.map_editor)
 --   self:addWindow(self.menu_bar)
-
-
 
   local scr_w = app.config.width
   local scr_h = app.config.height
@@ -1289,6 +1287,11 @@ function GameUI:afterLoad(old, new)
   end
 
   self.announcer.playing = false
+
+  -- ANDROID: Put the Android menu button back, and remove the menu bar
+  self.android_menu_button = UIAndroidMenuButton(self)
+  self:addWindow(self.android_menu_button)
+  self:removeWindow(self.menu_bar)
 
   return UI.afterLoad(self, old, new)
 end

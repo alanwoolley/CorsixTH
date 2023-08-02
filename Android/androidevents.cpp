@@ -1,31 +1,31 @@
 #include "androidevents.h"
+#include <android/log.h>
 
 #include <cstring>
 #include <cstdio>
 #include "lua_sdl.h"
 #include "th_lua.h"
 
-static void l_pushtablestring(lua_State *L, const char* k, char* v) {
+static void l_pushtablestring(lua_State *L, const char *k, char *v) {
     lua_pushstring(L, k);
     lua_pushstring(L, v);
     lua_settable(L, -3);
 }
 
-static void l_pushtablebool(lua_State *L, const char* k, unsigned char v) {
+static void l_pushtablebool(lua_State *L, const char *k, unsigned char v) {
     lua_pushstring(L, k);
     lua_pushboolean(L, (int) v);
     lua_settable(L, -3);
 }
 
-static void l_pushtableint(lua_State *L, const char* k, int v) {
+static void l_pushtableint(lua_State *L, const char *k, int v) {
     lua_pushstring(L, k);
     lua_pushinteger(L, v);
     lua_settable(L, -3);
 }
 
-int handleAndroidEvents(SDL_Event &e, lua_State* dispatcher) {
+int handleAndroidEvents(SDL_Event &e, lua_State *dispatcher) {
     int nargs = -1;
-    char buf[255];
     char d[255];
 
     switch (e.type) {
@@ -54,23 +54,20 @@ int handleAndroidEvents(SDL_Event &e, lua_State* dispatcher) {
             break;
         case SDL_USEREVENT_LOAD:
             lua_pushliteral(dispatcher, "load");
-            strcpy(d, (const char*) e.user.data1);
-            sprintf(buf, "Loading %s", d);
-            lua_pushstring(dispatcher, (const char*) d);
+            strcpy(d, (const char *) e.user.data1);
+            lua_pushstring(dispatcher, (const char *) d);
             nargs = 2;
             break;
         case SDL_USEREVENT_SAVE:
             lua_pushliteral(dispatcher, "save");
-            strcpy(d, (const char*) e.user.data1);
-            sprintf(buf, "Saving %s", d);
-            lua_pushstring(dispatcher, (const char*) d);
+            strcpy(d, (const char *) e.user.data1);
+            lua_pushstring(dispatcher, (const char *) d);
             nargs = 2;
             break;
         case SDL_USEREVENT_GAMESPEED:
             lua_pushliteral(dispatcher, "gamespeed");
-            strcpy(d, (const char*) e.user.data1);
-            sprintf(buf, "Game speed: %s", d);
-            lua_pushstring(dispatcher, (const char*) d);
+            strcpy(d, (const char *) e.user.data1);
+            lua_pushstring(dispatcher, (const char *) d);
             nargs = 2;
             break;
         case SDL_USEREVENT_RESTART:
@@ -79,8 +76,8 @@ int handleAndroidEvents(SDL_Event &e, lua_State* dispatcher) {
             break;
         case SDL_USEREVENT_AUTOSAVE:
             lua_pushliteral(dispatcher, "tryautosave");
-            strcpy(d, (const char*) e.user.data1);
-            lua_pushstring(dispatcher, (const char*) d);
+            strcpy(d, (const char *) e.user.data1);
+            lua_pushstring(dispatcher, (const char *) d);
             nargs = 2;
             break;
 
@@ -127,4 +124,14 @@ int handleAndroidEvents(SDL_Event &e, lua_State* dispatcher) {
     }
 
     return nargs;
+}
+
+int pushEvent(Uint32 eventType, void *data) {
+    SDL_Event e;
+    e.type = eventType;
+    if (data != nullptr) {
+        e.user.data1 = data;
+    }
+
+    return SDL_PushEvent(&e);
 }

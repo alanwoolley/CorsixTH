@@ -19,5 +19,6 @@
 #define SDL_USEREVENT_SHOWJUKEBOX (ANDROID_USEREVENTS + 8)
 
 int handleAndroidEvents(SDL_Event &e, lua_State* dispatcher);
+int pushEvent(Uint32 eventType, void *data = nullptr);
 
 #endif
