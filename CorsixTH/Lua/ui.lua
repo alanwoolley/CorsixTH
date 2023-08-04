@@ -194,6 +194,12 @@ function UI:UI(app, minimal)
 
   self:setCursor(self.default_cursor)
 
+  -- ANDROID: Touch event markers
+  self.touch_origin = { x = -1, y = -1 } -- The original point at which the finger went down.
+  self.touch_down = false -- Whether a primary finger is down and we're still interested in it.
+  self.touch_pending_move = false -- Whether we've crossed the threshold for a touch-drag, pending recognition of movement.
+  self.touch_pending_duration = false -- Whether we've crossed the threshold for a long-press, pending duration.
+  self.touch_moving = false -- Whether we're currently in the process of moving via a drag.
 
   self:setupGlobalKeyHandlers()
 end
@@ -900,97 +906,6 @@ function UI:onMouseWheel(x, y)
   Window.onMouseWheel(self, x, y)
 end
 
--- -- Touch controls
--- local fingersdown = 0
--- local touchtick = -1
--- local downdelayticks = 15
--- local lastdown = {-1, -1 }
--- local rightdown = false
---
---
--- function UI:onTouchUp(finger, x, y)
---   print ("touch up finger: " .. finger .. " x: " .. x .. " y: " .. y)
---   fingersdown = fingersdown - 1
---   if rightdown then
---     rightdown = false
---     return
---   end
---
---   if finger > 0 then
---     -- Ignore for now
---     return
---   end
---
---   if touchtick > -1  then
---       print ("Pressing left button")
---       self:delayedTouchDown(1)
---   end
---
---     print ("Releasing left button")
---     self:onMouseUp(1, x, y)
--- end
---
--- function UI:onTouchDown(finger, x, y)
---   fingersdown = fingersdown +1
---
---   print ("touch down finger: " .. finger .. " x: " .. x .. " y: " .. y)
---
---   if finger > 0 and touchtick > -1 then
---     touchtick = -1
---     -- Ignore for now
---     return
---   end
---
---   --self:onMouseDown(1,x,y)
---   touchtick = 0
---   lastdown = {x,y}
--- end
---
--- function UI:delayedTouchDown(button)
---   touchtick = -1
---   print ("pressing: " .. button .. " coords: " .. lastdown[1] .. ", " .. lastdown[2])
---   self:onMouseDown(button, lastdown[1],lastdown[2])
---   if button == 3 then
---     print ("Right button has been pressed and released")
---     self:onMouseUp(button, lastdown[1],lastdown[2])
---     rightdown = true
---   end
---
---   lastdown = {-1, -1 }
---
---
--- end
---
--- function UI:onTouchMove(finger, x, y, dx, dy)
---   if finger > 0 or fingersdown > 1 then
---     -- Ignore for now
---     return
---   end
---
---   if touchtick > -1 then
---     if math.abs(lastdown[1] -x) > 10 or math.abs(lastdown[2]-y) >10 then
---       self:delayedTouchDown(1)
---     end
---   end
---
---   self:onMouseMove(x, y, dx, dy)
--- end
-
---function UI:onGesture(num_fingers, d_theta, d_dist, x, y)
---  if not gesturing then
---    return
---  end
---
---
---  print ("gesture. Fingers: " .. num_fingers .. " angle: " .. d_theta .. " dist: " .. d_dist)
---
---  self:onMouseMove(x,y,0,0)
---  --self:onMouseWheel(0, d_dist)
---  if self.app.world then
---    self.app.world:adjustZoom(d_dist)
---  end
---end
-
 --[[ Determines if a cursor entity can be clicked
 @param entity (Entity,nil) cursor entity clicked on if any
 @return true if can be clicked on, false otherwise (boolean) ]]
@@ -1053,12 +968,6 @@ function UI:onWindowResize(width, height)
 
     print ("Original config resolution: " .. configWidth .. "x" .. configHeight)
 
---     if ((width > height) ~= (configWidth > configHeight)) then
---         local tmp = configWidth
---         configWidth = configHeight
---         configHeight = tmp
---     end
-
     print ("Config resolution: " .. configWidth .. "x" .. configHeight)
     local windowRatio = width/height
     local configRatio = configWidth/configHeight
@@ -1081,6 +990,7 @@ function UI:onWindowResize(width, height)
 end
 
 function UI:onMouseMove(x, y, dx, dy)
+  print("Mouse move. x: " .. x .. " y: ".. y .. " dx: ".. dx .. " dy: " ..dy)
   if self.mouse_released then
     return false
   end
@@ -1124,16 +1034,13 @@ function UI:onTick()
     self:updateTooltip()
   end
 
---   if touchtick == downdelayticks and fingersdown == 1 then
---     print ("Going to press right button")
---     self:delayedTouchDown(3)
---   elseif touchtick > -1 then
---     touchtick = touchtick +1
---   end
+  -- ANDROID: Update the touch handling on every 'interesting' tick.
+  if self.touch_down then
+    self:onTouchTick()
+  end
 
   return repaint
 end
-
 
 function UI:addWindow(window)
   if window.closed then
@@ -1314,3 +1221,120 @@ end
 
 -- Stub for compatibility with savegames r1896-1921
 function UI:stopVideo() end
+
+-- ANDROID: Touch to mouse synthesis
+
+local ticks_for_long_press = 33
+local ticks_for_click_and_drag = 5
+local long_press_tick_countdown = ticks_for_long_press
+local click_and_drag_tick_countdown = ticks_for_click_and_drag
+
+function UI:resetTouch()
+  -- Reset all of the touch state, ready for the next interaction
+  self.touch_moving = false
+  self.touch_down = false
+  self.touch_pending_move = false
+  self.touch_pending_duration = false
+  self.touch_origin = { x = -1, y = -1 }
+  long_press_tick_countdown = ticks_for_long_press
+  click_and_drag_tick_countdown = ticks_for_click_and_drag
+end
+
+function UI:onTouchTick()
+  -- This is called every tick when there's a touch down. Each tick is 30ms.
+
+  if (self.touch_pending_duration and not self.touch_moving) then
+    long_press_tick_countdown = long_press_tick_countdown - 1
+    if (long_press_tick_countdown == 0) then
+      print("Converting touch into a long press at " .. self.touch_origin.x .. "," ..self.touch_origin.y)
+      -- Do right press and cancel all touch handlers
+      self:onMouseDown(3, self.touch_origin.x, self.touch_origin.y)
+      self:onMouseUp(3,self.touch_origin.x, self.touch_origin.y)
+      self:resetTouch()
+    end
+  end
+
+  if (not self.touch_pending_move and not self.touch_moving) then
+    click_and_drag_tick_countdown = click_and_drag_tick_countdown - 1
+    if (click_and_drag_tick_countdown == 0) then
+      print("Converting touch into click and drag.")
+      self.touch_pending_move = true
+    end
+  end
+end
+
+function UI:onTouchDown(fingerId, x, y)
+  if (fingerId ~= 0) then
+    return
+  end
+
+  local absX = math.floor(x * self.app.config.width)
+  local absY = math.floor(y * self.app.config.height)
+  self.touch_origin.x = absX
+  self.touch_origin.y = absY
+  self.touch_down = true
+  self.touch_pending_duration = true
+
+  -- Just move the mouse. Don't synthesise the mouse down event yet. Wait until we've recognised what action
+  -- the user is performing.
+  print ("Moving mouse to " ..absX .. "," .. absY)
+  self:onMouseMove(absX, absY, 0, 0)
+end
+
+function UI:onTouchUp(fingerId, x, y)
+  if (fingerId ~= 0) then
+      return
+  end
+
+  local absX = math.floor(x * self.app.config.width)
+  local absY = math.floor(y * self.app.config.height)
+
+  if (self.touch_down) then
+    print ("Completing touch event at " .. absX .. "," ..absY)
+    -- If the finger has been pressed down, then synthesise the mouse down and up events at this location.
+    -- Unless we're already moving, in which case we'll already have synthesised a down press at the appropriate
+    -- origin.
+    if (not self.touch_moving) then
+      self:onMouseDown(1, absX, absY)
+    end
+    self:onMouseUp(1, absX, absY)
+  end
+
+  self:resetTouch()
+end
+
+function UI:onTouchMove(fingerId, x, y, dx, dy)
+  if (fingerId ~= 0) then
+      return
+  end
+
+  local absX = math.floor(x * self.app.config.width)
+  local absY = math.floor(y * self.app.config.height)
+  local absDX = math.floor(dx * self.app.config.width)
+  local absDY = math.floor(dy * self.app.config.height)
+
+  -- Calculate the distance from the origin, and apply some threshold that must be crossed to determine this as a move event.
+  local distance_threshold = 30
+  local travel_dx = absX - self.touch_origin.x
+  local travel_dy = absY - self.touch_origin.y
+  local distance_from_origin = math.sqrt(travel_dx*travel_dx + travel_dy*travel_dy)
+  local outside_distance_threshold = distance_from_origin > distance_threshold
+
+  if (self.touch_moving) then
+    -- If we've already determined what sort of action the user is taking and we're moving, then just move the mouse.
+    self:onMouseMove(absX, absY, absDX, absDY)
+  elseif (self.touch_down and not self.touch_pending_move and outside_distance_threshold) then
+    -- We've moved but before a click and drag has been recognised. We can just consider this a move of the mouse instead. First we want to
+    -- cancel the touch down event, so we don't want to synthesise it when we release the finger.
+    self.touch_down = false
+    self.touch_moving = true
+    self:onMouseMove(absX, absY, absDX, absDY)
+  elseif (self.touch_down and self.touch_pending_move and outside_distance_threshold) then
+    -- We've moved, but enough time has passed for this to be considered a click and drag. First we want to click at the origin, and then we want to move.
+    -- Don't cancel touch_down here because we want to make sure we synthesise the mouse up event after the move too.
+    self.touch_pending_move = false
+    self.touch_moving = true
+    self:onMouseDown(1, self.touch_origin.x, self.touch_origin.y)
+    self:onMouseMove(absX, absY, x- self.touch_origin.x, y - self.touch_origin.y) -- Adjust these so that the delta is in relation to the origin.
+  end
+end

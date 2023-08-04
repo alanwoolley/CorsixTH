@@ -6,6 +6,8 @@
 #include "lua_sdl.h"
 #include "th_lua.h"
 
+#include <SDL_video.h>
+
 static void l_pushtablestring(lua_State *L, const char *k, char *v) {
     lua_pushstring(L, k);
     lua_pushstring(L, v);
@@ -29,28 +31,31 @@ int handleAndroidEvents(SDL_Event &e, lua_State *dispatcher) {
     char d[255];
 
     switch (e.type) {
-        case SDL_FINGERDOWN:
+        case SDL_FINGERDOWN: {
             lua_pushliteral(dispatcher, "touchdown");
             lua_pushinteger(dispatcher, e.tfinger.fingerId);
-            lua_pushinteger(dispatcher, e.tfinger.x);
-            lua_pushinteger(dispatcher, e.tfinger.y);
+            lua_pushnumber(dispatcher, e.tfinger.x);
+            lua_pushnumber(dispatcher, e.tfinger.y);
             nargs = 4;
+        }
             break;
-        case SDL_FINGERUP:
+        case SDL_FINGERUP: {
             lua_pushliteral(dispatcher, "touchup");
             lua_pushinteger(dispatcher, e.tfinger.fingerId);
-            lua_pushinteger(dispatcher, e.tfinger.x);
-            lua_pushinteger(dispatcher, e.tfinger.y);
+            lua_pushnumber(dispatcher, e.tfinger.x);
+            lua_pushnumber(dispatcher, e.tfinger.y);
             nargs = 4;
+        }
             break;
-        case SDL_FINGERMOTION:
+        case SDL_FINGERMOTION: {
             lua_pushliteral(dispatcher, "touchmove");
             lua_pushinteger(dispatcher, e.tfinger.fingerId);
-            lua_pushinteger(dispatcher, e.tfinger.x);
-            lua_pushinteger(dispatcher, e.tfinger.y);
-            lua_pushinteger(dispatcher, e.tfinger.dx);
-            lua_pushinteger(dispatcher, e.tfinger.dy);
+            lua_pushnumber(dispatcher, e.tfinger.x);
+            lua_pushnumber(dispatcher, e.tfinger.y);
+            lua_pushnumber(dispatcher, e.tfinger.dx);
+            lua_pushnumber(dispatcher, e.tfinger.dy);
             nargs = 6;
+        }
             break;
         case SDL_USEREVENT_LOAD:
             lua_pushliteral(dispatcher, "load");
