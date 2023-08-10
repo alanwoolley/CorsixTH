@@ -29,7 +29,7 @@ local runDebugger = corsixth.require("run_debugger")
 -- and add compatibility code in afterLoad functions
 -- Recommended: Also replace/Update the summary comment
 
-local SAVEGAME_VERSION = 177 -- Regression #2086
+local SAVEGAME_VERSION = 180 -- CorsixTH 0.67 release
 
 class "App"
 
@@ -1404,7 +1404,8 @@ function App:checkInstallFolder()
       [[C:]], [[D:]], [[E:]], [[F:]], [[G:]], [[H:]] }
     local possible_folders = { "ThemeHospital", "Theme Hospital", "HOSP", "TH97",
       [[GOG.com\Theme Hospital]], [[GOG Games\Theme Hospital]],
-      [[Origin Games\Theme Hospital\data\Game]] }
+      [[Origin Games\Theme Hospital\data\Game]], [[EA Games\Theme Hospital\data\Game]]
+    }
     for _, dir in pairs(possible_locations) do
       if status then break end
       for _, folder in pairs(possible_folders) do
@@ -1631,8 +1632,10 @@ end
 -- a specific savegame version is from.
 function App:getVersion(version)
   local ver = version or self.savegame_version
-  if ver > 170 then
+  if ver > 180 then
     return "Trunk"
+  elseif ver > 170 then
+    return "v0.67"
   elseif ver > 156 then
     return "v0.66"
   elseif ver > 138 then
@@ -1925,6 +1928,7 @@ function App:checkForUpdates()
   end
   local http = require("socket.http")
   local url = require("socket.url")
+  http.TIMEOUT = 2
 
   print("Checking for CorsixTH updates...")
   local update_body, status, _ = http.request(update_url)

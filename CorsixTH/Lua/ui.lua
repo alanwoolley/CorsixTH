@@ -244,11 +244,8 @@ function UI:playSound(name, played_callback, played_callback_delay)
   end
 end
 
--- Used for announcements only
+-- Stub with args for subclass GameUI.
 function UI:playAnnouncement(name, priority, played_callback, played_callback_delay)
-  if self.app.config.play_announcements then
-    self.app.audio:playSound(name, nil, true, played_callback, played_callback_delay)
-  end
 end
 
 function UI:setDefaultCursor(cursor)
@@ -714,8 +711,7 @@ end
 
 --! Called when the user presses a key on the keyboard
 --!param rawchar (string) The name of the key the user pressed.
---!param is_repeat (boolean) True if this is a key repeat event
-function UI:onKeyDown(rawchar, modifiers, is_repeat)
+function UI:onKeyDown(rawchar, modifiers)
   local handled = false
   -- Apply key-remapping and normalisation
   rawchar = string.sub(rawchar,1,6) == "Keypad" and
@@ -821,7 +817,7 @@ function UI:onKeyUp(rawchar)
   end
 end
 
-function UI:onEditingText(text, start, length) -- luacheck: ignore 212 keep args for child class
+function UI:onEditingText(text, start, length)
   -- Does nothing at the moment. We are handling text input ourselves.
 end
 
@@ -1122,7 +1118,7 @@ function UI:afterLoad(old, new)
   if old < 5 then
     self.editing_allowed = true
   end
-  if old < 176 then
+  if old < 179 then
     if self.app.good_install_folder and not self.app.using_demo_files then
       local gfx = self.app.gfx
       gfx.cache.raw = {}
