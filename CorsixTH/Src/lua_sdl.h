@@ -46,16 +46,6 @@ int luaopen_sdl(lua_State* L);
 
 void set_fps_limit(int fps);
 
-typedef struct {
-	int fpsLimit, edgeScrollSize, edgeScrollSpeed;
-	enum controls_mode {
-		NORMAL = 1, DESKTOP = 2, TOUCHPAD = 3
-	} controlsMode;
-	unsigned char playSoundFx, playMusic, playAnnouncements, adviserEnabled,
-			edgeScroll, vibrate;
-	char* originalFilesPath, *cthPath, *language;
-} Configuration;
-
 int l_load_music_async_callback(lua_State* L);
 
 

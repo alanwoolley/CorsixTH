@@ -1734,14 +1734,21 @@ end
 function App:updateConfig(newconfig)
   print "New configuration!"
   for k,v in pairs(newconfig) do print(k,v) end
-  
- -- self.audio:setBackgroundVolume(newconfig["musicVol"])
- -- self.audio:setSoundVolume(newconfig["sfxVol"])
- -- self.audio:setAnnouncementVolume(newconfig["announcementsVol"])
-  
-  -- This is really inconsistent!
-  
-  self.audio:playSoundEffects(newconfig["playSoundFx"])
+
+  if (not newconfig["playAudio"]) then
+    newconfig["playMusic"] = false
+    newconfig["playSfx"] = false
+    newconfig["playAnnouncements"] = false
+  end
+
+  self.config.music_volume = newconfig["musiclevel"]
+  self.audio:setBackgroundVolume(newconfig["musicLevel"])
+  self.audio:setSoundVolume(newconfig["sfxLevel"])
+  self.audio:setAnnouncementVolume(newconfig["announcerLevel"])
+  self.config.play_sounds = newconfig["playSfx"]
+  if (self.world ~= nil) then
+    self.audio:playSoundEffects(self.config.play_sounds)
+  end
   self.config.play_announcements = newconfig["playAnnouncements"]
   
   if newconfig["playMusic"] then
@@ -1758,10 +1765,12 @@ function App:updateConfig(newconfig)
       end
       
   self.config.adviser_disabled = not newconfig["adviserEnabled"]
-  self.config.scroll_region_size = newconfig["edgeScrollSize"]
-  self.config.scroll_speed = newconfig["edgeScrollSpeed"]
-  self.config.prevent_edge_scrolling = not newconfig["edgeScroll"]
-   
+
+  if (self.config.language ~= newconfig["language"]) then
+    self.config.language = newconfig["language"]
+    self:initLanguage()
+  end
+
   self:saveConfig()
 end
 
