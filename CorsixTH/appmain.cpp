@@ -30,6 +30,8 @@ SOFTWARE.
 #include <stack>
 
 #include "../Src/bootstrap.h"
+#include "Android/androidhooks.h"
+
 #ifdef CORSIX_TH_USE_SDL_MIXER
 #include <SDL_mixer.h>
 #endif
@@ -103,10 +105,12 @@ int main(int argc, char *argv[]) {
 			const char* err = lua_tostring(L, -1);
 			if (err != nullptr) {
 				std::fprintf(stderr, "%s\n", err);
+				reportError(err);
 			} else {
 				std::fprintf(stderr,
 							 "An error has occurred in CorsixTH:\n"
 							 "Uncaught non-string Lua error\n");
+				reportError();
 			}
 			lua_pushcfunction(L, bootstrap_lua_error_report);
 			lua_insert(L, -2);

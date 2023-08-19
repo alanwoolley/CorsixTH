@@ -126,7 +126,6 @@ function App:init()
   -- Prereq 1: Config file (for screen width / height / TH folder)
   -- Note: These errors cannot be translated, as the config file specifies the language
   local conf_path = self.command_line["config-file"] or "config.txt"
-  print ("Config path: " .. conf_path)
   local conf_chunk, conf_err = loadfile_envcall(conf_path)
   if not conf_chunk then
     error("Unable to load the config file. Please ensure that CorsixTH " ..
@@ -905,7 +904,6 @@ function App:fixConfig()
   end
 
   for key, value in pairs(self.config) do
-    print ("Config: " .. key .. " - value: " .. tostring(value))
     -- Trim whitespace from beginning and end string values - it shouldn't be
     -- there (at least in any current configuration options).
     if type(value) == "string" then
@@ -1162,10 +1160,14 @@ function App:run()
     print(debug.traceback(co, e, 0))
     print("")
     if self.world then
-      self.world:gameLog("Error in " .. self.last_dispatch_type .. " handler: ")
+      self.world:gameLog(handlerErrorMessage)
       self.world:gameLog(debug.traceback(co, e, 0))
       self.world:dumpGameLog()
     end
+
+    -- ANDROID: Push report the error
+    TH.reportError(self.last_dispatch_type, debug.traceback(co, e, 0))
+
     if self.world and self.last_dispatch_type == "timer" and self.world.current_tick_entity then
       -- Disconnecting the tick handler is quite a drastic measure, so give
       -- the option of just disconnecting the offending entity and attempting

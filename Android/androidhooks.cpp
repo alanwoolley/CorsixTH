@@ -12,6 +12,7 @@ static jmethodID midShowSettings, midShowLoad, midShowSave, midUpdateSaveGameDat
 static jmethodID midConfigGetAdvisorEnabled, midConfigGetAudioEnabled, midConfigGetSfxEnabled,
         midConfigGetMusicEnabled, midConfigGetLanguage, midConfigGetAnnouncerEnabled,
         midConfigGetAnnouncerVolume, midConfigGetSfxVolume, midConfigGetMusicVolume;
+static jmethodID midReportError;
 
 jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
     JNIEnv *env = nullptr;
@@ -36,6 +37,7 @@ jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
     midShowSave = env->GetStaticMethodID(gameActivityClass, "showSave", "()V");
     midUpdateSaveGameDatabase = env->GetStaticMethodID(gameActivityClass, "onSaveGameChanged",
                                                        "([BIJ[B[B)V");
+    midReportError = env->GetStaticMethodID(gameActivityClass, "onGameError", "([B[B)V");
 
     // Configuration Methods
     midConfigGetAdvisorEnabled = env->GetMethodID(gameConfigClass, "getAdvisorEnabled", "()Z");
@@ -49,6 +51,40 @@ jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
     midConfigGetLanguage = env->GetMethodID(gameConfigClass, "getLanguage", "()Ljava/lang/String;");
 
     return JNI_VERSION_1_4;
+}
+
+static int reportError(lua_State *L) {
+    JNIEnv *env;
+    jvm->AttachCurrentThread(&env, nullptr);
+    const char *handler = lua_tostring(L, 1);
+    const char *stack = lua_tostring(L, 2);
+
+    jbyteArray handlerArray = env->NewByteArray(strlen(handler));
+    env->SetByteArrayRegion(handlerArray, 0, strlen(handler), (const jbyte *) handler);
+
+    jbyteArray stackArray = env->NewByteArray(strlen(stack));
+    env->SetByteArrayRegion(stackArray, 0, strlen(stack), (const jbyte *) stack);
+
+    env->CallStaticVoidMethod(gameActivityClass, midReportError, handlerArray, stackArray);
+    return 0;
+}
+
+int reportError(const char* stack) {
+    JNIEnv *env;
+    jvm->AttachCurrentThread(&env, nullptr);
+    jbyteArray stackArray = env->NewByteArray(strlen(stack));
+    env->SetByteArrayRegion(stackArray, 0, strlen(stack), (const jbyte *) stack);
+
+    env->CallStaticVoidMethod(gameActivityClass, midReportError, nullptr, stackArray);
+    return 0;
+}
+
+int reportError() {
+    JNIEnv *env;
+    jvm->AttachCurrentThread(&env, nullptr);
+
+    env->CallStaticVoidMethod(gameActivityClass, midReportError, nullptr, nullptr);
+    return 0;
 }
 
 static int showSettings(lua_State *L) {
@@ -97,12 +133,12 @@ static int updateSaveGameDatabase(lua_State *L) {
     return 0;
 }
 
-
 void registerAndroidLuaFunctions(const lua_register_state *pState) {
     add_lua_function(pState, showSettings, "showSettings");
     add_lua_function(pState, showLoad, "showLoad");
     add_lua_function(pState, showSave, "showSave");
     add_lua_function(pState, updateSaveGameDatabase, "updateSaveGameDatabase");
+    add_lua_function(pState, reportError, "reportError");
 }
 
 extern "C" JNIEXPORT void JNICALL

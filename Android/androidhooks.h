@@ -4,6 +4,8 @@
 #include "th_lua_internal.h"
 
 void registerAndroidLuaFunctions(const lua_register_state *pState);
+int reportError(const char* stack);
+int reportError();
 
 #endif
 

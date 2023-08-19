@@ -235,9 +235,7 @@ int lua_panic(lua_State* L) {
     std::fprintf(stderr, "%p\n", lua_topointer(L, -1));
   std::fflush(stderr);
 
-  // A stack trace would be nice, but they cannot be done in a panic.
 
-	//sendCommand(jvm,COMMAND_GAME_LOAD_ERROR);
 
   return 0;
 }
