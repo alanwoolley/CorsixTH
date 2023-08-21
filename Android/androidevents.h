@@ -25,6 +25,7 @@ typedef struct {
     unsigned char playSfx, playMusic, playAnnouncements, adviserEnabled,
             edgeScroll, playAudio;
     float sfxLevel, musicLevel, announcerLevel;
+    int scrollMode;
     std::string language;
 } Configuration;
 

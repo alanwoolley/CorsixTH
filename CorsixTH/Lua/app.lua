@@ -1160,7 +1160,7 @@ function App:run()
     print(debug.traceback(co, e, 0))
     print("")
     if self.world then
-      self.world:gameLog(handlerErrorMessage)
+      self.world:gameLog("Error in " .. self.last_dispatch_type .. " handler: ")
       self.world:gameLog(debug.traceback(co, e, 0))
       self.world:dumpGameLog()
     end
@@ -1772,6 +1772,8 @@ function App:updateConfig(newconfig)
     self.config.language = newconfig["language"]
     self:initLanguage()
   end
+
+  self.config.scroll_mode = newconfig["scrollMode"]
 
   self:saveConfig()
 end

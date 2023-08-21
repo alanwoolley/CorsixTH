@@ -544,11 +544,6 @@ function GameUI:onWindowActive(gain)
   end
 end
 
---function GameUI:allowDragScroll()
---  local edit_window = self.app.ui:getWindow(UIEditRoom)
---  return not edit_window
---end
-
 -- TODO: try to remove duplication with UI:onMouseMove
 function GameUI:onMouseMove(x, y, dx, dy)
   if self.mouse_released then
@@ -565,6 +560,7 @@ function GameUI:onMouseMove(x, y, dx, dy)
   if self:onCursorWorldPositionChange() or self.simulated_cursor then
     repaint = true
   end
+
   if self.buttons_down.mouse_middle then
     local zoom = self.zoom_factor
     self.current_momentum.x = -dx/zoom
@@ -573,6 +569,12 @@ function GameUI:onMouseMove(x, y, dx, dy)
     self.current_momentum.z = 0
     self:scrollMap(self.current_momentum.x, self.current_momentum.y)
     repaint = true
+  end
+
+  -- ANDROID: Scroll when cursor is moved
+  if (not self.buttons_down.mouse_left) and (self.app.config.scroll_mode == 1) and self.touch_moving then
+    self:scrollMap(-dx, -dy)
+    return
   end
 
   if self.drag_mouse_move then
@@ -729,9 +731,8 @@ end
 --!param y (float) normalised y value of the gesture
 --!return (boolean) event processed indicator
 function GameUI:onMultiGesture(numfingers, dTheta, dDist, x, y)
-  print ("onMultiGesture: " .. tostring(numfingers) .. ", theta: " .. tostring(dTheta) .. ", dDist: " .. tostring(dDist) .. ", x: " .. tostring(x) .. ", y: " .. tostring(y))
   -- only deal with 2 finger events for now
-  if numfingers == 2 then
+  if (numfingers == 2) then
     -- calculate magnitude of pinch
     local mag = math.abs(dDist)
     if mag > multigesture_pinch_sensitivity_factor then
@@ -741,6 +742,12 @@ function GameUI:onMultiGesture(numfingers, dTheta, dDist, x, y)
         return
       end
       -- scroll map
+
+      -- ANDROID: If we're not allowed to scroll by the control scheme, then return quickly
+      if (self.app.config.scroll_mode ~= 2) then
+        return false
+      end
+
       local normx = self.app.config.width * x
       local normy = self.app.config.height * y
 

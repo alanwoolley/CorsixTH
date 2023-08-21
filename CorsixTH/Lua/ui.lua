@@ -986,11 +986,9 @@ function UI:onWindowResize(width, height)
 end
 
 function UI:onMouseMove(x, y, dx, dy)
-  print("Mouse move. x: " .. x .. " y: ".. y .. " dx: ".. dx .. " dy: " ..dy)
   if self.mouse_released then
     return false
   end
-
 
   local repaint = UpdateCursorPosition(self.app.video, x, y)
 
@@ -1242,7 +1240,6 @@ function UI:onTouchTick()
   if (self.touch_pending_duration and not self.touch_moving) then
     long_press_tick_countdown = long_press_tick_countdown - 1
     if (long_press_tick_countdown == 0) then
-      print("Converting touch into a long press at " .. self.touch_origin.x .. "," ..self.touch_origin.y)
       -- Do right press and cancel all touch handlers
       self:onMouseDown(3, self.touch_origin.x, self.touch_origin.y)
       self:onMouseUp(3,self.touch_origin.x, self.touch_origin.y)
@@ -1253,7 +1250,6 @@ function UI:onTouchTick()
   if (not self.touch_pending_move and not self.touch_moving) then
     click_and_drag_tick_countdown = click_and_drag_tick_countdown - 1
     if (click_and_drag_tick_countdown == 0) then
-      print("Converting touch into click and drag.")
       self.touch_pending_move = true
     end
   end
@@ -1273,7 +1269,6 @@ function UI:onTouchDown(fingerId, x, y)
 
   -- Just move the mouse. Don't synthesise the mouse down event yet. Wait until we've recognised what action
   -- the user is performing.
-  print ("Moving mouse to " ..absX .. "," .. absY)
   self:onMouseMove(absX, absY, 0, 0)
 end
 
@@ -1286,7 +1281,6 @@ function UI:onTouchUp(fingerId, x, y)
   local absY = math.floor(y * self.app.config.height)
 
   if (self.touch_down) then
-    print ("Completing touch event at " .. absX .. "," ..absY)
     -- If the finger has been pressed down, then synthesise the mouse down and up events at this location.
     -- Unless we're already moving, in which case we'll already have synthesised a down press at the appropriate
     -- origin.

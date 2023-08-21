@@ -11,7 +11,8 @@ static jclass gameActivityClass, gameConfigClass;
 static jmethodID midShowSettings, midShowLoad, midShowSave, midUpdateSaveGameDatabase;
 static jmethodID midConfigGetAdvisorEnabled, midConfigGetAudioEnabled, midConfigGetSfxEnabled,
         midConfigGetMusicEnabled, midConfigGetLanguage, midConfigGetAnnouncerEnabled,
-        midConfigGetAnnouncerVolume, midConfigGetSfxVolume, midConfigGetMusicVolume;
+        midConfigGetAnnouncerVolume, midConfigGetSfxVolume, midConfigGetMusicVolume,
+        midConfigGetScrollMode;
 static jmethodID midReportError;
 
 jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
@@ -49,6 +50,7 @@ jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
     midConfigGetSfxVolume = env->GetMethodID(gameConfigClass, "getSfxVolume", "()I");
     midConfigGetMusicVolume = env->GetMethodID(gameConfigClass, "getMusicVolume", "()I");
     midConfigGetLanguage = env->GetMethodID(gameConfigClass, "getLanguage", "()Ljava/lang/String;");
+    midConfigGetScrollMode = env->GetMethodID(gameConfigClass, "getScrollMode", "()I");
 
     return JNI_VERSION_1_4;
 }
@@ -168,6 +170,8 @@ Java_uk_co_armedpineapple_cth_GameActivity_nativeUpdateConfig(JNIEnv *env, jobje
     jint musicVolume = env->CallIntMethod(gameConfig, midConfigGetMusicVolume);
     jint announcerVolume = env->CallIntMethod(gameConfig, midConfigGetAnnouncerVolume);
 
+    jint scrollMode = env->CallIntMethod(gameConfig, midConfigGetScrollMode);
+
     jobject languageObj = env->CallObjectMethod(gameConfig, midConfigGetLanguage);
     const char *language = env->GetStringUTFChars((jstring) languageObj, nullptr);
 
@@ -181,6 +185,7 @@ Java_uk_co_armedpineapple_cth_GameActivity_nativeUpdateConfig(JNIEnv *env, jobje
     config->playMusic = musicEnabled;
     config->playAudio = audioEnabled;
     config->language = std::string(language);
+    config->scrollMode = scrollMode;
 
     pushEvent(SDL_USEREVENT_CONFIGURATION, (void *) config);
 

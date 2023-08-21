@@ -102,6 +102,8 @@ int handleAndroidEvents(SDL_Event &e, lua_State *dispatcher) {
             l_pushtablenumber(dispatcher, "musicLevel", newConfig->musicLevel);
             l_pushtablenumber(dispatcher, "announcerLevel", newConfig->announcerLevel);
 
+            l_pushtableint(dispatcher, "scrollMode", newConfig->scrollMode);
+
             l_pushtablestring(dispatcher, "language", newConfig->language.data());
 
             nargs = 2;
