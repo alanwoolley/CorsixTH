@@ -1269,7 +1269,7 @@ function UI:onTouchDown(fingerId, x, y)
 
   -- Just move the mouse. Don't synthesise the mouse down event yet. Wait until we've recognised what action
   -- the user is performing.
-  self:onMouseMove(absX, absY, 0, 0)
+  self:onMouseMove(absX, absY, 0, 0, true)
 end
 
 function UI:onTouchUp(fingerId, x, y)
@@ -1312,19 +1312,19 @@ function UI:onTouchMove(fingerId, x, y, dx, dy)
 
   if (self.touch_moving) then
     -- If we've already determined what sort of action the user is taking and we're moving, then just move the mouse.
-    self:onMouseMove(absX, absY, absDX, absDY)
+    self:onMouseMove(absX, absY, absDX, absDY, true)
   elseif (self.touch_down and not self.touch_pending_move and outside_distance_threshold) then
     -- We've moved but before a click and drag has been recognised. We can just consider this a move of the mouse instead. First we want to
     -- cancel the touch down event, so we don't want to synthesise it when we release the finger.
     self.touch_down = false
     self.touch_moving = true
-    self:onMouseMove(absX, absY, absDX, absDY)
+    self:onMouseMove(absX, absY, absDX, absDY, true)
   elseif (self.touch_down and self.touch_pending_move and outside_distance_threshold) then
     -- We've moved, but enough time has passed for this to be considered a click and drag. First we want to click at the origin, and then we want to move.
     -- Don't cancel touch_down here because we want to make sure we synthesise the mouse up event after the move too.
     self.touch_pending_move = false
     self.touch_moving = true
     self:onMouseDown(1, self.touch_origin.x, self.touch_origin.y)
-    self:onMouseMove(absX, absY, x- self.touch_origin.x, y - self.touch_origin.y) -- Adjust these so that the delta is in relation to the origin.
+    self:onMouseMove(absX, absY, x- self.touch_origin.x, y - self.touch_origin.y, true) -- Adjust these so that the delta is in relation to the origin.
   end
 end

@@ -1327,7 +1327,6 @@ function App:onTouchMove(...)
   return self.ui:onTouchMove(...)
 end
 
-
 function App:onWindowActive(...)
   return self.ui:onWindowActive(...)
 end
@@ -1774,6 +1773,8 @@ function App:updateConfig(newconfig)
   end
 
   self.config.scroll_mode = newconfig["scrollMode"]
+  self.config.prevent_edge_scrolling_original = newconfig["preventEdgeScroll"]
+  self.config.prevent_edge_scrolling = self.config.prevent_edge_scrolling_original
 
   self:saveConfig()
 end

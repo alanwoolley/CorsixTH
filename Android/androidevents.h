@@ -23,7 +23,7 @@ int pushEvent(Uint32 eventType, void *data = nullptr);
 
 typedef struct {
     unsigned char playSfx, playMusic, playAnnouncements, adviserEnabled,
-            edgeScroll, playAudio;
+            playAudio, preventEdgeScroll;
     float sfxLevel, musicLevel, announcerLevel;
     int scrollMode;
     std::string language;

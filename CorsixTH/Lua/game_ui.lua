@@ -545,7 +545,7 @@ function GameUI:onWindowActive(gain)
 end
 
 -- TODO: try to remove duplication with UI:onMouseMove
-function GameUI:onMouseMove(x, y, dx, dy)
+function GameUI:onMouseMove(x, y, dx, dy, isTouchDerived)
   if self.mouse_released then
     return false
   end
@@ -572,9 +572,16 @@ function GameUI:onMouseMove(x, y, dx, dy)
   end
 
   -- ANDROID: Scroll when cursor is moved
-  if (not self.buttons_down.mouse_left) and (self.app.config.scroll_mode == 1) and self.touch_moving then
+  if (not self.buttons_down.mouse_left) and (self.app.config.scroll_mode == 1) and self.touch_moving and isTouchDerived then
     self:scrollMap(-dx, -dy)
     return
+  end
+
+  -- ANDROID: Set whether we can scroll based on whether this is a synthesised event or not
+  if isTouchDerived then
+    self.app.config.prevent_edge_scrolling = true
+  else
+    self.app.config.prevent_edge_scrolling = self.app.config.prevent_edge_scrolling_original
   end
 
   if self.drag_mouse_move then
@@ -585,20 +592,20 @@ function GameUI:onMouseMove(x, y, dx, dy)
   local scroll_region_size = self.app.config.scroll_region_size
   local scroll_power = self.app.config.scroll_speed
 
-  --if self.app.config.fullscreen then
+  if self.app.config.fullscreen then
     -- As the mouse is locked within the window, a 1px region feels a lot
     -- larger than it actually is.
-  --  scroll_region_size = 1
-  --else
-    -- In windowed mode, a reasonable size is needed, though not too large. 
-  --  scroll_region_size = 8
-  --end
+    scroll_region_size = 1
+  else
+    -- In windowed mode, a reasonable size is needed, though not too large.
+    scroll_region_size = 8
+  end
 
   scroll_region_size = 8
   if not self.app.config.prevent_edge_scrolling and
-      (x < scroll_region_size or y < scroll_region_size or
-       x >= self.app.config.width - scroll_region_size or
-       y >= self.app.config.height - scroll_region_size) then
+          (x < scroll_region_size or y < scroll_region_size or
+                  x >= self.app.config.width - scroll_region_size or
+                  y >= self.app.config.height - scroll_region_size) then
     local scroll_dx = 0
     local scroll_dy = 0
     local scroll_power = 7

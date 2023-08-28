@@ -91,12 +91,12 @@ int handleAndroidEvents(SDL_Event &e, lua_State *dispatcher) {
             Configuration *newConfig = (Configuration *) e.user.data1;
             lua_newtable(dispatcher);
 
-            l_pushtablebool(dispatcher, "edgeScroll", newConfig->edgeScroll);
             l_pushtablebool(dispatcher, "playAudio", newConfig->playAudio);
             l_pushtablebool(dispatcher, "playSfx", newConfig->playSfx);
             l_pushtablebool(dispatcher, "playMusic", newConfig->playMusic);
             l_pushtablebool(dispatcher, "playAnnouncements", newConfig->playAnnouncements);
             l_pushtablebool(dispatcher, "adviserEnabled", newConfig->adviserEnabled);
+            l_pushtablebool(dispatcher, "preventEdgeScroll", newConfig->preventEdgeScroll);
 
             l_pushtablenumber(dispatcher, "sfxLevel", newConfig->sfxLevel);
             l_pushtablenumber(dispatcher, "musicLevel", newConfig->musicLevel);

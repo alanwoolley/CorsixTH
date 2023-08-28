@@ -12,7 +12,7 @@ static jmethodID midShowSettings, midShowLoad, midShowSave, midUpdateSaveGameDat
 static jmethodID midConfigGetAdvisorEnabled, midConfigGetAudioEnabled, midConfigGetSfxEnabled,
         midConfigGetMusicEnabled, midConfigGetLanguage, midConfigGetAnnouncerEnabled,
         midConfigGetAnnouncerVolume, midConfigGetSfxVolume, midConfigGetMusicVolume,
-        midConfigGetScrollMode;
+        midConfigGetScrollMode, midConfigGetEdgeScroll;
 static jmethodID midReportError;
 
 jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
@@ -46,6 +46,7 @@ jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
     midConfigGetSfxEnabled = env->GetMethodID(gameConfigClass, "getSfxEnabled", "()Z");
     midConfigGetMusicEnabled = env->GetMethodID(gameConfigClass, "getMusicEnabled", "()Z");
     midConfigGetAnnouncerEnabled = env->GetMethodID(gameConfigClass, "getAnnouncerEnabled", "()Z");
+    midConfigGetEdgeScroll = env->GetMethodID(gameConfigClass, "getEdgeScroll", "()Z");
     midConfigGetAnnouncerVolume = env->GetMethodID(gameConfigClass, "getAnnouncerVolume", "()I");
     midConfigGetSfxVolume = env->GetMethodID(gameConfigClass, "getSfxVolume", "()I");
     midConfigGetMusicVolume = env->GetMethodID(gameConfigClass, "getMusicVolume", "()I");
@@ -165,6 +166,7 @@ Java_uk_co_armedpineapple_cth_GameActivity_nativeUpdateConfig(JNIEnv *env, jobje
     jboolean musicEnabled = env->CallBooleanMethod(gameConfig, midConfigGetMusicEnabled);
     jboolean announcerEnabled = env->CallBooleanMethod(gameConfig, midConfigGetAnnouncerEnabled);
     jboolean audioEnabled = env->CallBooleanMethod(gameConfig, midConfigGetAudioEnabled);
+    jboolean edgeScroll = env->CallBooleanMethod(gameConfig, midConfigGetEdgeScroll);
 
     jint sfxVolume = env->CallIntMethod(gameConfig, midConfigGetSfxVolume);
     jint musicVolume = env->CallIntMethod(gameConfig, midConfigGetMusicVolume);
@@ -186,6 +188,7 @@ Java_uk_co_armedpineapple_cth_GameActivity_nativeUpdateConfig(JNIEnv *env, jobje
     config->playAudio = audioEnabled;
     config->language = std::string(language);
     config->scrollMode = scrollMode;
+    config->preventEdgeScroll = !edgeScroll;
 
     pushEvent(SDL_USEREVENT_CONFIGURATION, (void *) config);
 
