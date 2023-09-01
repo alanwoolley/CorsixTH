@@ -174,12 +174,12 @@ end
 
 function UIMainMenu:buttonLoadGame()
 -- Android hook: Open the load dialog
-  TH.showLoad()
+  TH.android.showLoad()
 end
 
 function UIMainMenu:buttonSettings()
   -- Android hook: Open the settings view
-  TH.showSettings()
+  TH.android.showSettings()
 end
 
 function UIMainMenu:buttonOptions()

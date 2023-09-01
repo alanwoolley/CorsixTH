@@ -119,13 +119,16 @@ local function MakePermanentObjectsTable(inverted)
     end
     if type(lib) == "table" then
       for k, v in pairs(lib) do
-        local type_of_lib = type(v)
-        if type_of_lib == "function" or type_of_lib == "table" or type_of_lib == "userdata" then
-          permanent[v] = name .. "." .. k
-          if name == "TH" and type_of_lib == "table" then
-            -- C class metatables
-            local callenv = th_getfenv(getmetatable(v).__call)
-            permanent[callenv] = name .. "." .. k .. ".<mt>"
+        -- ANDROID: Exclude the android events from this to avoid persisting them
+        if k:find("^android") == nil then
+          local type_of_lib = type(v)
+          if type_of_lib == "function" or type_of_lib == "table" or type_of_lib == "userdata" then
+            permanent[v] = name .. "." .. k
+            if name == "TH" and type_of_lib == "table" then
+              -- C class metatables
+              local callenv = th_getfenv(getmetatable(v).__call)
+              permanent[callenv] = name .. "." .. k .. ".<mt>"
+            end
           end
         end
       end
@@ -283,7 +286,7 @@ function SaveGameFile(filename)
 
   local rep = TheApp.world:getLocalPlayerHospital().reputation
   local balance = TheApp.world:getLocalPlayerHospital().balance
-  TH.updateSaveGameDatabase(filename, rep, balance, lname, ss)
+  TH.android.updateSaveGameDatabase(filename, rep, balance, lname, ss)
 end
 
 --! Compatibility function to work out the game's graphics set

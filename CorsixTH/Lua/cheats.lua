@@ -59,6 +59,7 @@ end
 --!param num (integer) The cheat from the cheat_list called
 --!return true if cheat was successful, false otherwise
 function Cheats:performCheat(num)
+  self.hospital.cheated = true
   local cheat_success = self.cheat_list[num].func(self) ~= false
   return cheat_success and self.cheat_list[num].name ~= "lose_level"
 end

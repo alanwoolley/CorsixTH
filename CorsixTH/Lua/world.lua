@@ -1519,6 +1519,14 @@ function World:winGame(player_no)
     end
     self.ui.bottom_panel:queueMessage("information", message, nil, 0, 2, callback)
     self.ui.bottom_panel:openLastMessage()
+
+    -- ANDROID: Report campaign level campaign completed
+    print (self.campaign_info)
+    if type(self.map.level_number) == "number"
+            and self.campaign_info == "TH.campaign"
+            and not self.ui.hospital.cheated then
+      TH.android_events.onCampaignLevelComplete(self.map.level_number)
+    end
   end
 end
 

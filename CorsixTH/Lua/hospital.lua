@@ -20,6 +20,8 @@ SOFTWARE. --]]
 
 corsixth.require("announcer")
 
+local TH = require("TH")
+
 class "Hospital"
 
 ---@type Hospital
@@ -1349,6 +1351,11 @@ function Hospital:spendMoney(amount, reason, changeValue)
     if changeValue then
       self.value = self.value + changeValue
     end
+
+    -- ANDROID - register event if not cheated
+    if not self.cheated then
+      TH.android_events.onBankBalanceChanged(-amount)
+    end
   end
 end
 
@@ -1366,6 +1373,14 @@ function Hospital:receiveMoney(amount, reason, changeValue)
     self.money_in = self.money_in + amount
     if changeValue then
       self.value = self.value - changeValue
+    end
+
+    -- ANDROID - register event if not cheated
+    if not self.cheated then
+      TH.android_events.onBankBalanceChanged(amount)
+      if (reason == _S.transactions.bank_loan) then
+        TH.android_events.onLoanTaken(amount)
+      end
     end
   end
 end
@@ -1557,6 +1572,11 @@ function Hospital:humanoidDeath(patient)
   if not patient.is_debug then
     local case = self.disease_casebook[patient.disease.id]
     case.fatalities = case.fatalities + 1
+
+    -- ANDROID - register event if not cheated
+    if not self.cheated then
+      TH.android_events.onKill()
+    end
   end
   self.num_deaths = self.num_deaths + 1
   self.num_deaths_this_year = self.num_deaths_this_year + 1
@@ -1824,6 +1844,11 @@ function Hospital:updateCuredCounts(patient)
 
   if not patient.is_debug then
     self:changeReputation("cured", patient.disease)
+
+    -- ANDROID - register event if not cheated
+    if not self.cheated then
+      TH.android_events.onCure()
+    end
   end
 
   self.num_cured = self.num_cured + 1

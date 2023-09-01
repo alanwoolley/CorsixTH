@@ -1166,7 +1166,7 @@ function App:run()
     end
 
     -- ANDROID: Push report the error
-    TH.reportError(self.last_dispatch_type, debug.traceback(co, e, 0))
+    TH.android.reportError(self.last_dispatch_type, debug.traceback(co, e, 0))
 
     if self.world and self.last_dispatch_type == "timer" and self.world.current_tick_entity then
       -- Disconnecting the tick handler is quite a drastic measure, so give

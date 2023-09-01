@@ -6,13 +6,16 @@
 
 static JavaVM *jvm = nullptr;
 
-static jclass gameActivityClass, gameConfigClass;
+static jclass gameActivityClass, gameConfigClass, eventsClass;
+static jobject gameActivitySingleton, gameEventHandler;
 
 static jmethodID midShowSettings, midShowLoad, midShowSave, midUpdateSaveGameDatabase;
 static jmethodID midConfigGetAdvisorEnabled, midConfigGetAudioEnabled, midConfigGetSfxEnabled,
         midConfigGetMusicEnabled, midConfigGetLanguage, midConfigGetAnnouncerEnabled,
         midConfigGetAnnouncerVolume, midConfigGetSfxVolume, midConfigGetMusicVolume,
         midConfigGetScrollMode, midConfigGetEdgeScroll;
+static jmethodID midEventOnCure, midEventOnKill, midEventOnCampaignLevelComplete,
+        midEventOnBankBalanceChanged, midEventOnLoanTaken;
 static jmethodID midReportError;
 
 jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
@@ -31,6 +34,14 @@ jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
             (jclass) (env->FindClass("uk/co/armedpineapple/cth/GameActivity")));
     gameConfigClass = (jclass) env->NewGlobalRef(
             (jclass) (env->FindClass("uk/co/armedpineapple/cth/GameConfiguration")));
+    eventsClass = (jclass) env->NewGlobalRef(
+            (jclass) (env->FindClass("uk/co/armedpineapple/cth/GameEventHandler")));
+
+    // Singletons
+    jfieldID singletonFieldId = env->GetStaticFieldID(gameActivityClass, "singleton",
+                                                      "Luk/co/armedpineapple/cth/GameActivity;");
+    jobject singleton = env->GetStaticObjectField(gameActivityClass, singletonFieldId);
+    gameActivitySingleton = (jobject) env->NewGlobalRef(singleton);
 
     // Activity Methods
     midShowSettings = env->GetStaticMethodID(gameActivityClass, "showSettings", "()V");
@@ -53,6 +64,21 @@ jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
     midConfigGetLanguage = env->GetMethodID(gameConfigClass, "getLanguage", "()Ljava/lang/String;");
     midConfigGetScrollMode = env->GetMethodID(gameConfigClass, "getScrollMode", "()I");
 
+    // Events Methods
+    midEventOnCure = env->GetMethodID(eventsClass, "onCure", "()V");
+    midEventOnKill = env->GetMethodID(eventsClass, "onKill", "()V");
+    midEventOnCampaignLevelComplete = env->GetMethodID(eventsClass, "onCampaignLevelComplete",
+                                                       "(I)V");
+    midEventOnBankBalanceChanged = env->GetMethodID(eventsClass, "onBankBalanceChanged",
+                                                    "(J)V");
+    midEventOnLoanTaken = env->GetMethodID(eventsClass, "onLoanTaken", "(J)V");
+
+    // Game Event handler
+
+    jmethodID midGetGameEventHandler = env->GetMethodID(gameActivityClass, "getGameEventHandler", "()Luk/co/armedpineapple/cth/GameEventHandler;");
+    jobject localGameEventHandler = env->CallObjectMethod(gameActivitySingleton, midGetGameEventHandler);
+    gameEventHandler = env->NewGlobalRef(localGameEventHandler);
+
     return JNI_VERSION_1_4;
 }
 
@@ -72,7 +98,7 @@ static int reportError(lua_State *L) {
     return 0;
 }
 
-int reportError(const char* stack) {
+int reportError(const char *stack) {
     JNIEnv *env;
     jvm->AttachCurrentThread(&env, nullptr);
     jbyteArray stackArray = env->NewByteArray(strlen(stack));
@@ -136,12 +162,48 @@ static int updateSaveGameDatabase(lua_State *L) {
     return 0;
 }
 
-void registerAndroidLuaFunctions(const lua_register_state *pState) {
-    add_lua_function(pState, showSettings, "showSettings");
-    add_lua_function(pState, showLoad, "showLoad");
-    add_lua_function(pState, showSave, "showSave");
-    add_lua_function(pState, updateSaveGameDatabase, "updateSaveGameDatabase");
-    add_lua_function(pState, reportError, "reportError");
+static int onCureEvent(lua_State *L) {
+    JNIEnv *env;
+    jvm->AttachCurrentThread(&env, nullptr);
+    env->CallVoidMethod(gameEventHandler, midEventOnCure);
+    return 0;
+}
+
+static int onKillEvent(lua_State *L) {
+    JNIEnv *env;
+    jvm->AttachCurrentThread(&env, nullptr);
+    env->CallVoidMethod(gameEventHandler, midEventOnKill);
+    return 0;
+}
+
+static int onBankBalanceChangedEvent(lua_State *L) {
+    JNIEnv *env;
+    jvm->AttachCurrentThread(&env, nullptr);
+
+    const long balanceDelta = lua_tointeger(L, 1);
+
+    env->CallVoidMethod(gameEventHandler, midEventOnBankBalanceChanged, balanceDelta);
+    return 0;
+}
+
+static int onLoanTaken(lua_State *L) {
+    JNIEnv *env;
+    jvm->AttachCurrentThread(&env, nullptr);
+
+    const int loanAmount = lua_tointeger(L, 1);
+
+    env->CallVoidMethod(gameEventHandler, midEventOnLoanTaken, loanAmount);
+    return 0;
+}
+
+static int onCampaignLevelComplete(lua_State *L) {
+    JNIEnv *env;
+    jvm->AttachCurrentThread(&env, nullptr);
+
+    const int level = lua_tointeger(L, 1);
+
+    env->CallVoidMethod(gameEventHandler, midEventOnCampaignLevelComplete, level);
+    return 0;
 }
 
 extern "C" JNIEXPORT void JNICALL
@@ -193,4 +255,34 @@ Java_uk_co_armedpineapple_cth_GameActivity_nativeUpdateConfig(JNIEnv *env, jobje
     pushEvent(SDL_USEREVENT_CONFIGURATION, (void *) config);
 
     env->ReleaseStringUTFChars((jstring) languageObj, language);
+}
+
+void registerAndroidLuaFunctions(const lua_register_state *pState) {
+    lua_settop(pState->L, pState->top);
+    /* Make metatable the environment for registered functions */
+    auto metatable = pState->metatables[static_cast<size_t>(lua_metatable::android)];
+    lua_pushvalue(pState->L, metatable);
+
+    add_lua_function(pState, showSettings, "showSettings");
+    add_lua_function(pState, showLoad, "showLoad");
+    add_lua_function(pState, showSave, "showSave");
+    add_lua_function(pState, updateSaveGameDatabase, "updateSaveGameDatabase");
+    add_lua_function(pState, reportError, "reportError");
+
+    lua_setfield(pState->L, pState->main_table, "android");
+}
+
+void registerAndroidEventsLuaFunctions(const lua_register_state *pState) {
+    lua_settop(pState->L, pState->top);
+    /* Make metatable the environment for registered functions */
+    auto metatable = pState->metatables[static_cast<size_t>(lua_metatable::android_events)];
+    lua_pushvalue(pState->L, metatable);
+
+    add_lua_function(pState, onCureEvent, "onCure");
+    add_lua_function(pState, onKillEvent, "onKill");
+    add_lua_function(pState, onBankBalanceChangedEvent, "onBankBalanceChanged");
+    add_lua_function(pState, onLoanTaken, "onLoanTaken");
+    add_lua_function(pState, onCampaignLevelComplete, "onCampaignLevelComplete");
+
+    lua_setfield(pState->L, pState->main_table, "android_events");
 }

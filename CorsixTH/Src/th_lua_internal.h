@@ -55,6 +55,11 @@ enum class lua_metatable {
   line,
   iso_fs,
 
+#ifdef __ANDROID__
+  android,
+  android_events,
+#endif
+
   count
 };
 

@@ -225,6 +225,10 @@ void luaT_setclosure(const lua_register_state* pState, lua_CFunction fn,
   luaT_pushcclosure(pState->L, fn, iUps);
 }
 
+int mtcall(lua_State* L) {
+  printf ("test");
+}
+
 int luaopen_th(lua_State* L) {
   lua_settop(L, 0);
   lua_checkstack(L, 16 + static_cast<int>(lua_metatable::count));
@@ -240,14 +244,16 @@ int luaopen_th(lua_State* L) {
   oState.main_table = lua_gettop(L);
   oState.top = lua_gettop(L);
 
+#ifdef __ANDROID__
+    registerAndroidLuaFunctions(pState);
+    registerAndroidEventsLuaFunctions(pState);
+#endif
+
   // Misc. functions
   lua_settop(L, oState.top);
   add_lua_function(pState, l_load_strings, "LoadStrings");
   add_lua_function(pState, l_get_compile_options, "GetCompileOptions");
   add_lua_function(pState, bootstrap_lua_resources, "GetBuiltinFont");
-
-  // Android functions
-  registerAndroidLuaFunctions(pState);
 
   // Classes
   lua_register_map(pState);

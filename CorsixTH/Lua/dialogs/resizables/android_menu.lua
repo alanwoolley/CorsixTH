@@ -75,13 +75,13 @@ function UIAndroidMenu:onRestartPressed()
 end
 
 function UIAndroidMenu:onSettingsPressed()
-    TH.showSettings()
+    TH.android.showSettings()
 end
 
 function UIAndroidMenu:onLoadPressed()
-    TH.showLoad()
+    TH.android.showLoad()
 end
 
 function UIAndroidMenu:onSavePressed()
-    TH.showSave()
+    TH.android.showSave()
 end
