@@ -3,6 +3,7 @@
 #include <jni.h>
 #include <android/log.h>
 #include <SDL_events.h>
+#include <iostream>
 
 static JavaVM *jvm = nullptr;
 
@@ -18,14 +19,22 @@ static jmethodID midEventOnCure, midEventOnKill, midEventOnCampaignLevelComplete
         midEventOnBankBalanceChanged, midEventOnLoanTaken;
 static jmethodID midReportError;
 
+static void ensureEnv(JNIEnv** env) {
+    int result = jvm->GetEnv((void **) env, JNI_VERSION_1_4);
+    if (result == JNI_EDETACHED) {
+        if (jvm->AttachCurrentThread(env, nullptr) != 0) {
+            std::cerr << "Failed to attach" << std::endl;
+        }
+    } else if (result == JNI_EVERSION) {
+        std::cerr << "Version not supported" << std::endl;
+    }
+}
+
 jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
-    JNIEnv *env = nullptr;
     jvm = vm;
 
-    if ((*jvm).GetEnv((void **) &env, JNI_VERSION_1_4) != JNI_OK) {
-        __android_log_print(ANDROID_LOG_ERROR, "CorsixTH", "Failed to get JNI Env");
-        return JNI_VERSION_1_4;
-    }
+    JNIEnv *env;
+    ensureEnv(&env);
 
     // Init global references so that we don't need to keep getting them.
 
@@ -82,27 +91,44 @@ jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
     return JNI_VERSION_1_4;
 }
 
+static int checkStackSize(lua_State *L, int expected) {
+    int stackSize = lua_gettop(L);
+    if (stackSize != expected) {
+        return luaL_error(L, "Unexpected stack size. Was %d, expected %d.", stackSize, expected);
+    }
+    return 0;
+}
+
 static int reportError(lua_State *L) {
+    checkStackSize(L, 2);
     JNIEnv *env;
-    jvm->AttachCurrentThread(&env, nullptr);
+    ensureEnv(&env);
+
     const char *handler = lua_tostring(L, 1);
+    const int handlerLen = static_cast<int>(luaL_len(L, 1));
     const char *stack = lua_tostring(L, 2);
+    const int stackLen = static_cast<int>(luaL_len(L, 2));
 
-    jbyteArray handlerArray = env->NewByteArray(strlen(handler));
-    env->SetByteArrayRegion(handlerArray, 0, strlen(handler), (const jbyte *) handler);
+    jbyteArray handlerArray = env->NewByteArray(handlerLen);
+    env->SetByteArrayRegion(handlerArray, 0, handlerLen, (const jbyte *) handler);
 
-    jbyteArray stackArray = env->NewByteArray(strlen(stack));
-    env->SetByteArrayRegion(stackArray, 0, strlen(stack), (const jbyte *) stack);
+    jbyteArray stackArray = env->NewByteArray(stackLen);
+    env->SetByteArrayRegion(stackArray, 0, stackLen, (const jbyte *) stack);
 
     env->CallStaticVoidMethod(gameActivityClass, midReportError, handlerArray, stackArray);
+
+    env->DeleteLocalRef(handlerArray);
+    env->DeleteLocalRef(stackArray);
+
     return 0;
 }
 
 int reportError(const char *stack) {
     JNIEnv *env;
-    jvm->AttachCurrentThread(&env, nullptr);
-    jbyteArray stackArray = env->NewByteArray(strlen(stack));
-    env->SetByteArrayRegion(stackArray, 0, strlen(stack), (const jbyte *) stack);
+    ensureEnv(&env);
+
+    jbyteArray stackArray = env->NewByteArray(static_cast<int>(strlen(stack)));
+    env->SetByteArrayRegion(stackArray, 0, static_cast<int>(strlen(stack)), (const jbyte *) stack);
 
     env->CallStaticVoidMethod(gameActivityClass, midReportError, nullptr, stackArray);
     return 0;
@@ -110,7 +136,7 @@ int reportError(const char *stack) {
 
 int reportError() {
     JNIEnv *env;
-    jvm->AttachCurrentThread(&env, nullptr);
+    ensureEnv(&env);
 
     env->CallStaticVoidMethod(gameActivityClass, midReportError, nullptr, nullptr);
     return 0;
@@ -118,89 +144,100 @@ int reportError() {
 
 static int showSettings(lua_State *L) {
     JNIEnv *env;
-    jvm->AttachCurrentThread(&env, nullptr);
+    ensureEnv(&env);
     env->CallStaticVoidMethod(gameActivityClass, midShowSettings);
     return 0;
 }
 
 static int showLoad(lua_State *L) {
     JNIEnv *env;
-    jvm->AttachCurrentThread(&env, nullptr);
+    ensureEnv(&env);
     env->CallStaticVoidMethod(gameActivityClass, midShowLoad);
     return 0;
 }
 
 static int showSave(lua_State *L) {
     JNIEnv *env;
-    jvm->AttachCurrentThread(&env, nullptr);
+    ensureEnv(&env);
     env->CallStaticVoidMethod(gameActivityClass, midShowSave);
     return 0;
 }
 
 static int updateSaveGameDatabase(lua_State *L) {
+    checkStackSize(L, 5);
     const char *saveName = lua_tostring(L, 1);
+    const int saveLen = static_cast<int>(luaL_len(L, 1));
     const int rep = lua_tointeger(L, 2);
     const long money = lua_tointeger(L, 3);
     const char *level = lua_tostring(L, 4);
+    const int levelLen = static_cast<int>(luaL_len(L, 4));
     const char *ssPath = lua_tostring(L, 5);
+    const int ssLen = static_cast<int>(luaL_len(L, 5));
 
     JNIEnv *env;
+    ensureEnv(&env);
 
-    jvm->AttachCurrentThread(&env, nullptr);
+    jbyteArray saveString = env->NewByteArray(saveLen);
+    env->SetByteArrayRegion(saveString, 0, saveLen, (const jbyte *) saveName);
 
-    jbyteArray saveString = env->NewByteArray(strlen(saveName));
-    env->SetByteArrayRegion(saveString, 0, strlen(saveName), (const jbyte *) saveName);
+    jbyteArray levelString = env->NewByteArray(levelLen);
+    env->SetByteArrayRegion(levelString, 0, levelLen, (const jbyte *) level);
 
-    jbyteArray levelString = env->NewByteArray(strlen(level));
-    env->SetByteArrayRegion(levelString, 0, strlen(level), (const jbyte *) level);
-
-    jbyteArray ssString = env->NewByteArray(strlen(ssPath));
-    env->SetByteArrayRegion(ssString, 0, strlen(ssPath), (const jbyte *) ssPath);
+    jbyteArray ssString = env->NewByteArray(ssLen);
+    env->SetByteArrayRegion(ssString, 0, ssLen, (const jbyte *) ssPath);
 
     env->CallStaticVoidMethod(gameActivityClass, midUpdateSaveGameDatabase, saveString, rep, money,
                               levelString, ssString);
+
+    env->DeleteLocalRef(saveString);
+    env->DeleteLocalRef(levelString);
+    env->DeleteLocalRef(ssString);
+
     return 0;
 }
 
 static int onCureEvent(lua_State *L) {
     JNIEnv *env;
-    jvm->AttachCurrentThread(&env, nullptr);
+    ensureEnv(&env);
     env->CallVoidMethod(gameEventHandler, midEventOnCure);
     return 0;
 }
 
 static int onKillEvent(lua_State *L) {
     JNIEnv *env;
-    jvm->AttachCurrentThread(&env, nullptr);
+    ensureEnv(&env);
     env->CallVoidMethod(gameEventHandler, midEventOnKill);
     return 0;
 }
 
 static int onBankBalanceChangedEvent(lua_State *L) {
+    checkStackSize(L, 1);
     JNIEnv *env;
-    jvm->AttachCurrentThread(&env, nullptr);
+    ensureEnv(&env);
 
-    const long balanceDelta = lua_tointeger(L, 1);
+    const long balanceDelta = static_cast<long>(luaL_checkinteger(L, 1));
 
     env->CallVoidMethod(gameEventHandler, midEventOnBankBalanceChanged, balanceDelta);
     return 0;
 }
 
 static int onLoanTaken(lua_State *L) {
+    checkStackSize(L, 1);
     JNIEnv *env;
-    jvm->AttachCurrentThread(&env, nullptr);
+    ensureEnv(&env);
 
-    const int loanAmount = lua_tointeger(L, 1);
+    const int loanAmount = static_cast<int>(luaL_checkinteger(L, 1));
 
     env->CallVoidMethod(gameEventHandler, midEventOnLoanTaken, loanAmount);
     return 0;
 }
 
 static int onCampaignLevelComplete(lua_State *L) {
+    checkStackSize(L, 1);
     JNIEnv *env;
-    jvm->AttachCurrentThread(&env, nullptr);
+    ensureEnv(&env);
 
-    const int level = lua_tointeger(L, 1);
+    const int level = static_cast<int>(luaL_checkinteger(L, 1));
 
     env->CallVoidMethod(gameEventHandler, midEventOnCampaignLevelComplete, level);
     return 0;
