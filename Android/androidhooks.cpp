@@ -167,8 +167,8 @@ static int updateSaveGameDatabase(lua_State *L) {
     checkStackSize(L, 5);
     const char *saveName = lua_tostring(L, 1);
     const int saveLen = static_cast<int>(luaL_len(L, 1));
-    const int rep = lua_tointeger(L, 2);
-    const long money = lua_tointeger(L, 3);
+    const auto rep = static_cast<jint>(luaL_checkinteger(L, 2));
+    const auto money = static_cast<jlong>(luaL_checkinteger(L, 3));
     const char *level = lua_tostring(L, 4);
     const int levelLen = static_cast<int>(luaL_len(L, 4));
     const char *ssPath = lua_tostring(L, 5);
@@ -215,7 +215,7 @@ static int onBankBalanceChangedEvent(lua_State *L) {
     JNIEnv *env;
     ensureEnv(&env);
 
-    const long balanceDelta = static_cast<long>(luaL_checkinteger(L, 1));
+    const auto balanceDelta = static_cast<jlong>(luaL_checkinteger(L, 1));
 
     env->CallVoidMethod(gameEventHandler, midEventOnBankBalanceChanged, balanceDelta);
     return 0;
@@ -226,7 +226,7 @@ static int onLoanTaken(lua_State *L) {
     JNIEnv *env;
     ensureEnv(&env);
 
-    const int loanAmount = static_cast<int>(luaL_checkinteger(L, 1));
+    const auto loanAmount = static_cast<jlong>(luaL_checkinteger(L, 1));
 
     env->CallVoidMethod(gameEventHandler, midEventOnLoanTaken, loanAmount);
     return 0;
@@ -237,7 +237,7 @@ static int onCampaignLevelComplete(lua_State *L) {
     JNIEnv *env;
     ensureEnv(&env);
 
-    const int level = static_cast<int>(luaL_checkinteger(L, 1));
+    const jint level = static_cast<jint>(luaL_checkinteger(L, 1));
 
     env->CallVoidMethod(gameEventHandler, midEventOnCampaignLevelComplete, level);
     return 0;
