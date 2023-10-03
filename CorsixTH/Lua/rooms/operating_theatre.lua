@@ -20,6 +20,7 @@ SOFTWARE. --]]
 
 local room = {}
 room.id = "operating_theatre"
+room.vip_must_visit = true
 room.level_config_id = 10
 room.class = "OperatingTheatreRoom"
 room.name = _S.rooms_short.operating_theatre
@@ -68,13 +69,14 @@ function OperatingTheatreRoom:roomFinished()
     end
   end
   -- Tell the player what is missing, if anything.
-  if not self.hospital:hasRoomOfType("ward") then
-    self.world.ui.adviser:say(_A.room_requirements.op_need_ward)
+  if self.hospital:countRoomOfType("ward", 1) == 0 then
+    self.hospital:giveAdvice({_A.room_requirements.op_need_ward})
   end
-  if not self.hospital:hasStaffOfCategory("Surgeon") then
-    self.world.ui.adviser:say(_A.room_requirements.op_need_two_surgeons)
-  elseif self.hospital:hasStaffOfCategory("Surgeon") == 1 then
-    self.world.ui.adviser:say(_A.room_requirements.op_need_another_surgeon)
+  local numSurgeons = self.hospital:countStaffOfCategory("Surgeon", 2)
+  if numSurgeons == 0 then
+    self.hospital:giveAdvice({_A.room_requirements.op_need_two_surgeons})
+  elseif numSurgeons == 1 then
+    self.hospital:giveAdvice({_A.room_requirements.op_need_another_surgeon})
   end
   return Room.roomFinished(self)
 end
@@ -96,7 +98,7 @@ end
 --! Returns true if an operation is ongoing
 function OperatingTheatreRoom:isOperating()
   for k, _ in pairs(self.staff_member_set) do
-    if k.action_queue[1].name == "multi_use_object" then
+    if k:getCurrentAction().name == "multi_use_object" then
       return true
     end
   end
@@ -140,7 +142,7 @@ function OperatingTheatreRoom:commandEnteringStaff(staff)
   -- Resume operation if already ongoing
   if self:isOperating() then
     local surgeon1 = next(self.staff_member_set)
-    local ongoing_action = surgeon1.action_queue[1]
+    local ongoing_action = surgeon1:getCurrentAction()
     assert(ongoing_action.name == "multi_use_object")
 
     local table, table_x, table_y = self.world:findObjectNear(staff, "operating_table_b")
@@ -172,22 +174,6 @@ function OperatingTheatreRoom:setStaffMembersAttribute(attribute, value)
   end
 end
 
--- Returns the current staff member. if there are currently two surgeons it returns
--- the one with higher tiredness.
-function OperatingTheatreRoom:getStaffMember()
-  local staff
-  for staff_member, _ in pairs(self.staff_member_set) do
-    if staff and not staff.fired then
-      if staff.attributes["fatigue"] < staff_member.attributes["fatigue"] then
-        staff = staff_member
-      end
-    else
-      staff = staff_member
-    end
-  end
-  return staff
-end
-
 --! Builds the first operation action (i.e. with the surgeon whose we see the front).
 --!param surgeon1 (Staff): the surgeon who does this operation action. He must
 --! be the same as the surgeon who gets the action on his queue.
@@ -195,7 +181,7 @@ end
 --!param operation_table (OperatingTable): master object representing
 --! the operation table.
 function OperatingTheatreRoom:buildTableAction1(surgeon1, patient, operation_table)
-  local loop_callback_multi_use = --[[persistable:operatring_theatre_multi_use_callback]] function(_)
+  local loop_callback_multi_use = --[[persistable:operatring_theatre_multi_use_callback]] function()
     -- dirty hack to make the truncated animation work
     surgeon1.animation_idx = nil
   end
@@ -204,7 +190,7 @@ function OperatingTheatreRoom:buildTableAction1(surgeon1, patient, operation_tab
     self:dealtWithPatient(patient)
     -- Tell the patient that it's time to leave, but only if the first action
     -- is really an idle action.
-    if patient.action_queue[1].name == "idle" then
+    if patient:getCurrentAction().name == "idle" then
       patient:finishAction()
     end
   end

@@ -18,6 +18,10 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE. --]]
 
+corsixth.require("announcer")
+
+local AnnouncementPriority = _G["AnnouncementPriority"]
+
 class "CallsDispatcher"
 
 ---@type CallsDispatcher
@@ -61,7 +65,7 @@ function CallsDispatcher:callForStaff(room)
   end
   local sound = room.room_info.call_sound
   if anyone_missed and sound and not room.sound_played then
-    room.world.ui:playAnnouncement(sound)
+    room.world.ui:playAnnouncement(sound, AnnouncementPriority.Normal)
     room.sound_played = true
   end
 end
@@ -96,8 +100,8 @@ function CallsDispatcher:callForRepair(object, urgent, manual, lock_room)
   lock_room = manual or lock_room
 
   local call = {
-    verification = --[[persistable:call_dispatcher_repair_verification]] function(staff) return false end,
-    priority = --[[persistable:call_dispatcher_repair_priority]] function(staff) return 1 end,
+    verification = --[[persistable:call_dispatcher_repair_verification]] function() return false end,
+    priority = --[[persistable:call_dispatcher_repair_priority]] function() return 1 end,
     execute = --[[persistable:call_dispatcher_repair_execute]] function(staff) return CallsDispatcher.sendStaffToRepair(object, staff) end,
     object = object,
     key = "repair",
@@ -109,24 +113,12 @@ function CallsDispatcher:callForRepair(object, urgent, manual, lock_room)
   }
 
   object:setRepairingMode(lock_room and true or false)
-  local message
-  local ui = object.world.ui
-  if not object.world:getLocalPlayerHospital():hasStaffOfCategory("Handyman") then
-    -- Advise about hiring Handyman
-    message = _A.warnings.machinery_damaged2
-  end
 
   if not manual and urgent then
-    local room = object:getRoom()
-    local sound = room.room_info.handyman_call_sound
-    if sound then
-      ui:playAnnouncement(sound)
-      ui:playSound("machwarn.wav")
-    end
-    message = _A.warnings.machines_falling_apart
-  end
-  if message then
-    ui.adviser:say(message)
+    object.hospital:giveAdvice({_A.warnings.machines_falling_apart})
+  elseif object.hospital:countStaffOfCategory("Handyman", 1) == 0 then
+    -- Advise about hiring Handyman
+    object.hospital:giveAdvice({_A.warnings.machinery_damaged2})
   end
 
   if not self.call_queue[object] then
@@ -138,9 +130,9 @@ end
 
 function CallsDispatcher:callForWatering(plant)
   local call = {
-    verification = --[[persistable:call_dispatcher_watering_verification]]function(staff)
+    verification = --[[persistable:call_dispatcher_watering_verification]]function()
       return false end,
-    priority = --[[persistable:call_dispatcher_watering_priority]] function(staff)
+    priority = --[[persistable:call_dispatcher_watering_priority]] function()
       return 1 end,
     execute = --[[persistable:call_dispatcher_watering_execute]] function(staff) return CallsDispatcher.sendStaffToWatering(plant, staff) end,
     object = plant,
@@ -519,7 +511,7 @@ function CallsDispatcher.getPriorityForRoom(room, attribute, staff)
     end
   end
 
-  -- Prefer the tirer staff (such that less chance to have "resting sychronization issue")
+  -- Prefer the tirer staff (such that less chance to have "resting synchronization issue")
   score = score - staff.attributes["fatigue"] * 40 -- 40 is just a weighting scale
 
   -- TODO: Assign doctor with higher ability
@@ -544,7 +536,7 @@ function CallsDispatcher.sendStaffToRoom(room, staff)
   staff:setDynamicInfoText(_S.dynamic_info.staff.actions.heading_for:format(room.room_info.name))
 end
 
-function CallsDispatcher.staffActionInterruptHandler(action, humanoid, high_priority)
+function CallsDispatcher.staffActionInterruptHandler(action, humanoid)
   if action.call.assigned == humanoid then
     action.call.assigned = nil
     humanoid.on_call = nil

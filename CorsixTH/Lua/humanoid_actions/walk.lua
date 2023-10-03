@@ -78,23 +78,17 @@ action_walk_interrupt = permanent"action_walk_interrupt"( function(action, human
     if door and (door.reserved_for == humanoid or class.is(humanoid, Vip)) then --  "or class.is(humanoid, Vip)" is added as a temporary fix
   -- TODO: find the cause of the "VIP bug", why does the door not get unreserved sometimes when the VIP has looked into a room? See issue 1025
       door.reserved_for = nil
-      if door.queue:size() > 0 then
-        door.queue:pop()
-        door:updateDynamicInfo()
-      end
+      door:getRoom():tryAdvanceQueue()
     end
+
+    -- guarding with the action.keep_reserved check as we don't want to unexpect
+    -- if we are just interrupting but resume the walk action afterwards
+    humanoid:unexpectFromRoom(humanoid.world:getRoom(action.x, action.y))
   else
     -- This flag can be used only once at a time.
     action.keep_reserved = nil
   end
-  -- Unexpect the patient from a possible destination room.
-  if humanoid.next_room_to_visit then
-    local door = humanoid.next_room_to_visit.door
-    if door.queue then
-      door.queue:unexpect(humanoid)
-      door:updateDynamicInfo()
-    end
-  end
+
   -- Terminate immediately if high-priority
   if high_priority then
     local timer_function = humanoid.timer_function
@@ -176,7 +170,7 @@ end
 
 local flags_here, flags_there = {}, {}
 local action_walk_tick; action_walk_tick = permanent"action_walk_tick"( function(humanoid)
-  local action = humanoid.action_queue[1]
+  local action = humanoid:getCurrentAction()
   local path_x = action.path_x
   local path_y = action.path_y
   local path_index = action.path_index
@@ -203,13 +197,17 @@ local action_walk_tick; action_walk_tick = permanent"action_walk_tick"( function
   -- Also make sure that a room hasn't unexpectedly been built on top of the
   -- path since the route was calculated.
   if not recalc_route and flags_here.roomId ~= flags_there.roomId then
-    local door = TheApp.objects.door.thob
-    local door2 = TheApp.objects.swing_door_right.thob
-    if flags_here.thob ~= door and flags_here.thob ~= door2 and
-        flags_there.thob ~= door and flags_there.thob ~= door2 and
-        (not flags_there.room or
-          map:getCellFlags(path_x[#path_x], path_y[#path_y]).roomId ~= flags_there.roomId) then
-      recalc_route = true
+    -- if going to the corridor we don't care as we are at the door
+    -- as this will be false we won't bother checking for rerouting
+    recalc_route = flags_there.room
+    local door = TheApp.objects.door.id
+    local door2 = TheApp.objects.swing_door_right.id
+    local doorcheck = {[door] = true, [door2] = true}
+    -- but we should see if this is the same room id we want to go to and cancel the reroute
+    -- ensure we still have a door on this route
+    if recalc_route and (humanoid.world:getObject(x1, y1, doorcheck) or humanoid.world:getObject(x2, y2, doorcheck)) and -- is there any door
+        map:getCellFlags(path_x[#path_x], path_y[#path_y]).roomId == flags_there.roomId then
+      recalc_route = false
     end
   end
   if recalc_route then
@@ -249,7 +247,7 @@ local action_walk_tick_door = permanent"action_walk_tick_door"( function(humanoi
 end)
 
 navigateDoor = function(humanoid, x1, y1, dir)
-  local action = humanoid.action_queue[1]
+  local action = humanoid:getCurrentAction()
   local duration = 12
   local dx = x1
   local dy = y1
@@ -280,30 +278,32 @@ navigateDoor = function(humanoid, x1, y1, dir)
       humanoid:setTilePositionSpeed(x1, y1)
       humanoid:setNextAction(IdleAction():setCount(10), 0)
       humanoid:queueAction(MeanderAction())
+      if door.reserved_for == humanoid then
+        door.reserved_for = nil
+        room:tryAdvanceQueue()
+      end
       return
     end
   end
   if door.user or (door.reserved_for and door.reserved_for ~= humanoid) or
       (is_entering_room and not room:canHumanoidEnter(humanoid)) then
-    --queueing patients are no longer enroute
-    room.humanoids_enroute[humanoid] = nil
     local queue = door.queue
     if door.reserved_for == humanoid then
       door.reserved_for = nil
-      if queue:size() > 0 and room.is_active then
-        queue:pop()
-        door:updateDynamicInfo()
-      end
+      room:tryAdvanceQueue()
     end
     humanoid:setTilePositionSpeed(x1, y1)
     local action_index = 0
     if is_entering_room and queue:size() == 0 and not room:getPatient() and
         not door.user and not door.reserved_for and humanoid.should_knock_on_doors and
         room.room_info.required_staff and not swinging then
-      humanoid:queueAction(KnockDoorAction(door, dir), action_index)
+      humanoid:queueAction(KnockDoorAction(humanoid, door, dir), action_index)
       action_index = action_index + 1
     end
-    humanoid:queueAction(QueueAction(x1, y1, queue):setIsLeaving(humanoid:isLeaving())
+    -- a doctor/nurse answering a call but not yet left the room will not ever be leaving
+    -- if they happen to queue when leaving the room, humanoid:isLeaving will not reflect
+    -- the true state, so just use the is_entering_room fact instead
+    humanoid:queueAction(QueueAction(x1, y1, queue):setIsLeaving(not is_entering_room)
         :setReserveWhenDone(door), action_index)
     action.must_happen = action.saved_must_happen
     action.reserve_on_resume = door
@@ -315,7 +315,7 @@ navigateDoor = function(humanoid, x1, y1, dir)
   elseif is_entering_room and not action.done_knock and humanoid.should_knock_on_doors and
       room.room_info.required_staff and not swinging then
     humanoid:setTilePositionSpeed(x1, y1)
-    humanoid:queueAction(KnockDoorAction(door, dir), 0)
+    humanoid:queueAction(KnockDoorAction(humanoid, door, dir), 0)
     action.reserve_on_resume = door
     action.done_knock = true
     return

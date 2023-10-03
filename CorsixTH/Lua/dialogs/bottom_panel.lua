@@ -96,41 +96,55 @@ function UIBottomPanel:UIBottomPanel(ui)
     return _S.tooltip.toolbar.reputation .. " (" .. self.ui.hospital.reputation .. ")"
   end, 41, 30, 137, 42)
 
-  -- original TH F-key shortcuts
-  ui:addKeyHandler("F1", self.bank_button, self.bank_button.handleClick, "left")  -- bank manager
-  ui:addKeyHandler("F2", self.bank_button, self.bank_button.handleClick, "right")  -- bank stats
-  ui:addKeyHandler("F3", buttons[1], buttons[1].handleClick, "left")    -- staff management
-  ui:addKeyHandler("F4", buttons[2], buttons[2].handleClick, "left")    -- town map
-  ui:addKeyHandler("F5", buttons[3], buttons[3].handleClick, "left")    -- casebook
-  ui:addKeyHandler("F6", buttons[4], buttons[4].handleClick, "left")    -- research
-  ui:addKeyHandler("F7", buttons[5], buttons[5].handleClick, "left")    -- status
-  ui:addKeyHandler("F8", buttons[6], buttons[6].handleClick, "left")    -- charts
-  ui:addKeyHandler("F9", buttons[7], buttons[7].handleClick, "left")    -- policy
+  self:registerKeyHandlers()
+end
 
-  -- "old" keyboard shortcuts for some of the fullscreen windows
-  ui:addKeyHandler("T", buttons[2], buttons[2].handleClick, "left") -- T for town map
-  ui:addKeyHandler("R", buttons[4], buttons[4].handleClick, "left") -- R for research
+function UIBottomPanel:registerKeyHandlers()
+  local ui = self.ui
+  local buttons = self.additional_buttons
+
+  -- The bottom panel hotkeys.
+  ui:addKeyHandler("ingame_panel_bankManager", self.bank_button, self.bank_button.handleClick, "left")  -- bank manager
+  ui:addKeyHandler("ingame_panel_bankStats", self.bank_button, self.bank_button.handleClick, "right")  -- bank stats
+  ui:addKeyHandler("ingame_panel_staffManage", buttons[1], buttons[1].handleClick, "left")    -- staff management
+  ui:addKeyHandler("ingame_panel_townMap", buttons[2], buttons[2].handleClick, "left")    -- town map
+  ui:addKeyHandler("ingame_panel_casebook", buttons[3], buttons[3].handleClick, "left")    -- casebook
+  ui:addKeyHandler("ingame_panel_research", buttons[4], buttons[4].handleClick, "left")    -- research
+  ui:addKeyHandler("ingame_panel_status", buttons[5], buttons[5].handleClick, "left")    -- status
+  ui:addKeyHandler("ingame_panel_charts", buttons[6], buttons[6].handleClick, "left")    -- charts
+  ui:addKeyHandler("ingame_panel_policy", buttons[7], buttons[7].handleClick, "left")    -- policy
+  -- Hotkeys for building a room, furnishing the corridor, editing a room, and hiring staff.
+  ui:addKeyHandler("ingame_panel_buildRoom", self, self.dialogBuildRoom)    -- Build room.
+  ui:addKeyHandler("ingame_panel_furnishCorridor", self, self.dialogFurnishCorridor)    -- Furnish corridor.
+  ui:addKeyHandler("ingame_panel_editRoom", self, self.editRoom)    -- Edit room.
+  ui:addKeyHandler("ingame_panel_hireStaff", self, self.dialogHireStaff)    -- Hire staff.
+
+  -- Alternate keyboard shortcuts for some of the fullscreen windows.
+  ui:addKeyHandler("ingame_panel_map_alt", buttons[2], buttons[2].handleClick, "left") -- town map
+  ui:addKeyHandler("ingame_panel_research_alt", buttons[4], buttons[4].handleClick, "left") -- research
   local config = ui.app.config
   if not config.volume_opens_casebook then
-    ui:addKeyHandler("C", buttons[3], buttons[3].handleClick, "left") -- C for casebook
+    ui:addKeyHandler("ingame_panel_casebook_alt", buttons[3], buttons[3].handleClick, "left") -- casebook
   else
-    ui:addKeyHandler({"shift", "C"}, buttons[3], buttons[3].handleClick, "left") -- Shift + C for casebook
+    ui:addKeyHandler("ingame_panel_casebook_alt02", buttons[3], buttons[3].handleClick, "left") -- casebook
   end
-  ui:addKeyHandler({"shift", "L"}, self, self.openLoad)  -- Shift + L for Load saved game menu
-  ui:addKeyHandler({"shift", "S"}, self, self.openSave)  -- Shift + S for Load create save menu
-  ui:addKeyHandler({"shift", "R"}, self, self.restart)  -- Shift + R for restart the level
-  ui:addKeyHandler({"shift", "Q"}, self, self.quit)  -- Shift + Q quit the game and return to main menu
-  ui:addKeyHandler({"shift", "alt", "S"}, self, self.quickSave)  -- Shift+Alt+S quick save
-  ui:addKeyHandler({"shift", "alt", "L"}, self, self.quickLoad)  -- Shift+Alt+L load last quick save
+  ui:addKeyHandler("ingame_loadMenu", self, self.openLoad)  -- load saved game menu
+  ui:addKeyHandler("ingame_saveMenu", self, self.openSave)  -- load create save menu
+  ui:addKeyHandler("ingame_restartLevel", self, self.restart)  -- restart the level
+  ui:addKeyHandler("ingame_quitLevel", self, self.quit)  -- quit the game and return to main menu
+  ui:addKeyHandler("ingame_quickSave", self, self.quickSave)  -- quick save
+  ui:addKeyHandler("ingame_quickLoad", self, self.quickLoad)  -- load last quick save
 
   -- misc. keyhandlers
-  ui:addKeyHandler("M", self, self.openFirstMessage)    -- M for message
-  ui:addKeyHandler("I", self, self.toggleInformation)   -- I for Information when you first build
-  ui:addKeyHandler("J", self, self.openJukebox)   -- open the jukebox
+  ui:addKeyHandler("ingame_openFirstMessage", self, self.openFirstMessage)    -- message
+  ui:addKeyHandler("ingame_toggleInfo", self, self.toggleInformation)   -- information when you first build
+  ui:addKeyHandler("ingame_jukebox", self, self.openJukebox)   -- jukebox
 end
 
 function UIBottomPanel:openJukebox()
-  self.ui:addWindow(UIJukebox(self.ui.app))
+  if self.ui.app.config.audio and self.ui.app:isAudioEnabled() then
+    self.ui:addWindow(UIJukebox(self.ui.app))
+  end
 end
 
 function UIBottomPanel:openSave()
@@ -162,7 +176,8 @@ function UIBottomPanel:draw(canvas, x, y)
 
   x, y = x + self.x, y + self.y
   self.money_font:draw(canvas, ("%7i"):format(self.ui.hospital.balance), x + 44, y + 9)
-  local month, day = self.world:getDate()
+  local game_date = self.world:date()
+  local month, day = game_date:monthOfYear(), game_date:dayOfMonth()
   self.date_font:draw(canvas, _S.date_format.daymonth:format(day, month), x + 140, y + 20, 60, 0)
 
   -- Draw possible information in the dynamic info bar
@@ -203,32 +218,73 @@ function UIBottomPanel:drawReputationMeter(canvas, x_left, y)
   self.panel_sprites:draw(canvas, 36, x_left + math.floor(step * (self.ui.hospital.reputation - self.ui.hospital.reputation_min)), y)
 end
 
+--! Adds dynamic text to the bottom panel based on cursor position
+--!param canvas
+--!param x (num) coordinate
+--!param y (num) coordinate
 function UIBottomPanel:drawDynamicInfo(canvas, x, y)
-  if self.world:isCurrentSpeed("Pause") and not self.world.user_actions_allowed then
-    self.pause_font:drawWrapped(canvas, _S.misc.pause, x + 10, y + 14, 255, "center")
-  elseif self.dynamic_info then
-    local info = self.dynamic_info
-    local font = self.white_font
-    for i, text in ipairs(info["text"]) do
-      font:drawWrapped(canvas, text, x + 20, y + 10 * i, 240)
-      if i == #info["text"] and info["progress"] then
-        local white = canvas:mapRGB(255, 255, 255)
-        local black = canvas:mapRGB(0, 0, 0)
-        local orange = canvas:mapRGB(221, 83, 0)
-        canvas:drawRect(white, x + 165, y + 10 * i, 100, 10)
-        canvas:drawRect(black, x + 166, y + 1 + 10 * i, 98, 8)
-        canvas:drawRect(orange, x + 166, y + 1 + 10 * i, math.floor(98 * info["progress"]), 8)
-        if info["dividers"] then
-          for _, value in ipairs(info["dividers"]) do
-            canvas:drawRect(white, x + 165 + math.floor(value * 100), y + 10 * i, 1, 10)
-          end
+  if self.world:isCurrentSpeed("Pause") then
+    if not self.world.user_actions_allowed then
+      -- Original pause behaviour, show pause text
+      self.pause_font:drawWrapped(canvas, _S.misc.pause, x + 10, y + 14, 255, "center")
+      return
+    elseif not (self.dynamic_info and self.dynamic_info["text"]) then
+      -- User allows editing while paused, only show pause text where dynamic text not present
+      self.pause_font:drawWrapped(canvas, _S.misc.pause, x + 10, y + 14, 255, "center")
+      return
+    end
+  end
+
+  if not (self.dynamic_info and self.dynamic_info["text"]) then
+    return
+  end
+
+  local info = self.dynamic_info
+  local font = self.white_font
+  for i, text in ipairs(info["text"]) do
+    font:drawWrapped(canvas, text, x + 20, y + 10 * i, 240)
+    if i == #info["text"] and info["progress"] then
+      local white = canvas:mapRGB(255, 255, 255)
+      local black = canvas:mapRGB(0, 0, 0)
+      local orange = canvas:mapRGB(221, 83, 0)
+      canvas:drawRect(white, x + 165, y + 10 * i, 100, 10)
+      canvas:drawRect(black, x + 166, y + 1 + 10 * i, 98, 8)
+      canvas:drawRect(orange, x + 166, y + 1 + 10 * i, math.floor(98 * info["progress"]), 8)
+      if info["dividers"] then
+        for _, value in ipairs(info["dividers"]) do
+          canvas:drawRect(white, x + 165 + math.floor(value * 100), y + 10 * i, 1, 10)
         end
       end
     end
   end
 end
 
+--! Update the information shown in the information box on the panel.
+--!
+--! If the info is nil then a cooldown timer is used before removing the
+--! information from the display.
+--!
+--!param info (table) A table containing the information to display. The text
+--! key is required and contains an array of lines to show. An optional
+--! progress key may be given to draw a progress bar, following the text and
+--! and an array of dividers may be provided to draw extra vertical lines in
+--! the progress bar.
+--!
+--! info = {
+--!   text: { "He's not the saviour", "He's very naughty boy" },
+--!   progress: 50,
+--!   dividers: { 25, 50, 75 }
+--! }
 function UIBottomPanel:setDynamicInfo(info)
+  if info and not info["text"] then
+    self.world:gameLog("")
+    self.world:gameLog("Dynamic info is missing text!")
+    self.world:gameLog("Please report this issue including the call stack below.")
+    self.world:gameLog(debug.traceback())
+
+    return
+  end
+
   if not info then
     self.countdown = 25
   else
@@ -419,7 +475,7 @@ end
 --! Pop the message with the given index from the message queue and turn it into an actual
 -- message window; if no index is provided the first message in the queue is popped.
 function UIBottomPanel:createMessageWindow(index)
-  local --[[persistable:bottom_panel_message_window_close]] function onClose(window, out_of_time)
+  local --[[persistable:bottom_panel_message_window_close]] function onClose(window)
     local index_to_remove
     for i, win in ipairs(self.message_windows) do
       if index_to_remove ~= nil then
@@ -442,6 +498,7 @@ function UIBottomPanel:createMessageWindow(index)
   if not message_info then
     return
   end
+  -- Create the message window, note this does not show it to the player on creation.
   local alert_window = UIMessage(self.ui, 175, 1 + #message_windows * 30,
     onClose, message_info.type, message_info.message, message_info.owner, message_info.timeout, message_info.default_choice, message_info.callback)
   message_windows[#message_windows + 1] = alert_window
@@ -483,9 +540,9 @@ function UIBottomPanel:onTick()
       local fps = self.ui.app:getFPS()
       if fps then
         self.dynamic_info = {text = {
-          ("FPS: %i"):format(math.floor(fps + 0.5)),
-          ("Lua GC: %.1f Kb"):format(collectgarbage"count"),
-          ("Entities: %i"):format(#self.ui.app.world.entities),
+          ("FPS: %i"):format(math.floor(fps + 0.5) or 0),
+          ("Lua GC: %.1f Kb"):format(collectgarbage("count") or 0),
+          ("Entities: %i"):format(#self.ui.app.world.entities or 0),
         }}
         self.countdown = 1
       end
@@ -535,34 +592,74 @@ end
 
 function UIBottomPanel:dialogBuildRoom()
   if self.world.user_actions_allowed then
-    local dlg = UIBuildRoom(self.ui)
-    self.ui:setEditRoom(false)
-    self.ui:addWindow(dlg)
-    self.ui:tutorialStep(3, 1, 2)
+    local w = self.ui:getWindow(UIBuildRoom)
+    local fullscreen = self.ui:getWindow(UIFullscreen)
+
+    if w then
+      if fullscreen then
+        fullscreen:close()
+      else
+        w:close()
+      end
+    else
+      if fullscreen then
+        fullscreen:close()
+      end
+
+      local dlg = UIBuildRoom(self.ui)
+      self.ui:setEditRoom(false)
+      self.ui:addWindow(dlg)
+      self.ui:tutorialStep(3, 1, 2)
+    end
   end
 end
 
 function UIBottomPanel:dialogFurnishCorridor()
   if self.world.user_actions_allowed then
-    -- Close any fullscreen window
+    local w = self.ui:getWindow(UIFurnishCorridor)
     local fullscreen = self.ui:getWindow(UIFullscreen)
-    if fullscreen then
-      fullscreen:close()
+
+    if w then
+      if fullscreen then
+        fullscreen:close()
+      else
+        w:close()
+      end
+    else
+      if fullscreen then
+        fullscreen:close()
+      end
+
+      local dlg = UIFurnishCorridor(self.ui)
+      self.ui:setEditRoom(false)
+      self.ui:addWindow(dlg)
+      self.ui:tutorialStep(1, 1, 2)
     end
-    local dlg = UIFurnishCorridor(self.ui)
-    self.ui:setEditRoom(false)
-    self.ui:addWindow(dlg)
-    self.ui:tutorialStep(1, 1, 2)
   end
 end
 
 function UIBottomPanel:dialogHireStaff()
   if self.world.user_actions_allowed then
-    local dlg = UIHireStaff(self.ui)
-    self.ui:setEditRoom(false)
-    self.ui:addWindow(dlg)
-    self.ui:tutorialStep(2, 1, 2)
-    self.ui:tutorialStep(4, 1, 2)
+    local w = self.ui:getWindow(UIHireStaff)
+    local fullscreen = self.ui:getWindow(UIFullscreen)
+
+    if w then
+      if fullscreen then
+        fullscreen:close()
+      else
+        w:close()
+      end
+    else
+      if fullscreen then
+        fullscreen:close()
+      end
+
+      local dlg = UIHireStaff(self.ui)
+      self.ui:setEditRoom(false)
+      self.ui:addWindow(dlg)
+      self.ui:tutorialStep(2, 1, 2)
+      self.ui:tutorialStep(4, 1, 2)
+    end
   end
 end
 
@@ -616,6 +713,9 @@ function UIBottomPanel:dialogResearch(enable)
     self:updateButtonStates()
     return
   end
+  if TheApp.using_demo_files then
+    self.ui:addWindow(UIInformation(self.ui, {_S.errors.dialog_missing_graphics}))
+  end
   if self.ui.hospital.research_dep_built then
     if enable then
       self:addDialog("UIResearch")
@@ -642,7 +742,9 @@ function UIBottomPanel:giveResearchAdvice()
     end
   end
   local msg = can_build_research and _A.warnings.research_screen_open_1 or _A.warnings.research_screen_open_2
-  self.ui.adviser:say(msg)
+  if not TheApp.using_demo_files then
+    self.ui.adviser:say(msg)
+  end
 end
 
 function UIBottomPanel:dialogStatus(enable)
@@ -715,7 +817,7 @@ function UIBottomPanel:addDialog(dialog_class, extra_function)
   local edit_window = self.ui:getWindow(UIEditRoom)
   -- If we are currently editing a room, ask for abortion before adding any dialog.
   if edit_window then
-    self.ui:addWindow(UIConfirmDialog(self.ui,
+    self.ui:addWindow(UIConfirmDialog(self.ui, false,
       _S.confirmation.abort_edit_room,
       --[[persistable:abort_edit_room_confirm_dialog]]function()
         self.ui:setEditRoom(false)
@@ -768,10 +870,6 @@ function UIBottomPanel:afterLoad(old, new)
       end
     end
   end
-  if old < 47 then
-    self.ui:addKeyHandler("I", self, self.toggleInformation)
-    self.ui:addKeyHandler("A", self, self.toggleAdviser)
-  end
   if old < 58 then
     self.pause_font = TheApp.gfx:loadFont("QData", "Font124V")
   end
@@ -784,47 +882,11 @@ function UIBottomPanel:afterLoad(old, new)
       self.additional_buttons[i] = self.buttons[5 + i]:makeToggle() -- made them toggle buttons
     end
     self.bank_button = self.buttons[1]:makeToggle()
+  end
+  -- Hotfix to force re-calculation of the money font (see issue #1193)
+  self.money_font = self.ui.app.gfx:loadFont("QData", "Font05V")
 
-    -- keyboard shortcuts have been added/changed
-    self.ui:addKeyHandler("F1", self.bank_button, self.bank_button.handleClick, "left")  -- bank manager
-    self.ui:addKeyHandler("F2", self.bank_button, self.bank_button.handleClick, "right")  -- bank manager
-    self.ui:addKeyHandler("F3", self.additional_buttons[1], self.additional_buttons[1].handleClick, "left")    -- staff management
-    self.ui:addKeyHandler("F4", self.additional_buttons[2], self.additional_buttons[2].handleClick, "left")    -- town map
-    self.ui:addKeyHandler("F5", self.additional_buttons[3], self.additional_buttons[3].handleClick, "left")    -- casebook
-    self.ui:addKeyHandler("F6", self.additional_buttons[4], self.additional_buttons[4].handleClick, "left")    -- research
-    self.ui:addKeyHandler("F7", self.additional_buttons[5], self.additional_buttons[5].handleClick, "left")    -- status
-    self.ui:addKeyHandler("F8", self.additional_buttons[6], self.additional_buttons[6].handleClick, "left")    -- charts
-    self.ui:addKeyHandler("F9", self.additional_buttons[7], self.additional_buttons[7].handleClick, "left")    -- policy
-    self.ui:removeKeyHandler("T", self)
-    self.ui:removeKeyHandler("C", self)
-    self.ui:removeKeyHandler("R", self)
-    self.ui:addKeyHandler("T", self.additional_buttons[2], self.additional_buttons[2].handleClick, "left") -- T for town map
-    self.ui:addKeyHandler("C", self.additional_buttons[3], self.additional_buttons[3].handleClick, "left") -- C for casebook
-    self.ui:addKeyHandler("R", self.additional_buttons[4], self.additional_buttons[4].handleClick, "left") -- R for research
-  end
-  if old <  70 then
-    self.ui:removeKeyHandler("a", self)
-  end
-  if old < 71 then
-    self.ui:removeKeyHandler("C", self.additional_buttons[3], self.additional_buttons[3].handleClick, "left")  -- remove C for opening the Casebook
-    -- add choice for opening casebook as per chosen option in config
-    local config = self.ui.app.config
-    if not config.volume_opens_casebook then
-      self.ui:addKeyHandler("C", self.additional_buttons[3], self.additional_buttons[3].handleClick, "left") -- C for casebook
-    else
-      self.ui:addKeyHandler({"shift", "C"}, self.additional_buttons[3], self.additional_buttons[3].handleClick, "left") -- Shift + C for casebook
-    end
-    -- add new key handlers
-    self.ui:addKeyHandler("J", self, self.openJukebox)   -- open the jukebox
-    self.ui:addKeyHandler({"shift", "L"}, self, self.openLoad)  -- Shift + L for Load saved game menu
-    self.ui:addKeyHandler({"shift", "S"}, self, self.openSave)  -- Shift + S for Load create save menu
-    self.ui:addKeyHandler({"shift", "R"}, self, self.restart)  -- Shift + R for restart the level
-    self.ui:addKeyHandler({"shift", "Q"}, self, self.quit)  -- Shift + Q quit the game and return to main menu
-  end
-  if old < 82 then
-    self.ui:addKeyHandler({"shift","alt", "S"}, self, self.quickSave)  -- Shift+Alt+S quick save
-    self.ui:addKeyHandler({"shift","alt", "L"}, self, self.quickLoad)  -- Shift+Alt+L load last quick save
-  end
+  self:registerKeyHandlers()
+
   Window.afterLoad(self, old, new)
 end
-

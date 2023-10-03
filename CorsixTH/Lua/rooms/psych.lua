@@ -20,6 +20,7 @@ SOFTWARE. --]]
 
 local room = {}
 room.id = "psych"
+room.vip_must_visit = false
 room.level_config_id = 8
 room.class = "PsychRoom"
 room.name = _S.rooms_short.psychiatric
@@ -51,9 +52,8 @@ function PsychRoom:PsychRoom(...)
 end
 
 function PsychRoom:roomFinished()
-  if not self.hospital:hasStaffOfCategory("Psychiatrist") then
-    self.world.ui.adviser
-    :say(_A.room_requirements.psychiatry_need_psychiatrist)
+  if self.hospital:countStaffOfCategory("Psychiatrist", 1) == 0 then
+    self.hospital:giveAdvice({_A.room_requirements.psychiatry_need_psychiatrist})
   end
   return Room.roomFinished(self)
 end
@@ -67,7 +67,7 @@ function PsychRoom:commandEnteringStaff(staff)
     staff:walkTo(ox, oy)
     staff:queueAction(UseObjectAction(obj))
     local num_meanders = math.random(2, 8)
-    local loop_callback_meanders = --[[persistable:psych_meander_loop_callback]] function(action)
+    local loop_callback_meanders = --[[persistable:psych_meander_loop_callback]] function()
       num_meanders = num_meanders - 1
       if num_meanders == 0 then
         self:commandEnteringStaff(staff)
@@ -91,10 +91,10 @@ function PsychRoom:commandEnteringPatient(patient)
     if bookcase == nil then
       bookcase, bx, by = self.world:findObjectNear(staff, "bookcase")
     end
-    if patient and patient.user_of then
+    if patient and patient.user_of and patient.user_of.object_type.id == "couch" then
       duration = duration - 1
     end
-    if duration <= 0 then
+    if duration == 0 then
       if patient.diagnosed and patient.disease.id == "king_complex" then
         -- Diagnosed patients (Elvis) need to change clothes
         local after_use_screen = --[[persistable:psych_screen_after_use]] function()
@@ -114,6 +114,11 @@ function PsychRoom:commandEnteringPatient(patient)
         self:dealtWithPatient(patient)
       end
       return
+    else
+      if patient:getRoom() ~= self and self:getStaffMember() then
+        self:getStaffMember():setNextAction(MeanderAction())
+        return
+      end
     end
     if bookcase and (duration % 10) == 0 and math.random(1, 2) == 1 then
       staff:walkTo(bx, by)

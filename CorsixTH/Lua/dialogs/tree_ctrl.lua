@@ -18,7 +18,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE. --]]
 
---! Iterface for items within a UI tree control
+--! Interface for items within a UI tree control
 class "TreeNode"
 
 ---@type TreeNode
@@ -279,16 +279,17 @@ function FileTreeNode:hasChildren()
     if lfs.attributes(self.path, "mode") ~= "directory" then
       return false
     end
-    local status, _f, _s, _v = pcall(lfs.dir, self.path)
+    local status, err, dir_obj = pcall(lfs.dir, self.path)
     if not status then
-      print("Error while fetching children for " .. self.path .. ": " .. _f)
+      print("Error while fetching children for " .. self.path .. ": " .. err)
     else
-      for item in _f, _s, _v do
+      for item in dir_obj.next, dir_obj do
         if self:isValidFile(item) then
           self.has_children = true
           break
         end
       end
+      dir_obj:close()
     end
   end
   return self.has_children
@@ -572,7 +573,7 @@ function TreeControl:hitTestTree(x, y)
   end
 end
 
-function TreeControl:onMouseMove(x, y)
+function TreeControl:onMouseMove(x, y, dx, dy)
   local redraw = Window.onMouseMove(self, x, y)
   local node, expand = self:hitTestTree(x, y)
   if expand and self.highlighted_node ~= nil then
@@ -598,8 +599,21 @@ function TreeControl:onMouseDown(button, x, y)
   return redraw
 end
 
+--! Function to handle (final) selection by user that needs to feed back data to
+--! another dialog.
+--!param callback (function) Code to execute on trigger
+--!return self
 function TreeControl:setSelectCallback(callback)
   self.select_callback = callback
+  return self
+end
+
+--! Function for where an action in the file tree needs to feed back data to another
+--! dialog. Its specific usage should be noted in the parent element
+--!param callback (function) Code to execute on trigger
+--!return self
+function TreeControl:setValueChangeCallback(callback)
+  self.val_change_callback = callback
   return self
 end
 
@@ -607,6 +621,7 @@ function TreeControl:onMouseUp(button, x, y)
   local redraw = Window.onMouseUp(self, button, x, y)
   local node, expand = self:hitTestTree(x, y)
   if self.mouse_down_in_self and node then
+    -- Expand/collapse directory
     if expand then
       if node:hasChildren() then
         if node:isExpanded() then
@@ -616,10 +631,16 @@ function TreeControl:onMouseUp(button, x, y)
         end
         redraw = true
       end
+    -- Clicking on already highlighted file
     elseif self.selected_node == node and self.select_callback then
       self.select_callback(node)
+      redraw = true
+    -- A new file has been selected (not highlighted)
     else
       self.selected_node = node
+      if self.val_change_callback then
+        self.val_change_callback(node, node:getLabel())
+      end
       node:select()
       redraw = true
     end

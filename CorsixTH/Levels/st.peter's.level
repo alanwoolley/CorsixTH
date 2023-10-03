@@ -66,7 +66,7 @@ How many patients still infected and not-cured cause the hospital to be evacuate
 When a drug is first researched, what effectiveness does it have
 #gbv.StartRating 80
 
-The following table contains all diagnoses and treatments that shows up inthe drug casebook
+The following table contains all diagnoses and treatments that shows up in the drug casebook
 in the game. ContRate is whether this is contagious (lower the number the greater the chances of it appearing, 0 means never)  and
 Known specifies whether it should show up from the beginning of the level and
 RschReqd how much research is required to discover the treatment room for the disease.
@@ -372,7 +372,7 @@ But we don't want any such conditions on the example level!
 
 --------------------- Competitor Information -----------------------
 
-| Index in the away "computer" | Is that opponent playing? | 1 is yes, 0 no | Comment |
-#computer[12].Playing 1 Corsix
-#computer[13].Playing 1 Roujin
-#computer[14].Playing 1 Edvin
+| Index in the away "computer" | Is that opponent playing? 1 is yes, 0 no | Name |
+#computer[12].Playing.Name 1 Corsix
+#computer[13].Playing.Name 1 Roujin
+#computer[14].Playing.Name 1 Edvin

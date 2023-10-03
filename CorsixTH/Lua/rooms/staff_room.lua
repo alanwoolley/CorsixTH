@@ -20,6 +20,7 @@ SOFTWARE. --]]
 
 local room = {}
 room.id = "staff_room"
+room.vip_must_visit = false
 room.level_config_id = 25
 room.class = "StaffRoom"
 room.name = _S.rooms_short.staffroom
@@ -49,6 +50,7 @@ function StaffRoom:onHumanoidEnter(humanoid)
   self.humanoids[humanoid] = true
   self:tryAdvanceQueue()
   humanoid:setDynamicInfoText("")
+  -- Other humanoids shouldn't be entering, so don't worry about them
   if class.is(humanoid, Staff) then
     -- Receptionists cannot enter, so we do not have to worry about them
     -- If it is a handyman and he is here to do a job, let him pass
@@ -56,8 +58,6 @@ function StaffRoom:onHumanoidEnter(humanoid)
       humanoid:setNextAction(UseStaffRoomAction())
       self.door.queue.visitor_count = self.door.queue.visitor_count + 1
     end
-  else
-    -- Other humanoids shouldn't be entering, so don't worry about them
   end
 end
 

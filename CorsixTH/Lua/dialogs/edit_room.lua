@@ -18,7 +18,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE. --]]
 
-dofile "dialogs/place_objects"
+corsixth.require("dialogs.place_objects")
 
 class "UIEditRoom" (UIPlaceObjects)
 
@@ -30,8 +30,6 @@ function UIEditRoom:UIEditRoom(ui, room_type)
   -- NB: UIEditRoom:onCursorWorldPositionChange is called by the UIPlaceObjects
   -- constructor, hence the initialisation of required fields prior to the call.
   self.UIPlaceObjects(self, ui)
-  self:addKeyHandler("return", self.confirm) -- UIPlaceObjects does not need this
-  self:addKeyHandler("keypad enter", self.confirm)
 
   local app = ui.app
   local blue_red_swap = self.anims.Alt32_BlueRedSwap
@@ -80,14 +78,21 @@ function UIEditRoom:UIEditRoom(ui, room_type)
     self.purchase_button:enable(true)
     self:checkEnableConfirm()
   end
-  self.blueprint_wall_anims = {
-  }
-  self.blueprint_window = {
-  }
+
+  self.blueprint_wall_anims = {}
+  self.blueprint_window = {}
+
   self.mouse_down_x = false
   self.mouse_down_y = false
   self.mouse_cell_x = 0
   self.mouse_cell_y = 0
+
+  self:registerKeyHandlers()
+end
+
+function UIEditRoom:registerKeyHandlers()
+  self:addKeyHandler("global_confirm", self.confirm) -- UIPlaceObjects does not need this
+  self:addKeyHandler("global_confirm_alt", self.confirm)
 end
 
 function UIEditRoom:close(...)
@@ -154,7 +159,6 @@ function UIEditRoom:abortRoom()
   self:close()
   -- Finally remove the room from the world (close() needs the reference)
   if self.room then
-    self.room:deactivate() -- TODO: may be superfluous since already called in Room:tryToEdit
     self.world.rooms[self.room.id] = nil
   end
 end
@@ -167,21 +171,22 @@ function UIEditRoom:cancel()
   if self.phase == "walls" then
     if self.paid then
       -- While the confirmation window is open, don't allow the player to click the confirm button.
+      local confirm_button_state = self.confirm_button.enabled
       self.confirm_button:enable(false)
       self.confirm_dialog_open = true
       -- Ask if the user really wish to sell this room
-      self.ui:addWindow(UIConfirmDialog(self.ui,
+      self.ui:addWindow(UIConfirmDialog(self.ui, false,
         _S.confirmation.delete_room,
         --[[persistable:delete_room_confirm_dialog]]function()
           self:abortRoom()
         end,
         --[[persistable:delete_room_confirm_dialog_cancel]]function()
-          self.confirm_button:enable(true)
+          self.confirm_button:enable(confirm_button_state)
           self.confirm_dialog_open = nil
         end
       ))
     else
-      self:close()
+      self:abortRoom()
     end
     self.ui:setCursor(self.ui.default_cursor)
   elseif self.phase == "objects" then
@@ -258,7 +263,7 @@ local function isHumanoidObscuringArea(humanoid, x1, x2, y1, y2)
       if (x1 == humanoid.tile_x or x2 == humanoid.tile_x) or
           (y1 == humanoid.tile_y or y2 == humanoid.tile_y) then
         -- Humanoid not in the rectangle, but might be walking into it
-        local action = humanoid.action_queue[1]
+        local action = humanoid:getCurrentAction()
         if action.name ~= "walk" then
           return false
         end
@@ -293,19 +298,20 @@ function UIEditRoom:clearArea()
         humanoids_to_watch[entity] = true
 
         -- Try to make the humanoid leave the area
+        local current_action = entity:getCurrentAction()
         local meander = entity.action_queue[2]
         if meander and meander.name == "meander" then
           -- Interrupt the idle or walk, which will cause a new meander target
           -- to be chosen, which will be outside the blueprint rectangle
           meander.can_idle = false
-          local on_interrupt = entity.action_queue[1].on_interrupt
+          local on_interrupt = current_action.on_interrupt
           if on_interrupt then
-            entity.action_queue[1].on_interrupt = nil
-            on_interrupt(entity.action_queue[1], entity)
+            current_action.on_interrupt = nil
+            on_interrupt(current_action, entity)
           end
-        elseif entity.action_queue[1].name == "seek_room" or (meander and meander.name == "seek_room") then
+        elseif current_action.name == "seek_room" or (meander and meander.name == "seek_room") then
           -- Make sure that the humanoid doesn't stand idle waiting within the blueprint
-          if entity.action_queue[1].name == "seek_room" then
+          if current_action.name == "seek_room" then
             entity:queueAction(MeanderAction():setCount(1):setMustHappen(true), 0)
           else
             meander.done_walk = false
@@ -356,7 +362,7 @@ function UIEditRoom:onTick()
         -- The person might be dying (this check should probably be moved into
         -- isHumanoidObscuringArea, but I don't want to change too much right
         -- before a release).
-        if humanoid.action_queue[1].name == "die" then
+        if humanoid:getCurrentAction().name == "die" then
           if not humanoid.hospital then
             self.humanoids_to_watch[humanoid] = nil
           end
@@ -589,88 +595,106 @@ function UIEditRoom:returnToWallPhase(early)
   end
 end
 
+-- Remove walls
+function UIEditRoom:_remove_wall_line(x, y, step_x, step_y, n_steps, layer, neigh_x, neigh_y, world)
+  local map = world.map.th
+  for _ = 1, n_steps do
+    local existing = map:getCell(x, y, layer)
+    -- Possibly add transparency.
+    local flag = 0
+    if world.ui.transparent_walls then
+      flag = 1024
+    end
+    if world:getWallIdFromBlockId(existing) ~= "external" then
+      local neighbour = world:getRoom(x + neigh_x, y + neigh_y)
+      if neighbour then
+        if neigh_x ~= 0 or neigh_y ~= 0 then
+          local set = world:getWallSetFromBlockId(existing)
+          local dir = world:getWallDirFromBlockId(existing)
+          if set == "inside_tiles" then
+            set = "outside_tiles"
+          end
+          map:setCell(x, y, layer, flag + world.wall_types[neighbour.room_info.wall_type][set][dir])
+        end
+      else
+        map:setCell(x, y, layer, flag)
+      end
+    end
+    x = x + step_x
+    y = y + step_y
+  end
+end
+
+function UIEditRoom:removeRoom(save_objects, room, world)
+  -- Remove any placed objects (add them to list again) when save_objects is true
+  for x = room.x, room.x + room.width - 1 do
+    for y = room.y, room.y + room.height - 1 do
+      while true do
+        -- get litter then any other object
+        local obj = world:getObject(x, y, 'litter') or world:getObject(x, y)
+        -- but we need to ignore doors
+        if not obj or obj == room.door or class.is(obj, SwingDoor) then
+          break
+        end
+        if obj.object_type.id == "litter" then -- Silently remove litter from the world.
+          obj:remove()
+        else
+          if save_objects then
+            local obj_state = obj:getState()
+            world:destroyEntity(obj)
+            if not obj.master then
+              self:addObjects({{
+                object = TheApp.objects[obj.object_type.id],
+                state = obj_state,
+                qty = 1
+              }})
+            end
+          else
+            -- just destroy it
+            world:destroyEntity(obj)
+          end
+        end
+      end
+    end
+  end
+
+  -- now doors
+  world:destroyEntity(room.door)
+  if room.door2 then
+    world:destroyEntity(room.door2)
+  end
+
+  if save_objects then
+    -- backup list of objects
+    self.objects_backup = {}
+    for k, o in pairs(self.objects) do
+      self.objects_backup[k] = { object = o.object, qty = o.qty, state = o.state }
+    end
+
+    UIPlaceObjects.removeAllObjects(self, true)
+  end
+
+  self:_remove_wall_line(room.x, room.y, 0, 1, room.height, 3, -1,  0, world)
+  self:_remove_wall_line(room.x, room.y, 1, 0, room.width , 2,  0, -1, world)
+  self:_remove_wall_line(room.x + room.width, room.y , 0, 1, room.height, 3, 0, 0, world)
+  self:_remove_wall_line(room.x, room.y + room.height, 1, 0, room.width , 2, 0, 0, world)
+
+  -- Reset floor tiles and flags
+  world.map.th:unmarkRoom(room.x, room.y, room.width, room.height)
+end
+
 function UIEditRoom:returnToDoorPhase()
   self.ui:tutorialStep(3, {13, 14, 15}, 9)
-  local map = self.ui.app.map.th
   local room = self.room
   room.built = false
   if room.door and room.door.queue then
-    room.door.queue:rerouteAllPatients(SeekRoomAction(room.room_info.id))
+    room.door.queue:rerouteAllPatients(room.room_info.id)
   end
 
   self.purchase_button:enable(false)
   self.pickup_button:enable(false)
 
-  -- Remove any placed objects (add them to list again)
-  for x = room.x, room.x + room.width - 1 do
-    for y = room.y, room.y + room.height - 1 do
-      while true do
-        local obj = self.world:getObject(x, y)
-        if not obj or obj == room.door or class.is(obj, SwingDoor) then
-          break
-        end
-        if obj.object_type.id == "litter" then -- Silently remove litter from the world.
-          obj.remove()
-          break
-        end
-        self.world:destroyEntity(obj)
-        if not obj.master then
-          self:addObjects({{
-            object = TheApp.objects[obj.object_type.id],
-            qty = 1
-          }})
-        end
-      end
-    end
-  end
-  self.world:destroyEntity(self.room.door)
-  if self.room.door2 then
-    self.world:destroyEntity(self.room.door2)
-  end
-
-  -- backup list of objects
-  self.objects_backup = {}
-  for k, o in pairs(self.objects) do
-    self.objects_backup[k] = { object = o.object, qty = o.qty }
-  end
-
-  UIPlaceObjects.removeAllObjects(self, true)
-
-  -- Remove walls
-  local function remove_wall_line(x, y, step_x, step_y, n_steps, layer, neigh_x, neigh_y)
-    for _ = 1, n_steps do
-      local existing = map:getCell(x, y, layer)
-      -- Possibly add transparency.
-      local flag = 0
-      if self.ui.transparent_walls then
-        flag = 1024
-      end
-      if self.world:getWallIdFromBlockId(existing) ~= "external" then
-        local neighbour = self.world:getRoom(x + neigh_x, y + neigh_y)
-        if neighbour then
-          if neigh_x ~= 0 or neigh_y ~= 0 then
-            local set = self.world:getWallSetFromBlockId(existing)
-            local dir = self.world:getWallDirFromBlockId(existing)
-            if set == "inside_tiles" then
-              set = "outside_tiles"
-            end
-            map:setCell(x, y, layer, flag + self.world.wall_types[neighbour.room_info.wall_type][set][dir])
-          end
-        else
-          map:setCell(x, y, layer, flag)
-        end
-      end
-      x = x + step_x
-      y = y + step_y
-    end
-  end
-  remove_wall_line(room.x, room.y, 0, 1, room.height, 3, -1,  0)
-  remove_wall_line(room.x, room.y, 1, 0, room.width , 2,  0, -1)
-  remove_wall_line(room.x + room.width, room.y , 0, 1, room.height, 3, 0, 0)
-  remove_wall_line(room.x, room.y + room.height, 1, 0, room.width , 2, 0, 0)
-
-  -- Reset floor tiles and flags
-  self.world.map.th:unmarkRoom(room.x, room.y, room.width, room.height)
+  self:removeRoom(true, room, self.world)
 
   -- Re-create blueprint
   local rect = self.blueprint_rect
@@ -691,7 +715,8 @@ function UIEditRoom:screenToWall(x, y)
   local rect = self.blueprint_rect
 
   if cellx == rect.x or cellx == rect.x - 1 or cellx == rect.x + rect.w or cellx == rect.x + rect.w - 1 or
-     celly == rect.y or celly == rect.y - 1 or celly == rect.y + rect.h or celly == rect.y + rect.h - 1 then
+     celly == rect.y or celly == rect.y - 1 or celly == rect.y + rect.h or
+     celly == rect.y + rect.h - 1 then -- luacheck: ignore 542
   else
     return
   end
@@ -699,7 +724,7 @@ function UIEditRoom:screenToWall(x, y)
   -- NB: Doors and windows cannot be placed on corner tiles, hence walls of corner tiles
   -- are never returned, and the nearest non-corner wall is returned instead. If they
   -- could be placed on corner tiles, then you would have to consider the interaction of
-  -- wall shadows with windows and doors, amonst other things.
+  -- wall shadows with windows and doors, amongst other things.
   -- Swing doors are allowed to be adjacent everywhere except the top corner.
   local modifier = 0
   local swinging = false
@@ -856,12 +881,16 @@ function UIEditRoom:enterDoorPhase()
 
   -- check if all adjacent tiles of the rooms are still connected
   if not self:checkReachability() then
-    -- undo passable flags and go back to walls phase
-    self.phase = "walls"
-    self:returnToWallPhase(true)
-    self.ui:playSound("wrong2.wav")
-    self.ui.adviser:say(_A.room_forbidden_non_reachable_parts)
-    return
+    if self.ui.app.config.allow_blocking_off_areas then
+      print("Blocking off areas is allowed with room " .. self.blueprint_rect.x .. ", " .. self.blueprint_rect.y .. ".")
+    else
+      -- undo passable flags and go back to walls phase
+      self.phase = "walls"
+      self:returnToWallPhase(true)
+      self.ui:playSound("wrong2.wav")
+      self.ui.adviser:say(_A.room_forbidden_non_reachable_parts)
+      return
+    end
   end
 
   self.desc_text = _S.place_objects_window.place_door
@@ -980,7 +1009,7 @@ function UIEditRoom:onMouseDown(button, x, y)
   if self.world.user_actions_allowed and not self.confirm_dialog_open then
     if button == "left" then
       if self.phase == "walls" then
-        if 0 <= x and x < self.width and 0 <= y and y < self.height then
+        if 0 <= x and x < self.width and 0 <= y and y < self.height then -- luacheck: ignore 542
         else
           local mouse_x, mouse_y = self.ui:ScreenToWorld(self.x + x, self.y + y)
           self.mouse_down_x = math.floor(mouse_x)
@@ -988,9 +1017,7 @@ function UIEditRoom:onMouseDown(button, x, y)
           if self.move_rect then
             self.move_rect_x = self.mouse_down_x - self.blueprint_rect.x
             self.move_rect_y = self.mouse_down_y - self.blueprint_rect.y
-          elseif self.resize_rect then
-            -- nothing to do
-          else
+          elseif not self.resize_rect then
             self:setBlueprintRect(self.mouse_down_x, self.mouse_down_y, 1, 1)
           end
         end
@@ -1023,7 +1050,7 @@ function UIEditRoom:onMouseUp(button, x, y)
   return UIPlaceObjects.onMouseUp(self, button, x, y)
 end
 
-function UIEditRoom:onMouseMove(x, y, ...)
+function UIEditRoom:onMouseMove(x, y, dx, dy)
   if self.in_pickup_mode then
     self.ui:setCursor(self.ui.app.gfx:loadMainCursor("grab"))
   end
@@ -1159,7 +1186,7 @@ end
 --! param wall (string) original wall orientation
 --! return x (int) updated x value
 --! return y (int) updated y value
---! return x_mod (int) offest value to apply to tile count to determine relative position
+--! return x_mod (int) offset value to apply to tile count to determine relative position
 --! return y_mod (int) offset value to apply to tile count to determine relatitve position
 --! return wall (string) wall orientation style (only 2 styles)
 local function doorWallOffsetCalculations(x, y, wall)
@@ -1190,7 +1217,7 @@ function UIEditRoom:setDoorBlueprint(orig_x, orig_y, orig_wall)
       if self.blueprint_door.anim[1] then
         -- retrieve the old door position details to reset the blue print
         local oldx, oldy
-		local _, _, oldx_mod, oldy_mod, _ = doorWallOffsetCalculations(self.blueprint_door.floor_x,
+        local _, _, oldx_mod, oldy_mod, _ = doorWallOffsetCalculations(self.blueprint_door.floor_x,
           self.blueprint_door.floor_y, self.blueprint_door.wall)
         -- If we're dealing with swing doors the anim variable is actually a table with three
         -- identical "doors".
@@ -1419,9 +1446,9 @@ function UIEditRoom:onCursorWorldPositionChange(x, y)
         self.move_rect = false
         self.resize_rect = {
           n = (wy == rect.y),
-          s = (wy == rect.y + rect.h - 1) and not (wy == rect.y),
+          s = (wy == rect.y + rect.h - 1) and (wy ~= rect.y),
           w = (wx == rect.x),
-          e = (wx == rect.x + rect.w - 1) and not (wx == rect.x),
+          e = (wx == rect.x + rect.w - 1) and (wx ~= rect.x),
         }
 
         if (self.resize_rect.w or self.resize_rect.e) and (self.resize_rect.n or self.resize_rect.s) then
@@ -1528,11 +1555,15 @@ function UIEditRoom:placeObject()
 end
 
 function UIEditRoom:afterLoad(old, new)
-  if old < 101 then
-    self:removeKeyHandler("enter")
-    self:addKeyHandler("return", self.confirm)
+  if old < 172 then
+    -- reverts change in 171 where walls were moved into edit_room, its original
+    -- afterload was removed due to crashes
+    self.wall_types = nil
+    self.wall_id_by_block_id = nil
+    self.wall_set_by_block_id = nil
+    self.wall_dir_by_block_id = nil
   end
-  if old < 104 then
-    self:addKeyHandler("keypad enter", self.confirm)
-  end
+
+  UIPlaceObjects.afterLoad(self, old, new)
+  self:registerKeyHandlers()
 end

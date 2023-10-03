@@ -617,15 +617,15 @@ tooltip = {
   },
 }
 menu_charts = {
-  bank_manager  = "  (F1) MENADŻER BANKU  ",
-  statement     = "  (F2) RAPORT  ",
-  staff_listing = "  (F3) LISTA PERSONELU  ",
-  town_map      = "  (F4) MAPA MIASTA  ",
-  casebook      = "  (F5) TECZKA  ",
-  research      = "  (F6) BADANIA  ",
-  status        = "  (F7) POZYCJA  ",
-  graphs        = "  (F8) WYKRESY  ",
-  policy        = "  (F9) STRATEGIA SZPITALA  ",
+  bank_manager  = "  (%1%) MENADŻER BANKU  ",
+  statement     = "  (%1%) RAPORT  ",
+  staff_listing = "  (%1%) LISTA PERSONELU  ",
+  town_map      = "  (%1%) MAPA MIASTA  ",
+  casebook      = "  (%1%) TECZKA  ",
+  research      = "  (%1%) BADANIA  ",
+  status        = "  (%1%) POZYCJA  ",
+  graphs        = "  (%1%) WYKRESY  ",
+  policy        = "  (%1%) STRATEGIA SZPITALA  ",
   briefing      = "  ODPRAWA  ",
 }
 town_map = {
@@ -1219,7 +1219,7 @@ pay_rise = {
   poached = "%s zaproponowali mi %d. Jeśli nie zapłacisz mi tyle samo, odchodzę.",
 }
 menu_debug = {
-  lua_console = "  (F12) KONSOLA LUA  ",
+  lua_console = "  (%1%) KONSOLA LUA  ",
   porter_pagers = "  PORTER PAGERS        ",
   object_cells = "  OBJECT CELLS         ",
   display_pager = "  DISPLAY PAGER        ",
@@ -1230,7 +1230,7 @@ menu_debug = {
   mapwho_checking = "  MAPWHO CHECKING      ",
   sprite_viewer = "  SPRITE VIEWER  ",
   keep_clear_cells = "  KEEP CLEAR CELLS     ",
-  dump_strings = "  DUMP STRINGS  ",
+  dump_strings = "  (%1%) DUMP STRINGS  ",
   machine_pagers = "  MACHINE PAGERS       ",
   remove_walls = "  USUŃ ŚCIANY         ",
   enter_nav_debug = "  ENTER NAV DEBUG      ",
@@ -1248,14 +1248,14 @@ menu_debug = {
   show_nav_cells = "  SHOW NAV CELLS       ",
   win_game_anim = "  WIN GAME ANIM        ",
   display_room_status = "  DISPLAY ROOM STATUS  ",
-  cheats = "  (F11) CHEATS  ",
+  cheats = "  (%1%) CHEATS  ",
   remove_objects = "  USUŃ OBIEKTY       ",
   nav_bits = "  NAV BITS             ",
   win_level_anim = "  WIN LEVEL ANIM       ",
-  dump_gamelog = "  (CTRL+D) DUMP GAME LOG  ",
+  dump_gamelog = "  (%1%) DUMP GAME LOG  ",
   limit_camera = "  LIMIT CAMERA  ",
   pixbuf_cells = "  PIXBUF CELLS         ",
-  transparent_walls = "  (X) TRANSPARENT WALLS  ",
+  transparent_walls = "  (%1%) TRANSPARENT WALLS  ",
   show_help_hotspot = "  SHOW HELP HOTSPOTS   ",
   jump_to_level = "  JUMP TO LEVEL  ",
   entry_cells = "  ENTRY CELLS          ",
@@ -1276,19 +1276,19 @@ menu_options = {
   game_speed = "  SZYBKOŚĆ GRY ",
   music_vol = "  GŁOŚNOŚĆ MUZYKI ",
   sound_vol = "  GŁOŚNOŚĆ DŹWIĘKU ",
-  adviser_disabled = " (SHIFT+A) DORADCA  ",
+  adviser_disabled = " (%1%) DORADCA  ",
   warmth_colors = "  CIEPŁOŚĆ BARW  ",
   wage_increase = "  ŻĄDANIA PODWYŻKI",
   twentyfour_hour_clock = "  ZEGAR 24 GODZINNY  ",
   edge_scrolling = "  PRZEWIJANIE PRZY KRAWĘDZIACH  ",
-  announcements = " (ALT+A) POWIADOMIENIA   ",
+  announcements = " (%1%) POWIADOMIENIA   ",
   lock_windows = "  ZABLOKUJ OKNA  ",
   settings = "  USTAWIENIA  ",
-  sound = " (ALT+S) DŹWIĘK   ",
+  sound = " (%1%) DŹWIĘK   ",
   announcements_vol = "  GŁOŚNOŚĆ POWIADOMIEŃ  ",
-  music = " (ALT+M) MUZYKA  ",
+  music = " (%1%) MUZYKA  ",
   autosave = "  AUTOZAPIS ",
-  jukebox = "  SZAFA GRAJĄCA ",
+  jukebox = "  (%1%) SZAFA GRAJĄCA ",
 }
 menu_options_wage_increase = {
   grant = "    PRZYZNAWAJ ",
@@ -1301,12 +1301,12 @@ menu_options_warmth_colors = {
 }
 
 menu_options_game_speed = {
-  pause               = "  (P) PAUZA  ",
-  slowest             = "  (1) NAJWOLNIEJ  ",
-  slower              = "  (2) WOLNO  ",
-  normal              = "  (3) NORMALNIE  ",
-  max_speed           = "  (4) NAJSZYBCIEJ  ",
-  and_then_some_more  = "  (5) I JESZCZE TROCHĘ  ",
+  pause               = "  (%1%) PAUZA  ",
+  slowest             = "  (%1%) NAJWOLNIEJ  ",
+  slower              = "  (%1%) WOLNO  ",
+  normal              = "  (%1%) NORMALNIE  ",
+  max_speed           = "  (%1%) NAJSZYBCIEJ  ",
+  and_then_some_more  = "  (%1%) I JESZCZE TROCHĘ  ",
 }
 rooms_short = {
   ultrascan = "Ultraskaner",
@@ -2561,10 +2561,10 @@ menu_file_load = {
   [8] = "  GRA 8  ",
 }
 menu_file = {
-  quit = " (SHIFT+Q) WYJDŹ ",
-  save = " (SHIFT+S) ZAPISZ ",
-  load = " (SHIFT+L) WCZYTAJ ",
-  restart = " (SHIFT+R) ZACZNIJ OD NOWA  ",
+  quit = " (%1%) WYJDŹ ",
+  save = " (%1%) ZAPISZ ",
+  load = " (%1%) WCZYTAJ ",
+  restart = " (%1%) ZACZNIJ OD NOWA  ",
 }
 rooms_long = {
   ultrascan = "Ultraskaner",
@@ -2624,36 +2624,26 @@ fax = {
   vip_visit_result = {
     telegram = "Telegram!",
     remarks = {
-      good = {
-        [1] = "Doskonale zarządzany szpital. Dziękuję, że mnie tu zaprosiłeś.",
-        [2] = "Hmm. Całkiem niezła placówka służby zdrowia.",
-        [3] = "Podobał mi się twój czarujący szpital. No dobrze, idzie ktoś na tajskie curry?",
-      },
-      super = {
-        [1] = "Cóż za fantastyczny szpital. Jeśli poważnie zachoruję, przywieźcie mnie tutaj.",
-        [2] = "To jest dopiero szpital!",
-        [3] = "Super szpital. A wiem co mówię, bo już ich trochę widziałem.",
-      },
-      bad = {
-        [1] = "Po co sobie zawracałem głowę? To było gorsze, niż oglądanie czterogodzinnej opery!",
-        [2] = "Odrażający widok. To ma być szpital?! Chyba raczej chlew!",
-        [3] = "Jako osoba publiczna mam już dosyć odwiedzania takich nor jak ta! Rezygnuję.",
-      },
       free_build = {
         [1] = "Masz tu bardzo ładny szpital! Nie trudno się go prowadzi bez ograniczeń finansowych czyż nie?",
         [2] = "Nie jestem ekonomistą ale wydaje mi się, że też mógłbym poprowadzić ten szpital, jeżeli wiesz o czym mówię...",
         [3] = "Bardzo dobrze prowadzony szpital. Pamiętaj jednak o recesji! Racja... nie musisz się o to martwić.",
       },
-      mediocre = {
-        [1] = "No cóż, widywałem gorsze, ale powinieneś się bardziej postarać.",
-        [2] = "Ojej. Jeśli kiepsko się czujesz, to nie jest miejsce dla ciebie.",
-        [3] = "Szczerze mówiąc, to zwyczajny szpital. Oczekiwałem czegoś więcej.",
-      },
-      very_bad = {
-        [1] = "Co za melina. Zrobię co w mojej mocy, żeby ją zamknęli.",
-        [2] = "Skandal! W życiu nie widziałem tak koszmarnego szpitala. ",
-        [3] = "Jestem w szoku. Tego nie da się nazwać szpitalem! Idę na piwo.",
-      },
+      [1] = "Cóż za fantastyczny szpital. Jeśli poważnie zachoruję, przywieźcie mnie tutaj.",
+      [2] = "To jest dopiero szpital!",
+      [3] = "Super szpital. A wiem co mówię, bo już ich trochę widziałem.",
+      [4] = "Doskonale zarządzany szpital. Dziękuję, że mnie tu zaprosiłeś.",
+      [5] = "Hmm. Całkiem niezła placówka służby zdrowia.",
+      [6] = "Podobał mi się twój czarujący szpital. No dobrze, idzie ktoś na tajskie curry?",
+      [7] = "No cóż, widywałem gorsze, ale powinieneś się bardziej postarać.",
+      [8] = "Ojej. Jeśli kiepsko się czujesz, to nie jest miejsce dla ciebie.",
+      [9] = "Szczerze mówiąc, to zwyczajny szpital. Oczekiwałem czegoś więcej.",
+      [10] = "Po co sobie zawracałem głowę? To było gorsze, niż oglądanie czterogodzinnej opery!",
+      [11] = "Odrażający widok. To ma być szpital?! Chyba raczej chlew!",
+      [12] = "Jako osoba publiczna mam już dosyć odwiedzania takich nor jak ta! Rezygnuję.",
+      [13] = "Co za melina. Zrobię co w mojej mocy, żeby ją zamknęli.",
+      [14] = "Skandal! W życiu nie widziałem tak koszmarnego szpitala. ",
+      [15] = "Jestem w szoku. Tego nie da się nazwać szpitalem! Idę na piwo.",
     },
     rep_boost = "Twoja reputacja w środowisku umocniła się.",
     vip_remarked_name = "Po wizycie w twoim szpitalu %s zdecydował:",
@@ -2884,14 +2874,14 @@ introduction_texts = {
   level1 =
     "Witaj w swoim pierwszym szpitalu!//" ..
     "Aby rozpocząć działalność, postaw Biurko Recepcji, zbuduj Gabinet Lekarski i zatrudnij Recepcjonistkę oraz Lekarza. " ..
-    "Następnie zaczekaj, aż pojawią się kolejne zadania." ..
+    "Następnie zaczekaj, aż pojawią się kolejne zadania. " ..
     "Dobrym pomysłem jest budowa Gabinetu Psychiatrycznego oraz zatrudnienie Lekarza Psychiatry. " ..
     "Apteka i Pielęgniarka są także niezbędne w leczeniu pacjentów. " ..
     "Zwróć uwagę na ciężkie przypadki Głowowzdęcia - Napowietrzalnia rozwiąże ten problem. " ..
     "Będziesz musiał wyleczyć 10 ludzi i upewnić się, że twoja reputacja nie spadnie poniżej 200.",
   level9 =
     "Skoro już wzbogaciłeś konto Ministerstwa oraz ufundowałeś nową limuzynę samemu Ministrowi, możesz wracać do szpitala i nieść pomoc chorym i potrzebującym. " ..
-    "Tutaj napotkasz wiele różnych trudności." ..
+    "Tutaj napotkasz wiele różnych trudności. " ..
     "Z dobrze wyszkolonym personelem i gabinetami, nie powinieneś się niczego obawiać. " ..
     "Twój szpital musi być wart 200,000 PLN, a na konto ma trafić 400,000 PLN. " ..
     "Ani grosza mniej, bo nie ukończysz poziomu.",
@@ -2943,11 +2933,11 @@ introduction_texts = {
     "Musisz ustrzelić tyle szczurów, ile zdołasz, zanim Dozorcy uprzątną bałagan. " ..
     "Myślisz, że poradzisz sobie z zadaniem?",
   demo =
-    "Witaj w szpitalu demonstracyjnym!" ..
-    "Niestety wersja demo zawiera tylko ten poziom. Jednakże, jest to więcej niż wystarczająco, aby zając ci trochę czasu!" ..
-    "Napotkasz tutaj rozmaite choroby, które będą wymagały różnych gabinetów do ich wyleczenia. Od czasu do czasu moga tu również wystąpić nagłe wypadki. Będziesz musiał równiez wynaleźć nowe pomieszczenia przy użyciu gabinetu badawczego." ..
-    "Twoim celem jest zarobienie 100,000 PLN, mieć szpital warty 70,000 PLN i reputację 700, przy czym musisz wyleczyć co najmniej 75% swoich pacjentów." ..
-    "Upewnij się, że Twoja reputacja nie spadnie poniżej 300 oraz, że nie zabijesz więcej niż 40% pacjentów, albo przegrasz." ..
+    "Witaj w szpitalu demonstracyjnym!//" ..
+    "Niestety wersja demo zawiera tylko ten poziom. Jednakże, jest to więcej niż wystarczająco, aby zając ci trochę czasu! " ..
+    "Napotkasz tutaj rozmaite choroby, które będą wymagały różnych gabinetów do ich wyleczenia. Od czasu do czasu moga tu również wystąpić nagłe wypadki. Będziesz musiał równiez wynaleźć nowe pomieszczenia przy użyciu gabinetu badawczego. " ..
+    "Twoim celem jest zarobienie 100,000 PLN, mieć szpital warty 70,000 PLN i reputację 700, przy czym musisz wyleczyć co najmniej 75% swoich pacjentów. " ..
+    "Upewnij się, że Twoja reputacja nie spadnie poniżej 300 oraz, że nie zabijesz więcej niż 40% pacjentów, albo przegrasz.//" ..
     "Powodzenia!",
   level16 =
     "Kiedy już przebadasz część pacjentów, będziesz musiał zbudować pomieszczenia lecznicze oraz przychodnie, aby ich leczyć - " ..
@@ -3272,10 +3262,10 @@ map_editor_window = {
 }
 menu["player_count"] = "LICZBA GRACZY"
 menu_player_count = {
-	players_1 = "  1 GRACZ  ",
-	players_2 = "  2 GRACZY  ",
-	players_3 = "  3 GRACZY  ",
-	players_4 = "  4 GRACZY  ",
+  players_1 = "  1 GRACZ  ",
+  players_2 = "  2 GRACZY  ",
+  players_3 = "  3 GRACZY  ",
+  players_4 = "  4 GRACZY  ",
 }
 
 

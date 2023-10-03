@@ -66,43 +66,6 @@ function values(root_table, wildcard)
   return f
 end
 
--- Used to prevent infinite loops
-local pt_reflist = {}
-
--- Helper function to print the contents of a table. Child tables are printed recursively.
--- Call without specifying level, only obj and (if wished) max_level.
-function print_table(obj, max_level, level)
-  assert(type(obj) == "table", "Tried to print " .. tostring(obj) .. " with print_table.")
-  pt_reflist[#pt_reflist + 1] = obj
-  level = level or 0
-  local spacer = ""
-  for _ = 1, level do
-    spacer = spacer .. " "
-  end
-  for k, v in pairs(obj) do
-    print(spacer .. tostring(k), v)
-    if type(k) == "table" then
-      -- a set, recurse further into k, instead of v
-      v = k
-    end
-    if type(v) == "table" and (not max_level or max_level > level) then
-      -- check for reference loops
-      local found_ref = false
-      for _, ref in ipairs(pt_reflist) do
-        if ref == v then
-          found_ref = true
-        end
-      end
-      if found_ref then
-        print(spacer .. " " .. "<reference loop>")
-      else
-        print_table(v, max_level, level + 1)
-      end
-    end
-  end
-  pt_reflist[#pt_reflist] = nil
-end
-
 -- Can return the length of any table, where as #table_name is only suitable for use with arrays of one contiguous part without nil values.
 function table_length(table)
   local count = 0
@@ -143,7 +106,7 @@ function loadfile_envcall(filename)
   return loadstring_envcall(result, "@" .. filename)
 end
 
-if _G._VERSION == "Lua 5.2" or _G._VERSION == "Lua 5.3" then
+if _G._VERSION == "Lua 5.2" or _G._VERSION == "Lua 5.3" or _G._VERSION == "Lua 5.4" then
   function loadstring_envcall(contents, chunkname)
     -- Lua 5.2+ lacks setfenv()
     -- load() still only allows a chunk to have an environment set once, so
@@ -183,7 +146,7 @@ do
   if not metamethod_called then
     local next = next
     local getmetatable = getmetatable
-    pairs = function(t)
+    pairs = function(t) -- luacheck: ignore 121
       local mt = getmetatable(t)
       if mt then
         local __pairs = mt.__pairs
@@ -198,7 +161,7 @@ do
   ipairs(setmetatable({}, {__ipairs = function() metamethod_called = true end}))
   if not metamethod_called then
     local ipairs_orig = ipairs
-    ipairs = function(t)
+    ipairs = function(t) -- luacheck: ignore 121
       local mt = getmetatable(t)
       if mt then
         local __ipairs = mt.__ipairs
@@ -252,6 +215,12 @@ DrawFlags.EarlyList       = 2^10
 DrawFlags.ListBottom      = 2^11
 DrawFlags.BoundBoxHitTest = 2^12
 DrawFlags.Crop            = 2^13
+
+-- Keep in sync with animation_effect in th_gfx_common.h
+AnimationEffect = {}
+AnimationEffect.None = 0
+AnimationEffect.Glowing = 1
+AnimationEffect.Jelly = 2
 
 -- Compare values of two simple (non-nested) tables
 function compare_tables(t1, t2)
@@ -311,4 +280,138 @@ end
 function hasBit(value, bit)
   local p = 2 ^ bit
   return value % (p + p) >= p
+end
+
+--! Convert an array table to a string.
+--! Joins each elements by the provided separator. As a convenience feature
+--! if the input is not an array it will be converted to a string and
+--! returned.
+--!param array (table) array to join.
+--!param separator (string) separator between elements.
+--!return (string) The joined string.
+function array_join(array, separator)
+  separator = separator or ","
+
+  if type(array) ~= "table" then
+    return tostring(array)
+  end
+
+  if array[1] == nil then
+    return ""
+  end
+
+  local result = tostring(array[1])
+  local i = 2
+  while array[i] ~= nil do
+    result = result .. separator
+    result = result .. tostring(array[i])
+    i = i + 1
+  end
+
+  return result
+end
+
+local function serialize_string(val)
+  local level = 0
+  while string.find(val, ']' .. string.rep('=', level) .. ']') do
+    level = level + 1
+  end
+
+  return '[' .. string.rep('=', level) .. '[' .. val .. ']' .. string.rep('=', level) .. ']'
+end
+
+-- Helper function to print the contents of a table. Child tables are printed recursively.
+-- Call without specifying depth, only obj and (if wished) max_depth.
+local function serialize_table(obj, options, depth, pt_reflist)
+  -- Used to prevent infinite loops
+  pt_reflist = pt_reflist or {}
+  options = options or {detect_cycles = true} -- By default, don't crash on cycles.
+  depth = depth or 1
+
+  if options.max_depth and depth > options.max_depth then
+    return "{...}"
+  end
+
+  for _, ref in ipairs(pt_reflist) do
+    if ref == obj then
+      if options.detect_cycles then
+        return "<reference loop>"
+      elseif not options.max_depth then
+        assert("Infinite loop detected. Specify detect_cycles or max_depth when serializing tables that may contain cycles")
+      end
+    end
+  end
+  pt_reflist[#pt_reflist + 1] = obj
+
+  local first = true
+  local indent = string.rep(" ", depth * 2)
+  local result = "{"
+  local max_array_index = 0
+  for i, v in ipairs(obj) do
+    max_array_index = i
+    if not first then
+      result = result .. ","
+    end
+    first = false
+    if options.pretty then
+      result = result .. "\n" .. indent
+    end
+    result = result .. serialize(v, options, depth + 1, pt_reflist)
+  end
+
+  for k, v in pairs(obj) do
+    if not(type(k) == "number" and k >= 1 and k <= max_array_index) then
+      if not first then
+        result = result .. ','
+      end
+      first = false
+      if options.pretty then
+        result = result .. '\n' .. indent
+      end
+
+      result = result .. "[ "
+      result = result .. serialize(k, options, depth + 1, pt_reflist)
+      result = result .. " ]="
+      result = result .. serialize(v, options, depth + 1, pt_reflist)
+    end
+  end
+  indent = string.rep(" ", (depth - 1) * 2)
+
+  if options.pretty then
+    result = result .. '\n' .. indent
+  end
+  result = result .. "}"
+
+  return result
+end
+
+--! Serialize a value. Call it with the value to serialize and print the output.
+--  By default it will end recursion when a cycle is detected.
+--!param val Value to serialize.
+--!param options Option settings, table, 'detect_cycles' field boolean that
+--  ends recursion on a cycle, and 'max_depth' integer that ends recursion at the
+--  specified depth. By default initialized with "{detect_cycles = True}"
+--!param depth Recursion depth, should be omitted.
+--!param pt_reflist Seen nodes, should be omitted.
+--!return The seralized output.
+function serialize(val, options, depth, pt_reflist)
+  if type(val) == "string" then
+    return serialize_string(val)
+  elseif type(val) == "table" then
+    return serialize_table(val, options, depth, pt_reflist)
+  else
+    return tostring(val)
+  end
+end
+
+-- Clones a table, but only the first level.
+function shallow_clone(tbl)
+  if type(tbl) ~= "table" then return tbl end
+  local meta = getmetatable(tbl)
+  local target = {}
+  for k, v in pairs(tbl) do
+    target[k] = v
+  end
+  setmetatable(target, meta)
+  return target
 end

@@ -27,9 +27,9 @@ function VipGoToNextRoomAction:VipGoToNextRoomAction()
   self:HumanoidAction("vip_go_to_next_room")
 end
 
-local action_vip_go_to_next_room_end = permanent"action_next_room_end"( function(humanoid) end)
+local action_vip_go_to_next_room_end = permanent"action_next_room_end"( function() end)
 
-local function action_vip_go_to_next_room_start(action, humanoid)
+local function action_vip_go_to_next_room_start(_, humanoid)
   if humanoid.next_room_no == nil then
     -- This vip is done here.
     humanoid:goHome()
@@ -42,7 +42,7 @@ local function action_vip_go_to_next_room_start(action, humanoid)
     end
     humanoid:queueAction(WalkAction(x, y))
     -- What happens if the room disappears:
-    humanoid.next_room.humanoids_enroute[humanoid] = {callback = callback}
+    humanoid.next_room.door.queue:expect(humanoid, {callback = callback})
 
     -- Evaluation function
     local --[[persistable:vip_next_room_eval]] function evaluate()
@@ -50,7 +50,7 @@ local function action_vip_go_to_next_room_start(action, humanoid)
       humanoid.next_room.humanoids_enroute[humanoid] = nil
       --humanoid.next_room.door.reserved_for = humanoid
       humanoid:evaluateRoom()
-      humanoid.waiting = 3
+      humanoid.waiting = nil
     end
     -- Find direction to look at
     local ix, iy = humanoid.next_room:getEntranceXY(true)
@@ -64,7 +64,7 @@ local function action_vip_go_to_next_room_start(action, humanoid)
         dir = "east"
       end
     end
-    humanoid:queueAction(IdleAction():setLoopCallback(evaluate):setDirection(dir))
+    humanoid:queueAction(IdleAction():setCount(50):setAfterUse(evaluate):setDirection(dir))
 
     -- Finish this action and start the above sequence.
     humanoid:finishAction()

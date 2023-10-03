@@ -20,6 +20,7 @@ SOFTWARE. --]]
 
 local room = {}
 room.id = "inflation"
+room.vip_must_visit = false
 room.level_config_id = 17
 room.class = "InflationRoom"
 room.name = _S.rooms_short.inflation
@@ -62,7 +63,12 @@ function InflationRoom:commandEnteringPatient(patient)
 
   local inflation_after_use = --[[persistable:inflation_after_use]] function()
     patient:setLayer(0, patient.layers[0] - 10) -- Change to normal head
-    staff:setNextAction(MeanderAction())
+    -- if no other actions for staff member meander in room
+    if #staff.action_queue == 1 then
+      staff:setNextAction(MeanderAction())
+    else
+      staff:finishAction(staff:getCurrentAction())
+    end
     self:dealtWithPatient(patient)
   end
 

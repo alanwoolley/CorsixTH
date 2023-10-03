@@ -21,21 +21,24 @@ SOFTWARE.
 */
 
 #include "app.h"
+
+#include "config.h"
+
 #include "frmMain.h"
 #include "frmSprites.h"
 
 IMPLEMENT_APP(ThemeHospitalAnimViewApp)
 
-bool ThemeHospitalAnimViewApp::OnInit()
-{
-    wxTopLevelWindow *pForm;
-    if(::wxMessageBox(L"Launch animation viewer? (No -> sprite viewer)", L"AnimView", wxYES_NO) == wxYES)
-        pForm = new frmMain;
-    else
-        pForm = new frmSprites;
+bool ThemeHospitalAnimViewApp::OnInit() {
+  wxTopLevelWindow* pForm;
+  if (::wxMessageBox(L"Launch animation viewer? (No -> sprite viewer)",
+                     L"AnimView", wxYES_NO) == wxYES)
+    pForm = new frmMain;
+  else
+    pForm = new frmSprites;
 
-    pForm->Show(true);
-    SetTopWindow(pForm);
+  pForm->Show(true);
+  SetTopWindow(pForm);
 
-    return true;
+  return true;
 }

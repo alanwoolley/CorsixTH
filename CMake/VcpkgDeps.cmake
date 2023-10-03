@@ -18,7 +18,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-set(VCPKG_COMMIT_SHA "ebe81932c323b6437eea7d77ef6860024508f5e4")
+set(VCPKG_COMMIT_SHA "48b3f72436655e8ca8f7443d5faa17174725e40e")
 
 # Setup the various paths we are using
 set(_VCPKG_SCRIPT_NAME "build_vcpkg_deps.ps1")
@@ -33,6 +33,10 @@ elseif(CMAKE_GENERATOR_PLATFORM MATCHES "^[Xx]64$" OR CMAKE_GENERATOR MATCHES "W
   set(_VCPKG_TARGET_TRIPLET "x64-windows")
 elseif(CMAKE_GENERATOR_PLATFORM MATCHES "^[Aa][Rr][Mm]$" OR CMAKE_GENERATOR MATCHES "ARM$")
   set(_VCPKG_TARGET_TRIPLET "arm-windows")
+elseif(CMAKE_GENERATOR_PLATFORM MATCHES "^[Ww][Ii][Nn]32$")
+  set(_VCPKG_TARGET_TRIPLET "x86-windows")
+elseif(CMAKE_GENERATOR MATCHES "^Visual Studio 16 2019$")
+  set(_VCPKG_TARGET_TRIPLET "x64-windows")
 else()
   set(_VCPKG_TARGET_TRIPLET "x86-windows")
 endif()
@@ -59,4 +63,4 @@ if(err_val)
 endif()
 
 set(VCPKG_INSTALLED_PATH ${VCPKG_PARENT_DIR}/vcpkg/installed/${_VCPKG_TARGET_TRIPLET})
-set(CMAKE_TOOLCHAIN_FILE ${VCPKG_PARENT_DIR}/vcpkg/scripts/buildsystems/vcpkg.cmake)
+set(CMAKE_TOOLCHAIN_FILE ${VCPKG_PARENT_DIR}/vcpkg/scripts/buildsystems/vcpkg.cmake CACHE STRING "Vcpkg toolchain file")

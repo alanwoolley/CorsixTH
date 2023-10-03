@@ -20,6 +20,7 @@ SOFTWARE. --]]
 
 local room = {}
 room.id = "training"
+room.vip_must_visit = false
 room.level_config_id = 22
 room.class = "TrainingRoom"
 room.long_name = _S.rooms_long.training_room
@@ -67,9 +68,8 @@ function TrainingRoom:roomFinished()
   self.training_factor = self:calculateTrainingFactor(skeletons, bookcases) / 10.0
 
   -- Also tell the player if he/she doesn't have a consultant yet.
-  if not self.hospital:hasStaffOfCategory("Consultant") then
-    local text = _A.room_requirements.training_room_need_consultant
-    self.world.ui.adviser:say(text)
+  if self.hospital:countStaffOfCategory("Consultant", 1) == 0 then
+    self.hospital:giveAdvice({_A.room_requirements.training_room_need_consultant})
   end
   Room.roomFinished(self)
 end
@@ -104,7 +104,7 @@ end
 function TrainingRoom:testStaffCriteria(criteria, extra_humanoid)
   if extra_humanoid and extra_humanoid.profile and
       extra_humanoid.profile.is_consultant and self.staff_member then
-    -- Training room can only have on consultant
+    -- Training room can only have one consultant
     return false
   end
   return Room.testStaffCriteria(self, criteria, extra_humanoid)
@@ -161,11 +161,6 @@ function TrainingRoom:onHumanoidEnter(humanoid)
   humanoid.in_room = self
   humanoid.last_room = self -- Remember where the staff was for them to come back after staffroom rest
 
-  --entering humanoids are no longer enroute
-  if self.humanoids_enroute[humanoid] then
-    self.humanoids_enroute[humanoid] = nil -- humanoid is no longer walking to this room
-  end
-
   humanoid:setCallCompleted()
   self:commandEnteringStaff(humanoid)
   self.humanoids[humanoid] = true
@@ -211,14 +206,15 @@ function TrainingRoom:commandEnteringStaff(humanoid)
         humanoid:queueAction(UseObjectAction(obj))
         humanoid:queueAction(MeanderAction())
       else
+        self.hospital:giveAdvice({_A.staff_place_advice.not_enough_lecture_chairs})
         humanoid:setNextAction(self:createLeaveAction())
         humanoid:queueAction(MeanderAction())
         humanoid.last_room = nil
       end
     end
   elseif humanoid.humanoid_class ~= "Handyman" then
-    self.world.ui.adviser:say(_A.staff_place_advice.only_doctors_in_room
-    :format(_S.rooms_long.training_room))
+    self.hospital:giveAdvice({_A.staff_place_advice.only_doctors_in_room
+      :format(_S.rooms_long.training_room)})
     humanoid:setNextAction(self:createLeaveAction())
     humanoid:queueAction(MeanderAction())
     return

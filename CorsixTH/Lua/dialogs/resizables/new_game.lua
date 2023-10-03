@@ -79,14 +79,17 @@ function UINewGame:UINewGame(ui)
 
 
   local avail_diff = {
-    {text = _S.new_game_window.medium, tooltip = _S.tooltip.new_game_window.medium, param = "full"},
+    {text = _S.new_game_window.medium, tooltip = { _S.tooltip.new_game_window.medium,
+     nil, 130 }, param = "full"}
   }
-  if TheApp.fs:getFilePath("Levels", "Easy01.SAM") then
-    table.insert(avail_diff, 1, {text = _S.new_game_window.easy, tooltip = _S.tooltip.new_game_window.easy, param = "easy"})
+  if TheApp.fs:fileExists("Levels", "Easy01.SAM") then
+    table.insert(avail_diff, 1, {text = _S.new_game_window.easy, tooltip = { _S.tooltip.new_game_window.easy,
+     nil, 100 }, param = "easy"})
     self.difficulty = 2
   end
-  if TheApp.fs:getFilePath("Levels", "Hard01.SAM") then
-    avail_diff[#avail_diff + 1] = {text = _S.new_game_window.hard, tooltip = _S.tooltip.new_game_window.hard, param = "hard"}
+  if TheApp.fs:fileExists("Levels", "Hard01.SAM") then
+    avail_diff[#avail_diff + 1] = {text = _S.new_game_window.hard, tooltip = { _S.tooltip.new_game_window.hard,
+     nil, 175 }, param = "hard"}
   end
   self.available_difficulties = avail_diff
 
@@ -95,8 +98,8 @@ function UINewGame:UINewGame(ui)
   -- Title
   self:addBevelPanel(80, 10, 160, 20, col_caption):setLabel(_S.new_game_window.caption).lowered = true
 
-  -- Player Name
-  self.player_name = app.config.player_name or os.getenv("USER") or os.getenv("USERNAME") or "PLAYER"
+  local pname = app.config.player_name
+  self.player_name = (pname and pname:len() > 0) and pname or os.getenv("USER") or os.getenv("USERNAME") or "PLAYER"
   self:addBevelPanel(20, 45, 140, 30, col_shadow, col_bg, col_bg)
     :setLabel(_S.new_game_window.player_name).lowered = true
   self.name_textbox = self:addBevelPanel(165, 45, 140, 30, col_textbox, col_highlight, col_shadow)
@@ -194,6 +197,8 @@ end
 
 function UINewGame:startGame(difficulty)
   self.ui.app:loadLevel(1, difficulty)
+  self.ui.app.moviePlayer:playAdvanceMovie(1)
+
   -- Initiate campaign progression. The UI above may now have changed.
   if not TheApp.using_demo_files then
     TheApp.world.campaign_info = "TH.campaign"

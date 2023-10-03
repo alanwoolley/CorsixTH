@@ -24,9 +24,9 @@
 
 # Parameters
 Param(
-    [Parameter(Mandatory=$true)][bool]$BuildAnimView,
-    [Parameter(Mandatory=$true)][string]$VcpkgTriplet,
-    [Parameter(Mandatory=$true)][string]$VcpkgCommitSha
+    [Parameter(Mandatory = $true)][bool]$BuildAnimView,
+    [Parameter(Mandatory = $true)][string]$VcpkgTriplet,
+    [Parameter(Mandatory = $true)][string]$VcpkgCommitSha
 )
 
 ################
@@ -34,7 +34,7 @@ Param(
 ################
 
 $anim_view_libs = "wxwidgets"
-$corsixth_libs = "ffmpeg", "freetype", "lua", "luafilesystem", "lpeg", "sdl2", "sdl2-mixer", "luasocket"
+$corsixth_libs = "ffmpeg[core,avcodec,avformat,swresample,swscale]", "freetype", "lua[tools]", "luafilesystem", "lpeg", "sdl2", "fluidsynth[sndfile]", "sdl2-mixer[libmodplug,fluidsynth,libflac,mpg123,opusfile]", "luasocket", "luasec", "catch2"
 
 $vcpkg_git_url = "https://github.com/CorsixTH/vcpkg"
 
@@ -71,7 +71,8 @@ function run_script {
         run_command -command "git clone $vcpkg_git_url $dest_folder_name"
         Set-Location -Path $dest_folder_path
         run_command "git checkout $VcpkgCommitSha"
-    } else {
+    }
+    else {
         # Move into vcpkg folder and update to latest version
         Set-Location -Path $dest_folder_path
         run_command "git reset --hard; git fetch origin; git checkout $VcpkgCommitSha"
@@ -79,7 +80,7 @@ function run_script {
 
     $commit_id_filename = "commit_id.txt"
     if (-Not (Test-Path $commit_id_filename) -or
-        (Get-Content $commit_id_filename | Where-Object {$_ -ne $VcpkgCommitSha })) {
+        (Get-Content $commit_id_filename | Where-Object { $_ -ne $VcpkgCommitSha })) {
         # Sha does not match or does not exist.
         Write-Output "Dependencies have changed. Bootstrapping and updating vcpkg."
         run_command ".\bootstrap-vcpkg.bat"
@@ -98,6 +99,13 @@ function run_script {
 
     $libs_list = ""
 
+    # mpg123 on x64-windows requires x86-windows yasm-tool.
+    # https://github.com/microsoft/vcpkg/issues/15890
+    if ($VcpkgTriplet -like "x64-windows*") {
+        $yasm_tool_install = ".\vcpkg install yasm-tool:x86-windows"
+        run_command -command $yasm_tool_install
+    }
+
     # Build our libs list
     foreach ($library in $corsixth_libs) {
         $libs_list += $library + ' '
@@ -111,7 +119,7 @@ function run_script {
     }
 
     # Compile them locally
-    $install_command = ".\vcpkg install " + $triplet + $libs_list
+    $install_command = ".\vcpkg install --recurse " + $triplet + $libs_list
     run_command -command $install_command
 
     # Copy various files from bin to tools
@@ -136,7 +144,8 @@ try {
     run_script
     # Move back up a dir to return user to original location
     Set-Location -Path $starting_dir
-} catch [Exception]{
+}
+catch [Exception] {
     Set-Location -Path $starting_dir
     # Echo the exception back out
     $_

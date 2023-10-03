@@ -20,6 +20,7 @@ SOFTWARE. --]]
 
 local room = {}
 room.id = "decontamination"
+room.vip_must_visit = false
 room.level_config_id = 30
 room.class = "DecontaminationRoom"
 room.name = _S.rooms_short.decontamination
@@ -62,7 +63,7 @@ function DecontaminationRoom:commandEnteringPatient(patient)
   local console, stf_x, stf_y = self.world:findObjectNear(staff, "console")
 
   local --[[persistable:decontamination_shared_loop_callback]] function loop_callback()
-    if staff.action_queue[1].shower_ready and patient.action_queue[1].shower_ready then
+    if staff:getCurrentAction().shower_ready and patient:getCurrentAction().shower_ready then
       staff:finishAction()
       patient:finishAction()
     end

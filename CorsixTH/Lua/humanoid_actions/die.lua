@@ -28,7 +28,7 @@ function DieAction:DieAction()
 end
 
 local action_die_tick; action_die_tick = permanent"action_die_tick"( function(humanoid)
-  local action = humanoid.action_queue[1]
+  local action = humanoid:getCurrentAction()
   local phase = action.phase
   local mirror = humanoid.last_move_direction == "east" and 0 or 1
   if phase == 0 then
@@ -69,7 +69,7 @@ local action_die_tick; action_die_tick = permanent"action_die_tick"( function(hu
 end)
 
 local action_die_tick_reaper; action_die_tick_reaper = permanent"action_die_tick_reaper"( function(humanoid)
-  local action = humanoid.action_queue[1]
+  local action = humanoid:getCurrentAction()
   local mirror = humanoid.last_move_direction == "east" and 0 or 1
   local phase = action.phase
 
@@ -102,8 +102,8 @@ local action_die_tick_reaper; action_die_tick_reaper = permanent"action_die_tick
     local mirror_grim = 0
 
     local spawn_scenarios = {
-      {"south", humanoid.tile_x, humanoid.tile_y + 4, 0, 1, "north", 0, -1, {{after_spawn_idle_direction = "east", hole_x_offset = -5, hole_y_offset = 2}, {hole_x_offset = 0, hole_y_offset = 3}} },
-      {"east", humanoid.tile_x + 4, humanoid.tile_y, 1, 0, "west",  -1,  0, {{hole_x_offset = 3, hole_y_offset = 0}} }
+      {"south", humanoid.tile_x, humanoid.tile_y + 4, 1, 0, "west", -1, 0, {{after_spawn_idle_direction = "east", hole_x_offset = -5, hole_y_offset = 2}, {hole_x_offset = 0, hole_y_offset = 3}} },
+      {"east", humanoid.tile_x + 4, humanoid.tile_y, 0, 1, "north", 0, -1, {{hole_x_offset = 3, hole_y_offset = 0}} }
     }
 
     ---
@@ -114,13 +114,22 @@ local action_die_tick_reaper; action_die_tick_reaper = permanent"action_die_tick
       hole_x, hole_y = humanoid.world.pathfinder:findIdleTile(spawn_scenario[2], spawn_scenario[3], 0)
 
       if hole_x and humanoid.world:canNonSideObjectBeSpawnedAt(hole_x, hole_y, "gates_to_hell", holes_orientation, 0, 0) then
-        if holes_orientation == "east" then
+        if holes_orientation == "south" then
           mirror_grim = 1
         end
         grim_use_tile_x = hole_x + spawn_scenario[4]
         grim_use_tile_y = hole_y + spawn_scenario[5]
         humanoid.hole_use_tile_x = hole_x + spawn_scenario[7]
         humanoid.hole_use_tile_y = hole_y + spawn_scenario[8]
+        -- tile can't be in a room and must be accessible by the patient
+        if not humanoid.world:getPathDistance(humanoid.tile_x, humanoid.tile_y, humanoid.hole_use_tile_x, humanoid.hole_use_tile_y)
+            or humanoid.world:getRoom(humanoid.hole_use_tile_x, humanoid.hole_use_tile_y) then
+          return false
+        end
+        -- ensure grim won't be in a room
+        if humanoid.world:getRoom(grim_use_tile_x, grim_use_tile_y) then
+          return false
+        end
         --Ensure that the lava hole is passable on at least one of its sides to prevent it from blocking 1 tile wide corridors:
         humanoid.world.map:setCellFlags(hole_x, hole_y, {passable = false})
         local hole_has_passable_side = humanoid.world:getPathDistance(grim_use_tile_x, grim_use_tile_y, humanoid.hole_use_tile_x, humanoid.hole_use_tile_y) == 4
@@ -133,7 +142,8 @@ local action_die_tick_reaper; action_die_tick_reaper = permanent"action_die_tick
         for _, find_grim_spawn_attempt in ipairs(spawn_scenario[9]) do
           grim_spawn_idle_direction = find_grim_spawn_attempt.after_spawn_idle_direction or spawn_scenario[6]
           grim_x, grim_y = humanoid.world.pathfinder:findIdleTile(hole_x + find_grim_spawn_attempt.hole_x_offset, hole_y + find_grim_spawn_attempt.hole_y_offset, 0)
-          if grim_x and not humanoid.world:getRoom(grim_x, grim_y) then
+          if grim_x and not humanoid.world:getRoom(grim_x, grim_y)
+              and humanoid.world:getPathDistance(grim_x, grim_y, grim_use_tile_x, grim_use_tile_y) then
             grim_cant_walk_to_use_tile = false
             break
           end
@@ -257,8 +267,6 @@ local function action_die_start(action, humanoid)
   local anims = humanoid.die_anims
   assert(anims, "Error: no death animation for humanoid ".. humanoid.humanoid_class)
   action.must_happen = true
-  -- TODO: Right now the angel version of death is the only possibility
-  -- The Grim Reaper should sometimes also have a go.
   local fall = anims.fall_east
 
   --If this isn't done their bald head will become bloated instead of suddenly having hair:

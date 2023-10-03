@@ -63,6 +63,13 @@ function UISaveGame:abortName()
   self.new_savegame_textbox.panel:setLabel(_S.save_game_window.new_save_game)
 end
 
+--! Updates the textbox to selected file
+--!param label (string) Selected file name
+function UISaveGame:setInputValue(label)
+  local name = string.gsub(label, "%.sav$", "")
+  self.new_savegame_textbox:setText(name)
+end
+
 --! Function called when textbox is confirmed (e.g. by pressing enter)
 function UISaveGame:confirmName()
   local filename = self.new_savegame_textbox.text
@@ -82,7 +89,7 @@ end
 --! Try to save the game with given filename; if already exists, create confirmation window first.
 function UISaveGame:trySave(filename)
   if lfs.attributes(filename, "size") ~= nil then
-    self.ui:addWindow(UIConfirmDialog(self.ui, _S.confirmation.overwrite_save, --[[persistable:save_game_confirmation]] function() self:doSave(filename) end))
+    self.ui:addWindow(UIConfirmDialog(self.ui, false, _S.confirmation.overwrite_save, --[[persistable:save_game_confirmation]] function() self:doSave(filename) end))
   else
     self:doSave(filename)
   end

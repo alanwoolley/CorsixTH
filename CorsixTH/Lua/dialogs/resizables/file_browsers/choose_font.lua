@@ -18,7 +18,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE. --]]
 
-local TH = require "TH"
+local TH = require("TH")
 local lfsext = TH.lfsExt()
 
 --! Window where the user can choose a font file.
@@ -57,6 +57,6 @@ end
 function UIChooseFont:close()
   UIResizable.close(self)
   if self.mode == "menu" then
-    self.ui:addWindow(UIOptions(self.ui, self.mode))
+    self.ui:addWindow(UIFolder(self.ui, self.mode))
   end
 end

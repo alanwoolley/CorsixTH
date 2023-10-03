@@ -53,12 +53,12 @@ function IdleAction:setOnInterrupt(on_interrupt)
   return self
 end
 
-local action_idle_interrupt = permanent"action_idle_interrupt"( function(action, humanoid)
+local action_idle_interrupt = permanent"action_idle_interrupt"( function(_, humanoid)
   humanoid:setTimer(1, humanoid.finishAction)
 end)
 
 local action_timer = permanent"action_idle_timer"( function(humanoid)
-  local action = humanoid.action_queue[1]
+  local action = humanoid:getCurrentAction()
   if action.after_use then
     action.after_use()
     action.must_happen = true

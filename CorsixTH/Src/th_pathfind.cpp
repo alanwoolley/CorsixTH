@@ -20,621 +20,653 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-#include "config.h"
 #include "th_pathfind.h"
-#include "persist_lua.h"
-#include "lua.hpp"
+
+#include "config.h"
+
+#include <cmath>
 #include <cstdlib>
 #include <queue>
-#include <cmath>
+#include <stdexcept>
 #include <vector>
 
-BasePathing::BasePathing(THPathfinder *pf) : m_pPf(pf)
-{ }
+#include "lua.hpp"
+#include "persist_lua.h"
 
-node_t *BasePathing::pathingInit(const THMap *pMap, int iStartX, int iStartY)
-{
-    int iWidth = pMap->getWidth();
-    m_pPf->m_pDestination = nullptr;
-    m_pPf->_allocNodeCache(iWidth, pMap->getHeight());
-    node_t *pNode = m_pPf->m_pNodes + iStartY * iWidth + iStartX;
-    pNode->prev = nullptr;
-    pNode->distance = 0;
-    pNode->guess = makeGuess(pNode);
-    m_pPf->m_ppDirtyList[0] = pNode;
-    m_pPf->m_iDirtyCount = 1;
-    m_pPf->m_openHeap.clear();
-    return pNode;
+abstract_pathfinder::abstract_pathfinder(pathfinder* pf) : parent(pf) {}
+
+path_node* abstract_pathfinder::init(const level_map* pMap, int iStartX,
+                                     int iStartY) {
+  int iWidth = pMap->get_width();
+  parent->destination = nullptr;
+  parent->allocate_node_cache(iWidth, pMap->get_height());
+  path_node* pNode = &parent->nodes.at(iStartY * iWidth + iStartX);
+  pNode->prev = nullptr;
+  pNode->distance = 0;
+  pNode->guess = guess_distance(pNode);
+  pNode->visited = true;
+  parent->dirty_node_list[0] = pNode;
+  parent->dirty_node_count = 1;
+  parent->open_heap.clear();
+  return pNode;
 }
 
 /*! No need to check for the node being on the map edge, as the N/E/S/W
     flags are set as to prevent travelling off the map (as well as to
     prevent walking through walls).
  */
-bool BasePathing::pathingNeighbours(node_t *pNode, th_map_node_flags flags, int iWidth)
-{
-    if(flags.can_travel_w)
-        if(tryNode(pNode, flags, pNode - 1, THTD_West)) return true;
+bool abstract_pathfinder::search_neighbours(path_node* pNode,
+                                            map_tile_flags flags, int iWidth) {
+  if (flags.can_travel_w) {
+    if (try_node(pNode, flags, pNode - 1, travel_direction::west)) {
+      return true;
+    }
+  }
 
-    if(flags.can_travel_e)
-        if (tryNode(pNode, flags, pNode + 1, THTD_East)) return true;
+  if (flags.can_travel_e) {
+    if (try_node(pNode, flags, pNode + 1, travel_direction::east)) {
+      return true;
+    }
+  }
 
-    if(flags.can_travel_n)
-        if (tryNode(pNode, flags, pNode - iWidth, THTD_North)) return true;
+  if (flags.can_travel_n) {
+    if (try_node(pNode, flags, pNode - iWidth, travel_direction::north)) {
+      return true;
+    }
+  }
 
-    if(flags.can_travel_s)
-        if (tryNode(pNode, flags, pNode + iWidth, THTD_South)) return true;
+  if (flags.can_travel_s) {
+    if (try_node(pNode, flags, pNode + iWidth, travel_direction::south)) {
+      return true;
+    }
+  }
 
+  return false;
+}
+
+void abstract_pathfinder::record_neighbour_if_passable(
+    path_node* pNode, map_tile_flags neighbour_flags, bool passable,
+    path_node* pNeighbour) {
+  if (pNeighbour->visited) {
+    return;
+  }
+  if (passable && !neighbour_flags.passable) {
+    return;
+  }
+
+  if (pNeighbour->prev == pNeighbour) {
+    pNeighbour->prev = pNode;
+    pNeighbour->distance = pNode->distance + 1;
+    pNeighbour->guess = guess_distance(pNeighbour);
+    parent->dirty_node_list[parent->dirty_node_count++] = pNeighbour;
+    parent->push_to_open_heap(pNeighbour);
+  } else if (pNode->distance + 1 < pNeighbour->distance) {
+    pNeighbour->prev = pNode;
+    pNeighbour->distance = pNode->distance + 1;
+    /* guess doesn't change, and already in the dirty list */
+    parent->open_heap_promote(pNeighbour);
+  }
+}
+
+int basic_pathfinder::guess_distance(path_node* pNode) {
+  // As diagonal movement is not allowed, the minimum distance between two
+  // points is the sum of the distance in X and the distance in Y.
+  return abs(pNode->x - destination_x) + abs(pNode->y - destination_y);
+}
+
+bool basic_pathfinder::try_node(path_node* pNode, map_tile_flags flags,
+                                path_node* pNeighbour,
+                                travel_direction direction) {
+  map_tile_flags neighbour_flags =
+      map->get_tile_unchecked(pNeighbour->x, pNeighbour->y)->flags;
+  record_neighbour_if_passable(pNode, neighbour_flags, flags.passable,
+                               pNeighbour);
+  return false;
+}
+
+bool basic_pathfinder::find_path(const level_map* pMap, int iStartX,
+                                 int iStartY, int iEndX, int iEndY) {
+  if (pMap == nullptr) {
+    pMap = parent->default_map;
+  }
+  if (pMap == nullptr || pMap->get_tile(iEndX, iEndY) == nullptr ||
+      !pMap->get_tile_unchecked(iEndX, iEndY)->flags.passable) {
+    parent->destination = nullptr;
     return false;
-}
+  }
 
-void BasePathing::pathingTryNode(node_t *pNode, th_map_node_flags neighbour_flags, bool passable, node_t *pNeighbour)
-{
-    if(neighbour_flags.passable || !passable)
-    {
-        if(pNeighbour->prev == pNeighbour)
-        {
-            pNeighbour->prev = pNode;
-            pNeighbour->distance = pNode->distance + 1;
-            pNeighbour->guess = makeGuess(pNeighbour);
-            m_pPf->m_ppDirtyList[m_pPf->m_iDirtyCount++] = pNeighbour;
-            m_pPf->_openHeapPush(pNeighbour);
-        }
-        else if(pNode->distance + 1 < pNeighbour->distance)
-        {
-            pNeighbour->prev = pNode;
-            pNeighbour->distance = pNode->distance + 1;
-            /* guess doesn't change, and already in the dirty list */
-            m_pPf->_openHeapPromote(pNeighbour);
-        }
+  map = pMap;
+  destination_x = iEndX;
+  destination_y = iEndY;
+
+  path_node* pNode = init(pMap, iStartX, iStartY);
+  int iWidth = pMap->get_width();
+  path_node* pTarget = &parent->nodes.at(iEndY * iWidth + iEndX);
+
+  while (true) {
+    if (pNode == pTarget) {
+      parent->destination = pTarget;
+      return true;
     }
+
+    map_tile_flags flags = pMap->get_tile_unchecked(pNode->x, pNode->y)->flags;
+    if (search_neighbours(pNode, flags, iWidth)) {
+      return true;
+    }
+
+    if (parent->open_heap.empty()) {
+      parent->destination = nullptr;
+      break;
+    } else {
+      pNode = parent->pop_from_open_heap();
+    }
+  }
+  return false;
 }
 
-int PathFinder::makeGuess(node_t *pNode)
-{
-    // As diagonal movement is not allowed, the minimum distance between two
-    // points is the sum of the distance in X and the distance in Y.
-    return abs(pNode->x - m_iEndX) + abs(pNode->y - m_iEndY);
+int hospital_finder::guess_distance(path_node* pNode) { return 0; }
+
+bool hospital_finder::try_node(path_node* pNode, map_tile_flags flags,
+                               path_node* pNeighbour,
+                               travel_direction direction) {
+  map_tile_flags neighbour_flags =
+      map->get_tile_unchecked(pNeighbour->x, pNeighbour->y)->flags;
+  record_neighbour_if_passable(pNode, neighbour_flags, flags.passable,
+                               pNeighbour);
+  return false;
 }
 
-bool PathFinder::tryNode(node_t *pNode, th_map_node_flags flags,
-                         node_t *pNeighbour, int direction)
-{
-    th_map_node_flags neighbour_flags = m_pMap->getNodeUnchecked(pNeighbour->x, pNeighbour->y)->flags;
-    pathingTryNode(pNode, neighbour_flags, flags.passable, pNeighbour);
+bool hospital_finder::find_path_to_hospital(const level_map* pMap, int iStartX,
+                                            int iStartY) {
+  if (pMap == nullptr) {
+    pMap = parent->default_map;
+  }
+  if (pMap == nullptr || pMap->get_tile(iStartX, iStartY) == nullptr ||
+      !pMap->get_tile_unchecked(iStartX, iStartY)->flags.passable) {
+    parent->destination = nullptr;
     return false;
+  }
+
+  map = pMap;
+
+  path_node* pNode = init(pMap, iStartX, iStartY);
+  int iWidth = pMap->get_width();
+
+  while (true) {
+    pNode->visited = true;
+    map_tile_flags flags = pMap->get_tile_unchecked(pNode->x, pNode->y)->flags;
+
+    if (flags.hospital) {
+      parent->destination = pNode;
+      return true;
+    }
+
+    if (search_neighbours(pNode, flags, iWidth)) {
+      return true;
+    }
+
+    if (parent->open_heap.empty()) {
+      parent->destination = nullptr;
+      break;
+    } else {
+      pNode = parent->pop_from_open_heap();
+    }
+  }
+  return false;
 }
 
-bool PathFinder::findPath(const THMap *pMap, int iStartX, int iStartY, int iEndX, int iEndY)
-{
-    if(pMap == nullptr)
-        pMap = m_pPf->m_pDefaultMap;
-    if(pMap == nullptr || pMap->getNode(iEndX, iEndY) == nullptr
-        || !pMap->getNodeUnchecked(iEndX, iEndY)->flags.passable)
-    {
-        m_pPf->m_pDestination = nullptr;
-        return false;
-    }
+int idle_tile_finder::guess_distance(path_node* pNode) { return 0; }
 
-    m_pMap = pMap;
-    m_iEndX = iEndX;
-    m_iEndY = iEndY;
-
-    node_t *pNode = pathingInit(pMap, iStartX, iStartY);
-    int iWidth = pMap->getWidth();
-    node_t *pTarget = m_pPf->m_pNodes + iEndY * iWidth + iEndX;
-
-    while(true)
-    {
-        if(pNode == pTarget)
-        {
-            m_pPf->m_pDestination = pTarget;
-            return true;
-        }
-
-        th_map_node_flags flags = pMap->getNodeUnchecked(pNode->x, pNode->y)->flags;
-        if (pathingNeighbours(pNode, flags, iWidth)) return true;
-
-        if (m_pPf->m_openHeap.empty()) {
-            m_pPf->m_pDestination = nullptr;
-            break;
-        } else {
-            pNode = m_pPf->_openHeapPop();
-        }
-    }
+bool idle_tile_finder::try_node(path_node* pNode, map_tile_flags flags,
+                                path_node* pNeighbour,
+                                travel_direction direction) {
+  if (pNeighbour->visited) {
     return false;
+  }
+
+  map_tile_flags neighbour_flags =
+      map->get_tile_unchecked(pNeighbour->x, pNeighbour->y)->flags;
+  /* When finding an idle tile, do not navigate through doors */
+  switch (direction) {
+    case travel_direction::north:
+      if (!flags.door_north) {
+        record_neighbour_if_passable(pNode, neighbour_flags, flags.passable,
+                                     pNeighbour);
+      }
+      break;
+
+    case travel_direction::east:
+      if (!neighbour_flags.door_west) {
+        record_neighbour_if_passable(pNode, neighbour_flags, flags.passable,
+                                     pNeighbour);
+      }
+      break;
+
+    case travel_direction::south:
+      if (!neighbour_flags.door_north) {
+        record_neighbour_if_passable(pNode, neighbour_flags, flags.passable,
+                                     pNeighbour);
+      }
+      break;
+
+    case travel_direction::west:
+      if (!flags.door_west) {
+        record_neighbour_if_passable(pNode, neighbour_flags, flags.passable,
+                                     pNeighbour);
+      }
+      break;
+  }
+
+  /* Identify the neighbour in the open list nearest to the start */
+  if (pNeighbour->prev != pNeighbour) {
+    int iDX = pNeighbour->x - start_x;
+    int iDY = pNeighbour->y - start_y;
+    double fDistance = sqrt((double)(iDX * iDX + iDY * iDY));
+    if (best_next_node == nullptr || fDistance < best_distance) {
+      best_next_node = pNeighbour;
+      best_distance = fDistance;
+    }
+  }
+  return false;
 }
 
-int HospitalFinder::makeGuess(node_t *pNode)
-{
-    return 0;
-}
-
-bool HospitalFinder::tryNode(node_t *pNode, th_map_node_flags flags,
-                             node_t *pNeighbour, int direction)
-{
-    th_map_node_flags neighbour_flags = m_pMap->getNodeUnchecked(pNeighbour->x, pNeighbour->y)->flags;
-    pathingTryNode(pNode, neighbour_flags, flags.passable, pNeighbour);
+bool idle_tile_finder::find_idle_tile(const level_map* pMap, int iStartX,
+                                      int iStartY, int iN, int parcelId) {
+  if (pMap == nullptr) {
+    pMap = parent->default_map;
+  }
+  if (pMap == nullptr) {
+    parent->destination = nullptr;
     return false;
-}
+  }
 
-bool HospitalFinder::findPathToHospital(const THMap *pMap, int iStartX, int iStartY)
-{
-    if(pMap == nullptr)
-        pMap = m_pPf->m_pDefaultMap;
-    if(pMap == nullptr || pMap->getNode(iStartX, iStartY) == nullptr
-        || !pMap->getNodeUnchecked(iStartX, iStartY)->flags.passable)
-    {
-        m_pPf->m_pDestination = nullptr;
-        return false;
-    }
+  start_x = iStartX;
+  start_y = iStartY;
+  map = pMap;
 
-    m_pMap = pMap;
+  if (parcelId <= 0 || parcelId > pMap->get_parcel_count() ||
+      pMap->get_parcel_owner(parcelId) == 0)
+    parcelId = 0;
 
-    node_t *pNode = pathingInit(pMap, iStartX, iStartY);
-    int iWidth = pMap->getWidth();
+  path_node* pNode = init(pMap, iStartX, iStartY);
+  int iWidth = pMap->get_width();
+  path_node* pPossibleResult = nullptr;
 
-    while(true)
-    {
-        th_map_node_flags flags = pMap->getNodeUnchecked(pNode->x, pNode->y)->flags;
+  while (true) {
+    pNode->visited = true;
 
-        if(flags.hospital)
-        {
-            m_pPf->m_pDestination = pNode;
-            return true;
-        }
+    // Check whether pNode is a feasible destination.
+    const map_tile* node_tile = pMap->get_tile_unchecked(pNode->x, pNode->y);
+    map_tile_flags flags = node_tile->flags;
 
-        if (pathingNeighbours(pNode, flags, iWidth)) return true;
-
-        if (m_pPf->m_openHeap.empty()) {
-            m_pPf->m_pDestination = nullptr;
-            break;
-        } else {
-            pNode = m_pPf->_openHeapPop();
-        }
-    }
-    return false;
-}
-
-int IdleTileFinder::makeGuess(node_t *pNode)
-{
-    return 0;
-}
-
-bool IdleTileFinder::tryNode(node_t *pNode, th_map_node_flags flags,
-                             node_t *pNeighbour, int direction)
-{
-    th_map_node_flags neighbour_flags = m_pMap->getNodeUnchecked(pNeighbour->x, pNeighbour->y)->flags;
-    /* When finding an idle tile, do not navigate through doors */
-    switch(direction)
-    {
-    case THTD_North:
-        if(!flags.door_north)
-            pathingTryNode(pNode, neighbour_flags, flags.passable, pNeighbour);
-        break;
-
-    case THTD_East:
-        if(!neighbour_flags.door_west)
-            pathingTryNode(pNode, neighbour_flags, flags.passable, pNeighbour);
-        break;
-
-    case THTD_South:
-        if(!neighbour_flags.door_north)
-            pathingTryNode(pNode, neighbour_flags, flags.passable, pNeighbour);
-        break;
-
-    case THTD_West:
-        if(!flags.door_west)
-            pathingTryNode(pNode, neighbour_flags, flags.passable, pNeighbour);
-        break;
-    }
-
-    /* Identify the neighbour in the open list nearest to the start */
-    if(pNeighbour->prev != pNeighbour && pNeighbour->open_idx != -1)
-    {
-        int iDX = pNeighbour->x - m_iStartX;
-        int iDY = pNeighbour->y - m_iStartY;
-        double fDistance = sqrt((double)(iDX * iDX + iDY * iDY));
-        if(m_pBestNext == nullptr || fDistance < m_fBestDistance)
-        {
-            m_pBestNext = pNeighbour; m_fBestDistance = fDistance;
-        }
-    }
-    return false;
-}
-
-bool IdleTileFinder::findIdleTile(const THMap *pMap, int iStartX, int iStartY, int iN)
-{
-    if(pMap == nullptr)
-        pMap = m_pPf->m_pDefaultMap;
-    if(pMap == nullptr)
-    {
-        m_pPf->m_pDestination = nullptr;
-        return false;
-    }
-
-    m_iStartX = iStartX;
-    m_iStartY = iStartY;
-    m_pMap = pMap;
-
-    node_t *pNode = pathingInit(pMap, iStartX, iStartY);
-    int iWidth = pMap->getWidth();
-    node_t *pPossibleResult = nullptr;
-
-    while(true)
-    {
-        pNode->open_idx = -1;
-        th_map_node_flags flags = pMap->getNodeUnchecked(pNode->x, pNode->y)->flags;
-
-        if(!flags.do_not_idle && flags.passable && flags.hospital)
-        {
-            if(iN == 0)
-            {
-                m_pPf->m_pDestination = pNode;
-                return true;
-            }
-            else
-            {
-                pPossibleResult = pNode;
-                --iN;
-            }
-        }
-
-        m_pBestNext = nullptr;
-        m_fBestDistance = 0.0;
-
-        if (pathingNeighbours(pNode, flags, iWidth)) return true;
-
-        if (m_pPf->m_openHeap.empty()) {
-            m_pPf->m_pDestination = nullptr;
-            break;
-        }
-
-        if(m_pBestNext)
-        {
-            // Promote the best neighbour to the front of the open list
-            // This causes sequential iN to give neighbouring results for most iN
-            m_pBestNext->guess = -m_pBestNext->distance;
-            m_pPf->_openHeapPromote(m_pBestNext);
-        }
-        pNode = m_pPf->_openHeapPop();
-    }
-    if(pPossibleResult)
-    {
-        m_pPf->m_pDestination = pPossibleResult;
+    bool correct_parcel = parcelId == 0 || parcelId == node_tile->iParcelId;
+    if (!flags.do_not_idle && flags.passable && flags.hospital &&
+        correct_parcel) {
+      // Try to delay returning an idle tile until we find the Nth tile.
+      if (iN == 0) {
+        parent->destination = pNode;
         return true;
-    }
-    return false;
-}
-
-int Objectsvisitor::makeGuess(node_t *pNode)
-{
-    return 0;
-}
-
-bool Objectsvisitor::tryNode(node_t *pNode, th_map_node_flags flags, node_t *pNeighbour, int direction)
-{
-    int iObjectNumber = 0;
-    const THMapNode *pMapNode = m_pMap->getNodeUnchecked(pNeighbour->x, pNeighbour->y);
-    th_map_node_flags neighbour_flags = m_pMap->getNodeUnchecked(pNeighbour->x, pNeighbour->y)->flags;
-    for(auto thob : pMapNode->objects)
-    {
-        if(thob == m_eTHOB)
-            iObjectNumber++;
-    }
-    if(m_bAnyObjectType)
-        iObjectNumber = 1;
-    bool bSucces = false;
-    for(int i = 0; i < iObjectNumber; i++)
-    {
-        /* call the given Lua function, passing four arguments: */
-        /* The x and y position of the object (Lua tile co-ords) */
-        /* The direction which was last travelled in to reach (x,y); */
-        /*   0 (north), 1 (east), 2 (south), 3 (west) */
-        /* The distance to the object from the search starting point */
-        lua_pushvalue(m_pL, m_iVisitFunction);
-        lua_pushinteger(m_pL, pNeighbour->x + 1);
-        lua_pushinteger(m_pL, pNeighbour->y + 1);
-        lua_pushinteger(m_pL, direction);
-        lua_pushinteger(m_pL, pNode->distance);
-        lua_call(m_pL, 4, 1);
-        if(lua_toboolean(m_pL, -1) != 0)
-        {
-            bSucces = true;
-        }
-        lua_pop(m_pL, 1);
-    }
-    if(bSucces)
-        return true;
-
-    if(pNode->distance < m_iMaxDistance)
-    {
-        switch(direction)
-        {
-        case THTD_North:
-            if(!flags.door_north)
-                pathingTryNode(pNode, neighbour_flags, flags.passable, pNeighbour);
-            break;
-
-        case THTD_East:
-            if(!neighbour_flags.door_west)
-                pathingTryNode(pNode, neighbour_flags, flags.passable, pNeighbour);
-            break;
-
-        case THTD_South:
-            if(!neighbour_flags.door_north)
-                pathingTryNode(pNode, neighbour_flags, flags.passable, pNeighbour);
-            break;
-
-        case THTD_West:
-            if(!flags.door_west)
-                pathingTryNode(pNode, neighbour_flags, flags.passable, pNeighbour);
-            break;
-        }
-    }
-    return false;
-}
-
-bool Objectsvisitor::visitObjects(const THMap *pMap, int iStartX, int iStartY,
-                                  THObjectType eTHOB, int iMaxDistance,
-                                  lua_State *L, int iVisitFunction, bool anyObjectType)
-{
-    if(pMap == nullptr)
-        pMap = m_pPf->m_pDefaultMap;
-    if(pMap == nullptr)
-    {
-        m_pPf->m_pDestination = nullptr;
-        return false;
+      } else {
+        pPossibleResult = pNode;
+        --iN;
+      }
     }
 
-    m_pL = L;
-    m_iVisitFunction = iVisitFunction;
-    m_iMaxDistance = iMaxDistance;
-    m_bAnyObjectType = anyObjectType;
-    m_eTHOB = eTHOB;
-    m_pMap = pMap;
+    best_next_node = nullptr;
+    best_distance = 0.0;
 
-    node_t *pNode = pathingInit(pMap, iStartX, iStartY);
-    int iWidth = pMap->getWidth();
-
-    while(true)
-    {
-        th_map_node_flags flags = pMap->getNodeUnchecked(pNode->x, pNode->y)->flags;
-        if (pathingNeighbours(pNode, flags, iWidth)) return true;
-
-        if (m_pPf->m_openHeap.empty()) {
-            m_pPf->m_pDestination = nullptr;
-            break;
-        } else {
-            pNode = m_pPf->_openHeapPop();
-        }
+    if (search_neighbours(pNode, flags, iWidth)) {
+      return true;
     }
-    return false;
-}
 
-THPathfinder::THPathfinder() : m_oPathFinder(this), m_oHospitalFinder(this),
-                               m_oIdleTileFinder(this), m_oObjectsvisitor(this),
-                               m_openHeap()
-{
-    m_pNodes = nullptr;
-    m_ppDirtyList = nullptr;
-    m_pDestination = nullptr;
-    m_pDefaultMap = nullptr;
-    m_iNodeCacheWidth = 0;
-    m_iNodeCacheHeight = 0;
-    m_iDirtyCount = 0;
-}
-
-THPathfinder::~THPathfinder()
-{
-    delete[] m_pNodes;
-    delete[] m_ppDirtyList;
-}
-
-void THPathfinder::setDefaultMap(const THMap *pMap)
-{
-    m_pDefaultMap = pMap;
-}
-
-
-
-void THPathfinder::_allocNodeCache(int iWidth, int iHeight)
-{
-    if(m_iNodeCacheWidth != iWidth || m_iNodeCacheHeight != iHeight)
-    {
-        delete[] m_pNodes;
-        m_pNodes = new node_t[iWidth * iHeight];
-        node_t *pNode = m_pNodes;
-        for(int iY = 0; iY < iHeight; ++iY)
-        {
-            for(int iX = 0; iX < iWidth; ++iX, ++pNode)
-            {
-                pNode->prev = pNode;
-                pNode->x = iX;
-                pNode->y = iY;
-                // Other fields are undefined as the node is not part of a
-                // path, and thus can be left uninitialised.
-            }
-        }
-        delete[] m_ppDirtyList;
-        m_ppDirtyList = new node_t*[iWidth * iHeight];
-        m_iNodeCacheWidth = iWidth;
-        m_iNodeCacheHeight = iHeight;
+    if (parent->open_heap.empty()) {
+      parent->destination = nullptr;
+      break;
     }
-    else
-    {
-        for(int i = 0; i < m_iDirtyCount; ++i)
-        {
-            m_ppDirtyList[i]->prev = m_ppDirtyList[i];
-            // Other fields are undefined as the node is not part of a path,
-            // and thus can keep their old values.
-        }
-    }
-    m_iDirtyCount = 0;
-}
 
-int THPathfinder::getPathLength() const
-{
-    if(m_pDestination != nullptr)
-        return m_pDestination->distance;
-    else
-        return -1;
-}
-
-bool THPathfinder::getPathEnd(int* pX, int* pY) const
-{
-    if(m_pDestination == nullptr)
-    {
-        if(pX)
-            *pX = -1;
-        if(pY)
-            *pY = -1;
-        return false;
+    if (best_next_node) {
+      // Promote the best neighbour to the front of the open list
+      // This causes sequential iN to give neighbouring results for most
+      // iN
+      best_next_node->guess = -best_next_node->distance;
+      parent->open_heap_promote(best_next_node);
     }
-    if(pX)
-        *pX = m_pDestination->x;
-    if(pY)
-        *pY = m_pDestination->y;
+    pNode = parent->pop_from_open_heap();
+  }
+  if (pPossibleResult) {
+    parent->destination = pPossibleResult;
     return true;
+  }
+  return false;
 }
 
-void THPathfinder::pushResult(lua_State *L) const
-{
-    lua_checkstack(L, 3);
+int object_visitor::guess_distance(path_node* pNode) { return 0; }
 
-    if(m_pDestination == nullptr)
-    {
-        lua_pushnil(L);
-        lua_pushliteral(L, "no path");
-        return;
+bool object_visitor::try_node(path_node* pNode, map_tile_flags flags,
+                              path_node* pNeighbour,
+                              travel_direction direction) {
+  int iObjectNumber = 0;
+  const map_tile* pMapNode =
+      map->get_tile_unchecked(pNeighbour->x, pNeighbour->y);
+  map_tile_flags neighbour_flags =
+      map->get_tile_unchecked(pNeighbour->x, pNeighbour->y)->flags;
+  for (auto thob : pMapNode->objects) {
+    if (thob == target) {
+      iObjectNumber++;
     }
-
-    int iLength = m_pDestination->distance;
-    lua_createtable(L, iLength + 1, 0);
-    lua_createtable(L, iLength + 1, 0);
-
-    for(const node_t* pNode = m_pDestination; pNode; pNode = pNode->prev)
-    {
-        lua_pushinteger(L, pNode->x + 1);
-        lua_rawseti(L, -3, pNode->distance + 1);
-        lua_pushinteger(L, pNode->y + 1);
-        lua_rawseti(L, -2, pNode->distance + 1);
+  }
+  if (target_any_object_type) {
+    iObjectNumber = 1;
+  }
+  bool bSucces = false;
+  for (int i = 0; i < iObjectNumber; i++) {
+    /* call the given Lua function, passing four arguments: */
+    /* The x and y position of the object (Lua tile co-ords) */
+    /* The direction which was last travelled in to reach (x,y); */
+    /*   0 (north), 1 (east), 2 (south), 3 (west) */
+    /* The distance to the object from the search starting point */
+    lua_pushvalue(L, visit_function_index);
+    lua_pushinteger(L, pNeighbour->x + 1);
+    lua_pushinteger(L, pNeighbour->y + 1);
+    lua_pushinteger(L, static_cast<int>(direction));
+    lua_pushinteger(L, pNode->distance);
+    lua_call(L, 4, 1);
+    if (lua_toboolean(L, -1) != 0) {
+      bSucces = true;
     }
-}
+    lua_pop(L, 1);
+  }
+  if (bSucces) {
+    return true;
+  }
 
-void THPathfinder::_openHeapPush(node_t* pNode)
-{
-    pNode->open_idx = m_openHeap.size();
-    m_openHeap.push_back(pNode);
-    _openHeapPromote(pNode);
-}
-
-void THPathfinder::_openHeapPromote(node_t* pNode)
-{
-    int i = pNode->open_idx;
-    while(i > 0)
-    {
-        int parent = (i - 1) / 2;
-        node_t *pParent = m_openHeap[parent];
-        if(pParent->value() <= pNode->value())
-            break;
-        pParent->open_idx = i;
-        m_openHeap[i] = pParent;
-        m_openHeap[parent] = pNode;
-        i = parent;
-    }
-    pNode->open_idx = i;
-}
-
-node_t* THPathfinder::_openHeapPop()
-{
-    node_t *pResult = m_openHeap[0];
-    node_t *pNode = m_openHeap.back();
-    m_openHeap.pop_back();
-
-    if (m_openHeap.empty()) {
-        return pResult;
-    }
-
-    m_openHeap[0] = pNode;
-    int i = 0;
-    int min = 0;
-    int left = i * 2 + 1;
-    const int value = pNode->value();
-    while(left < m_openHeap.size())
-    {
-        min = i;
-        const int right = (i + 1) * 2;
-        int minvalue = value;
-        node_t *pSwap = nullptr;
-        node_t *pTest = m_openHeap[left];
-        if(pTest->value() < minvalue)
-            min = left, minvalue = pTest->value(), pSwap = pTest;
-        if(right < m_openHeap.size())
-        {
-            pTest = m_openHeap[right];
-            if(pTest->value() < minvalue)
-                min = right, pSwap = pTest;
+  if (pNode->distance < max_distance) {
+    switch (direction) {
+      case travel_direction::north:
+        if (!flags.door_north) {
+          record_neighbour_if_passable(pNode, neighbour_flags, flags.passable,
+                                       pNeighbour);
         }
-        if(min == i)
-            break;
+        break;
 
-        pSwap->open_idx = i;
-        m_openHeap[i] = pSwap;
-        m_openHeap[min] = pNode;
-        i = min;
-        left = i * 2 + 1;
+      case travel_direction::east:
+        if (!neighbour_flags.door_west) {
+          record_neighbour_if_passable(pNode, neighbour_flags, flags.passable,
+                                       pNeighbour);
+        }
+        break;
+
+      case travel_direction::south:
+        if (!neighbour_flags.door_north) {
+          record_neighbour_if_passable(pNode, neighbour_flags, flags.passable,
+                                       pNeighbour);
+        }
+        break;
+
+      case travel_direction::west:
+        if (!flags.door_west) {
+          record_neighbour_if_passable(pNode, neighbour_flags, flags.passable,
+                                       pNeighbour);
+        }
+        break;
     }
-    pNode->open_idx = min;
+  }
+  return false;
+}
+
+bool object_visitor::visit_objects(const level_map* pMap, int iStartX,
+                                   int iStartY, object_type eTHOB,
+                                   int iMaxDistance, lua_State* L,
+                                   int iVisitFunction, bool anyObjectType) {
+  if (pMap == nullptr) {
+    pMap = parent->default_map;
+  }
+  if (pMap == nullptr) {
+    parent->destination = nullptr;
+    return false;
+  }
+
+  this->L = L;
+  visit_function_index = iVisitFunction;
+  max_distance = iMaxDistance;
+  target_any_object_type = anyObjectType;
+  target = eTHOB;
+  map = pMap;
+
+  path_node* pNode = init(pMap, iStartX, iStartY);
+  int iWidth = pMap->get_width();
+
+  while (true) {
+    pNode->visited = true;
+    map_tile_flags flags = pMap->get_tile_unchecked(pNode->x, pNode->y)->flags;
+    if (search_neighbours(pNode, flags, iWidth)) {
+      return true;
+    }
+
+    if (parent->open_heap.empty()) {
+      parent->destination = nullptr;
+      break;
+    } else {
+      pNode = parent->pop_from_open_heap();
+    }
+  }
+  return false;
+}
+
+pathfinder::pathfinder()
+    : default_map(nullptr),
+      nodes({}),
+      dirty_node_list(nullptr),
+      open_heap(),
+      destination(nullptr),
+      node_cache_width(0),
+      node_cache_height(0),
+      dirty_node_count(0),
+      basic_pathfinder(this),
+      hospital_finder(this),
+      idle_tile_finder(this),
+      object_visitor(this) {}
+
+pathfinder::~pathfinder() { delete[] dirty_node_list; }
+
+void pathfinder::set_default_map(const level_map* pMap) { default_map = pMap; }
+
+void pathfinder::allocate_node_cache(int iWidth, int iHeight) {
+  if (node_cache_width != iWidth || node_cache_height != iHeight) {
+    nodes = std::vector<path_node>(iWidth * iHeight);
+    for (int iY = 0; iY < iHeight; ++iY) {
+      for (int iX = 0; iX < iWidth; ++iX) {
+        path_node& node = nodes[iY * iWidth + iX];
+        node.prev = &node;
+        node.x = iX;
+        node.y = iY;
+        node.visited = false;
+        // Other fields are undefined as the node is not part of a
+        // path, and thus can be left uninitialised.
+      }
+    }
+    delete[] dirty_node_list;
+    dirty_node_list = new path_node*[iWidth * iHeight];
+    node_cache_width = iWidth;
+    node_cache_height = iHeight;
+  } else {
+    for (int i = 0; i < dirty_node_count; ++i) {
+      dirty_node_list[i]->prev = dirty_node_list[i];
+      dirty_node_list[i]->visited = false;
+      // Other fields are undefined as the node is not part of a path,
+      // and thus can keep their old values.
+    }
+  }
+  dirty_node_count = 0;
+}
+
+int pathfinder::get_path_length() const {
+  if (destination != nullptr) {
+    return destination->distance;
+  } else {
+    return -1;
+  }
+}
+
+bool pathfinder::get_path_end(int* pX, int* pY) const {
+  if (destination == nullptr) {
+    if (pX) {
+      *pX = -1;
+    }
+    if (pY) {
+      *pY = -1;
+    }
+    return false;
+  }
+  if (pX) {
+    *pX = destination->x;
+  }
+  if (pY) {
+    *pY = destination->y;
+  }
+  return true;
+}
+
+void pathfinder::push_result(lua_State* L) const {
+  lua_checkstack(L, 3);
+
+  if (destination == nullptr) {
+    lua_pushnil(L);
+    lua_pushliteral(L, "no path");
+    return;
+  }
+
+  int iLength = destination->distance;
+  lua_createtable(L, iLength + 1, 0);
+  lua_createtable(L, iLength + 1, 0);
+
+  for (const path_node* pNode = destination; pNode; pNode = pNode->prev) {
+    lua_pushinteger(L, pNode->x + 1);
+    lua_rawseti(L, -3, pNode->distance + 1);
+    lua_pushinteger(L, pNode->y + 1);
+    lua_rawseti(L, -2, pNode->distance + 1);
+  }
+}
+
+void pathfinder::push_to_open_heap(path_node* pNode) {
+  pNode->open_idx = open_heap.size();
+  open_heap.push_back(pNode);
+  open_heap_promote(pNode);
+}
+
+void pathfinder::open_heap_promote(path_node* pNode) {
+  size_t i = pNode->open_idx;
+  if (open_heap.at(i) != pNode) {
+    throw std::runtime_error(
+        "Invalid open_idx on node. Does not point to itself in the open heap");
+  }
+
+  while (i > 0) {
+    size_t parent = (i - 1) / 2;
+    path_node* pParent = open_heap[parent];
+    if (pParent->value() <= pNode->value()) {
+      break;
+    }
+    pParent->open_idx = i;
+    open_heap[i] = pParent;
+    open_heap[parent] = pNode;
+    i = parent;
+  }
+  pNode->open_idx = i;
+}
+
+path_node* pathfinder::pop_from_open_heap() {
+  path_node* pResult = open_heap[0];
+  path_node* pNode = open_heap.back();
+  open_heap.pop_back();
+
+  if (open_heap.empty()) {
     return pResult;
+  }
+
+  open_heap[0] = pNode;
+  int i = 0;
+  int min = 0;
+  int left = i * 2 + 1;
+  const int value = pNode->value();
+  while (left < open_heap.size()) {
+    min = i;
+    const int right = (i + 1) * 2;
+    int minvalue = value;
+    path_node* pSwap = nullptr;
+    path_node* pTest = open_heap[left];
+    if (pTest->value() < minvalue) {
+      min = left;
+      minvalue = pTest->value();
+      pSwap = pTest;
+    }
+    if (right < open_heap.size()) {
+      pTest = open_heap[right];
+      if (pTest->value() < minvalue) {
+        min = right;
+        pSwap = pTest;
+      }
+    }
+    if (min == i) {
+      break;
+    }
+
+    pSwap->open_idx = i;
+    open_heap[i] = pSwap;
+    open_heap[min] = pNode;
+    i = min;
+    left = i * 2 + 1;
+  }
+  pNode->open_idx = min;
+  return pResult;
 }
 
-void THPathfinder::persist(LuaPersistWriter *pWriter) const
-{
-    if(m_pDestination == nullptr)
-    {
-        pWriter->writeVUInt(0);
-        return;
-    }
-    pWriter->writeVUInt(getPathLength() + 1);
-    pWriter->writeVUInt(m_iNodeCacheWidth);
-    pWriter->writeVUInt(m_iNodeCacheHeight);
-    for(const node_t* pNode = m_pDestination; pNode; pNode = pNode->prev)
-    {
-        pWriter->writeVUInt(pNode->x);
-        pWriter->writeVUInt(pNode->y);
-    }
+void pathfinder::persist(lua_persist_writer* pWriter) const {
+  if (destination == nullptr) {
+    pWriter->write_uint(0);
+    return;
+  }
+  pWriter->write_uint(get_path_length() + 1);
+  pWriter->write_uint(node_cache_width);
+  pWriter->write_uint(node_cache_height);
+  for (const path_node* pNode = destination; pNode; pNode = pNode->prev) {
+    pWriter->write_uint(pNode->x);
+    pWriter->write_uint(pNode->y);
+  }
 }
 
-void THPathfinder::depersist(LuaPersistReader *pReader)
-{
-    new (this) THPathfinder; // Call constructor
+void pathfinder::depersist(lua_persist_reader* pReader) {
+  new (this) pathfinder;  // Call constructor
 
-    int iLength;
-    if(!pReader->readVUInt(iLength))
-        return;
-    if(iLength == 0)
-        return;
-    int iWidth, iHeight;
-    if(!pReader->readVUInt(iWidth) || !pReader->readVUInt(iHeight))
-        return;
-    _allocNodeCache(iWidth, iHeight);
-    int iX, iY;
-    if(!pReader->readVUInt(iX) || !pReader->readVUInt(iY))
-        return;
-    node_t *pNode = m_pNodes + iY * iWidth + iX;
-    m_pDestination = pNode;
-    for(int i = 0; i <= iLength - 2; ++i)
-    {
-        if(!pReader->readVUInt(iX) || !pReader->readVUInt(iY))
-            return;
-        node_t *pPrevNode = m_pNodes + iY * iWidth + iX;
-        pNode->distance = iLength - 1 - i;
-        pNode->prev = pPrevNode;
-        m_ppDirtyList[m_iDirtyCount++] = pNode;
-        pNode = pPrevNode;
+  int iLength;
+  if (!pReader->read_uint(iLength)) {
+    return;
+  }
+  if (iLength == 0) {
+    return;
+  }
+  int iWidth, iHeight;
+  if (!pReader->read_uint(iWidth) || !pReader->read_uint(iHeight)) {
+    return;
+  }
+  allocate_node_cache(iWidth, iHeight);
+  int iX, iY;
+  if (!pReader->read_uint(iX) || !pReader->read_uint(iY)) {
+    return;
+  }
+  path_node* pNode = &nodes[iY * iWidth + iX];
+  destination = pNode;
+  for (int i = 0; i <= iLength - 2; ++i) {
+    if (!pReader->read_uint(iX) || !pReader->read_uint(iY)) {
+      return;
     }
-    pNode->distance = 0;
-    pNode->prev = nullptr;
-    m_ppDirtyList[m_iDirtyCount++] = pNode;
+    path_node* pPrevNode = &nodes[iY * iWidth + iX];
+    pNode->distance = iLength - 1 - i;
+    pNode->prev = pPrevNode;
+    dirty_node_list[dirty_node_count++] = pNode;
+    pNode = pPrevNode;
+  }
+  pNode->distance = 0;
+  pNode->prev = nullptr;
+  dirty_node_list[dirty_node_count++] = pNode;
 }

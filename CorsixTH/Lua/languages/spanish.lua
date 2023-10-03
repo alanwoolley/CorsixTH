@@ -18,7 +18,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE. --]]
 
-Language("Castellano", "Spanish", "es", "spa", "esp", "sp")
+Language("Español", "Spanish", "es", "spa", "esp", "sp")
 Inherit("english")
 Inherit("original_strings", 4)
 
@@ -180,7 +180,7 @@ letter = {
   },
   [10] = {
     [1] = "¡Hola, %s!//",
-    [2] = "Felicidades por dirigir con éxito todos los hospitales que te hemos asignado. Esta soberbia actuación te capacita para viajar libremente por todo el mundo. Recibirás una pensión de %d y una limusina, a cambio de que viajes de ciudad en ciudad, saludando a tu incondicional público y fomentando la labor que se realiza en todos los hospitales.//",
+    [2] = "Enhorabuena, has gestionado tus hospitales satisfactoriamente. Este logro te permitirá viajar dónde quieras, con una paga de %d y una limusina. Aunque por supuesto esperamos que en tus viajes, no defraudes a tu público y sigas promocionando los hospitales.//"
   },
   [11] = {
     [1] = "¡Hola, %s!//",
@@ -197,7 +197,7 @@ tooltip.staff_list.ability = "Muestra el nivel de habilidad de estos empleados"
 
 introduction_texts = {
   level1 =
-    "¡Bienvenido a tu primer hospital! " ..
+    "¡Bienvenido a tu primer hospital!//" ..
     "Para hacer que empiece a funcionar, coloca una recepción, construye una consulta y contrata a una recepcionista y a un médico. " ..
     "Luego espera a que lleguen los pacientes. " ..
     "Sería una buena idea que construyeras una consulta de psiquiatría y contrataras a un psiquiatra. " ..
@@ -316,12 +316,12 @@ introduction_texts = {
     "Ahora es cosa tuya, buena suerte y todo eso.",
 
   demo =
-    "¡Bienvenido al hospital de demostración!" ..
-    "Por desgracia, la versión de demostración solo contiene este nivel. Sin embargo, tienes más que suficiente para estar entretenido por un rato." ..
+    "¡Bienvenido al hospital de demostración!//" ..
+    "Por desgracia, la versión de demostración solo contiene este nivel. Sin embargo, tienes más que suficiente para estar entretenido por un rato. " ..
     "Te enfrentarás a varias enfermedades que necesitan de ciertas habitaciones para su cura. De vez en cuando pueden surgir emergencias. Y necesitarás " ..
-    "investigar sobre las enfermedades construyendo un Departamento de investigación." ..
-    "Tu objetivo es ganar 100.000 dólares, que el valor de tu hospital llegue hasta 70.000 dólares y tengas una reputación de 700, con un porcentaje de pacientes curados del 75%." ..
-    "Procura que tu reputación no caiga por debajo de 300 y que no mates a más del 40% de tus pacientes, o fracasarás." ..
+    "investigar sobre las enfermedades construyendo un Departamento de investigación. " ..
+    "Tu objetivo es ganar 100.000 dólares, que el valor de tu hospital llegue hasta 70.000 dólares y tengas una reputación de 700, con un porcentaje de pacientes curados del 75%. " ..
+    "Procura que tu reputación no caiga por debajo de 300 y que no mates a más del 40% de tus pacientes, o fracasarás.//" ..
     "¡Buena suerte!",
 }
 
@@ -643,32 +643,32 @@ tooltip.research_policy.research_progress = "Progreso del siguiente descubrimien
 menu["player_count"] = "CANTIDAD DE JUGADORES"
 
 menu_file = {
-  load =    " (MAYUS+L) CARGAR   ",
-  save =    " (MAYUS+S) GUARDAR   ",
-  restart = " (MAYUS+R) REINICIAR  ",
-  quit =    " (MAYUS+Q) SALIR   "
+  load =    " (%1%) CARGAR   ",
+  save =    " (%1%) GUARDAR   ",
+  restart = " (%1%) REINICIAR  ",
+  quit =    " (%1%) SALIR   "
 }
 --These menus lack uppercase accented characters, so lowercase are a must.
 menu_options = {
-  sound = "  (ALT+S)  SONIDO  ",
-  announcements = "  (ALT+A)  ANUNCIOS  ",
-  music = "  (ALT+M)  MúSICA  ",
-  jukebox = "  (J) REPRODUCTOR DE MúSICA  ",
+  sound = "  (%1%)  SONIDO  ",
+  announcements = "  (%1%)  ANUNCIOS  ",
+  music = "  (%1%)  MúSICA  ",
+  jukebox = "  (%1%) REPRODUCTOR DE MúSICA  ",
   lock_windows = "  BLOQUEAR VENTANAS  ",
   edge_scrolling = "  DESPLAZAR POR BORDES  ",
-  adviser_disabled = "  (MAYUS+A) CONSEJERO  ",
+  adviser_disabled = "  (%1%) CONSEJERO  ",
   warmth_colors = "  COLORES DE TEMPERATURA  ",
   wage_increase = "  PETICIONES DE SUELDO  ",
   twentyfour_hour_clock = "  RELOJ DE 24 HORAS  "
 }
 
 menu_options_game_speed = {
-  pause               = "  (P) PAUSA  ",
-  slowest             = "  (1) MUY LENTA  ",
-  slower              = "  (2) LENTA  ",
-  normal              = "  (3) NORMAL  ",
-  max_speed           = "  (4) VELOCIDAD MáXIMA  ",
-  and_then_some_more  = "  (5) VELOCIDAD ABSURDA  ",
+  pause               = "  (%1%) PAUSA  ",
+  slowest             = "  (%1%) MUY LENTA  ",
+  slower              = "  (%1%) LENTA  ",
+  normal              = "  (%1%) NORMAL  ",
+  max_speed           = "  (%1%) VELOCIDAD MáXIMA  ",
+  and_then_some_more  = "  (%1%) VELOCIDAD ABSURDA  ",
 }
 
 menu_options_warmth_colors = {
@@ -684,31 +684,31 @@ menu_options_wage_increase = {
 
 -- Add F-keys to entries in charts menu (except briefing), also town_map was added.
 menu_charts = {
-  bank_manager  = "  (F1) DIRECTOR DEL BANCO  ",
-  statement     = "  (F2) ESTADO DE CUENTAS  ",
-  staff_listing = "  (F3) LISTA DE PERSONAL  ",
-  town_map      = "  (F4) MAPA DE LA CIUDAD  ",
-  casebook      = "  (F5) HISTORIAL  ",
-  research      = "  (F6) INVESTIGACIóN  ",
-  status        = "  (F7) ESTADO  ",
-  graphs        = "  (F8) GRáFICAS  ",
-  policy        = "  (F9) NORMAS  ",
+  bank_manager  = "  (%1%) DIRECTOR DEL BANCO  ",
+  statement     = "  (%1%) ESTADO DE CUENTAS  ",
+  staff_listing = "  (%1%) LISTA DE PERSONAL  ",
+  town_map      = "  (%1%) MAPA DE LA CIUDAD  ",
+  casebook      = "  (%1%) HISTORIAL  ",
+  research      = "  (%1%) INVESTIGACIóN  ",
+  status        = "  (%1%) ESTADO  ",
+  graphs        = "  (%1%) GRáFICAS  ",
+  policy        = "  (%1%) NORMAS  ",
 }
 
 menu_debug = {
   jump_to_level               = "  CAMBIAR DE NIVEL  ",
-  connect_debugger            = "  (CTRL + C) CONECTAR A SERVIDOR DBGp LUA  ",
-  transparent_walls           = "  (X) PAREDES TRANSPARENTES  ",
+  connect_debugger            = "  (%1%) CONECTAR A SERVIDOR DBGp LUA  ",
+  transparent_walls           = "  (%1%) PAREDES TRANSPARENTES  ",
   limit_camera                = "  LIMITAR CáMARA  ",
   disable_salary_raise        = "  DESACTIVAR SUBIDA DE SUELDO  ",
   make_debug_fax              = "  CREAR FAX DE DEPURACIóN  ",
   make_debug_patient          = "  CREAR PACIENTE DE DEPURACIóN  ",
-  cheats                      = "  (F11) TRUCOS  ",
-  lua_console                 = "  (F12) CONSOLA LUA  ",
-  debug_script                = "  (MAYúS + D) EJECUTAR SCRIPT DE DEPURACIóN  ",
+  cheats                      = "  (%1%) TRUCOS  ",
+  lua_console                 = "  (%1%) CONSOLA LUA  ",
+  debug_script                = "  (%1%) EJECUTAR SCRIPT DE DEPURACIóN  ",
   calls_dispatcher            = "  LLAMAR A CONTROLADOR  ",
-  dump_strings                = "  VOLCAR TEXTOS DEL JUEGO  ",
-  dump_gamelog                = "  (CTRL+D) VOLCAR REGISTRO DEL JUEGO  ",
+  dump_strings                = "  (%1%) VOLCAR TEXTOS DEL JUEGO  ",
+  dump_gamelog                = "  (%1%) VOLCAR REGISTRO DEL JUEGO  ",
   map_overlay                 = "  SOBREPONER MAPA  ",
   sprite_viewer               = "  VISUALIZADOR DE ANIMACIONES  ",
 }

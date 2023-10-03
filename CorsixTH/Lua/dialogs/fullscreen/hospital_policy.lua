@@ -24,13 +24,12 @@ class "UIPolicy" (UIFullscreen)
 ---@type UIPolicy
 local UIPolicy = _G["UIPolicy"]
 
-function UIPolicy:UIPolicy(ui, disease_selection)
+function UIPolicy:UIPolicy(ui)
   self:UIFullscreen(ui)
   local gfx = ui.app.gfx
   if not pcall(function()
-    self.background = gfx:loadRaw("Pol01V", 640, 480)
-    local palette = gfx:loadPalette("QData", "Pol01V.pal")
-    palette:setEntry(255, 0xFF, 0x00, 0xFF) -- Make index 255 transparent
+    self.background = gfx:loadRaw("Pol01V", 640, 480, "QData", "QData", "Pol01V.pal", true)
+    local palette = gfx:loadPalette("QData", "Pol01V.pal", true)
     self.panel_sprites = gfx:loadSpriteTable("QData", "Pol02V", true, palette)
     self.label_font = gfx:loadFont("QData", "Font74V", false, palette)
     self.text_font = gfx:loadFont("QData", "Font105V", false, palette)
@@ -43,7 +42,7 @@ function UIPolicy:UIPolicy(ui, disease_selection)
   local hosp = ui.hospital
   self.hospital = hosp
 
-  local --[[persistable:hospital_policy_allow_staff]] function allowStaff(name, state, btn)
+  local --[[persistable:hospital_policy_allow_staff]] function allowStaff(name)
     if name == "Allow" then
       if self.prohibit_button.toggled then -- Changing setting from prohibit to allow
         hosp.policies["staff_allowed_to_move"] = true
@@ -225,10 +224,19 @@ function UIPolicy:close()
 end
 
 function UIPolicy:afterLoad(old, new)
-  UIFullscreen.afterLoad(self, old, new)
-
   if old < 116 then -- Ensure panelHit tests the sliders in the right order.
     self.sliders_z = {self.sliders["send_home"], self.sliders["guess_cure"],
         self.sliders["stop_procedure"], self.sliders["goto_staffroom"]}
   end
+  if old < 179 then
+    local gfx = TheApp.gfx
+
+    self.background = gfx:loadRaw("Pol01V", 640, 480, "QData", "QData", "Pol01V.pal", true)
+    local palette = gfx:loadPalette("QData", "Pol01V.pal", true)
+    self.panel_sprites = gfx:loadSpriteTable("QData", "Pol02V", true, palette)
+    self.label_font = gfx:loadFont("QData", "Font74V", false, palette)
+    self.text_font = gfx:loadFont("QData", "Font105V", false, palette)
+  end
+
+  UIFullscreen.afterLoad(self, old, new)
 end

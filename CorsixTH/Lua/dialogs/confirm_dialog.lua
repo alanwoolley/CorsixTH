@@ -19,12 +19,26 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE. --]]
 
 --! Dialog for "Are you sure you want to quit?" and similar yes/no questions.
+--! This dialog is also used for errors and requires some special handling
 class "UIConfirmDialog" (Window)
 
 ---@type UIConfirmDialog
 local UIConfirmDialog = _G["UIConfirmDialog"]
 
-function UIConfirmDialog:UIConfirmDialog(ui, text, callback_ok, callback_cancel)
+local top_frame = 357
+local top_frame_height = 22
+local middle_frame = 358
+local middle_frame_height = 11
+local bottom_frame = 359
+local text_width = 153
+
+--! Initialise the Confirmation Dialog
+--!param ui The UI
+--!param must_pause (boolean) set whether this dialog should pause the game
+--!param text (string) message to show
+--!param callback_ok (function) what to do on yes/ok
+--!param callback_cancel (function) what to do on no/cancel/close
+function UIConfirmDialog:UIConfirmDialog(ui, must_pause, text, callback_ok, callback_cancel)
   self:Window()
 
   local app = ui.app
@@ -40,27 +54,43 @@ function UIConfirmDialog:UIConfirmDialog(ui, text, callback_ok, callback_cancel)
   self.text = text
   self.callback_ok = callback_ok  -- Callback function to launch if user chooses ok
   self.callback_cancel = callback_cancel -- Callback function to launch if user chooses cancel
+  self.must_pause = must_pause
 
   -- Check how "high" the dialog must be
-  local w, h = self.white_font:sizeOf(text)
+  local _, text_height = self.white_font:sizeOf(text, text_width)
 
-  self:addPanel(357, 0, 0)  -- Dialog header
-  local last_y = 22
-  -- Rough estimate of how many rows it will be when drawn.
-  for y = 22, h * (w / 160) * 1.4, 11 do -- Previous value: 136
-    self:addPanel(358, 0, y)  -- Dialog background
-    self.height = self.height + 11
-    last_y = last_y + 11
+  self:addPanel(top_frame, 0, 0)  -- Dialog header
+  local last_y = top_frame_height
+
+  for _ = 1, math.ceil(text_height / middle_frame_height) do
+    self:addPanel(middle_frame, 0, last_y)  -- Dialog background
+    self.height = self.height + middle_frame_height
+    last_y = last_y + middle_frame_height
   end
 
-  self:addPanel(359, 0, last_y)  -- Dialog footer
+  self:addPanel(bottom_frame, 0, last_y)  -- Dialog footer
   self:addPanel(360, 0, last_y + 10):makeButton(8, 10, 82, 34, 361, self.cancel)
-    :setTooltip(_S.tooltip.window_general.cancel):setSound"No4.wav"
+    :setTooltip(_S.tooltip.window_general.cancel):setSound("No4.wav")
   self:addPanel(362, 90, last_y + 10):makeButton(0, 10, 82, 34, 363, self.ok)
-    :setTooltip(_S.tooltip.window_general.confirm):setSound"YesX.wav"
+    :setTooltip(_S.tooltip.window_general.confirm):setSound("YesX.wav")
 
-  self:addKeyHandler("return", self.ok)
-  self:addKeyHandler("keypad enter", self.ok)
+  self:registerKeyHandlers()
+  if self.must_pause then self:systemPause() end
+end
+
+-- Confirm dialogs are used for errors, if it is an error then pause the game
+function UIConfirmDialog:mustPause()
+  return self.must_pause
+end
+
+--! Function to tell the game a system pause is needed
+function UIConfirmDialog:systemPause()
+  TheApp.world:setSystemPause(true)
+end
+
+function UIConfirmDialog:registerKeyHandlers()
+  self:addKeyHandler("global_confirm", self.ok)
+  self:addKeyHandler("global_confirm_alt", self.ok)
 end
 
 function UIConfirmDialog:cancel()
@@ -72,11 +102,12 @@ function UIConfirmDialog:ok()
 end
 
 --! Closes the confirm dialog
---!param ok (boolean or nil) whether to call the confirm callback (true) or cancel callback (false/nil)
-function UIConfirmDialog:close(ok)
+--!param confirmed (boolean or nil) whether to call the confirm callback (true) or cancel callback (false/nil)
+function UIConfirmDialog:close(confirmed)
   -- NB: Window is closed before executing the callback in order to not save the confirmation dialog in a savegame
+  if self.must_pause then TheApp.world:setSystemPause(false) end -- Error dealt with
   Window.close(self)
-  if ok then
+  if confirmed then
     if self.callback_ok then
       self.callback_ok()
     end
@@ -91,15 +122,10 @@ function UIConfirmDialog:draw(canvas, x, y)
   Window.draw(self, canvas, x, y)
 
   x, y = x + self.x, y + self.y
-  self.white_font:drawWrapped(canvas, self.text, x + 17, y + 17, 153)
+  self.white_font:drawWrapped(canvas, self.text, x + 17, y + 17, text_width)
 end
 
 function UIConfirmDialog:afterLoad(old, new)
-  if old < 101 then
-    self:removeKeyHandler("enter")
-    self:addKeyHandler("return", self.ok)
-  end
-  if old < 104 then
-    self:addKeyHandler("keypad enter", self.ok)
-  end
+  Window.afterLoad(self, old, new)
+  self:registerKeyHandlers()
 end

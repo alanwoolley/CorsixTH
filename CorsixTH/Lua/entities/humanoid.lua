@@ -251,7 +251,7 @@ moods("cold",           3994,       0,       true) -- These have no priority sin
 moods("hot",            3988,       0,       true) -- they will be shown when hovering
 moods("queue",          4568,      70)             -- no matter what other priorities.
 moods("poo",            3996,       5)
-moods("sad_money",      4018,      50)
+moods("sad_money",      4018,      55)
 moods("patient_wait",   5006,      40)
 moods("epidemy1",       4566,      55)
 moods("epidemy2",       4570,      55)
@@ -300,28 +300,29 @@ function Humanoid:Humanoid(...)
 
   self.build_callbacks  = {--[[set]]}
   self.remove_callbacks = {--[[set]]}
+  self.staff_change_callbacks = {--[[set]]}
 end
 
 -- Save game compatibility
 function Humanoid:afterLoad(old, new)
-  if old < 38 then
+  if old < 38 and new >= 38 then
     -- should existing patients be updated and be getting really ill?
     -- adds the new variables for health icons
     self.attributes["health"] = math.random(60, 100) /100
   end
   -- make sure female slack patients have the correct animation
-  if old < 42 then
+  if old < 42 and new >= 42 then
     if self.humanoid_class == "Slack Female Patient" then
       self.die_anims = die_animations["Slack Female Patient"]
     end
   end
-  if old < 77 then
+  if old < 77 and new >= 77 then
     self.has_vomitted = 0
   end
-  if old < 49 then
+  if old < 49 and new >= 49 then
     self.has_fallen = 1
   end
-  if old < 61 then
+  if old < 61 and new >= 61 then
     -- callbacks changed
     self.build_callbacks = {}
     self.remove_callbacks = {}
@@ -334,14 +335,18 @@ function Humanoid:afterLoad(old, new)
       self.toilet_callback = nil
     end
   end
-  if old < 83 and self.humanoid_class == "Chewbacca Patient" then
+  if old < 83 and new >= 83 and self.humanoid_class == "Chewbacca Patient" then
     self.die_anims.extra_east = 1682
+  end
+  if old < 134 and new >= 134 then
+    self.staff_change_callbacks = {}
   end
 
   for _, action in pairs(self.action_queue) do
     -- Sometimes actions not actual instances of HumanoidAction
     HumanoidAction.afterLoad(action, old, new)
   end
+
   Entity.afterLoad(self, old, new)
 end
 
@@ -359,56 +364,9 @@ function Humanoid:getRoom()
 end
 
 function Humanoid:dump()
-  local name = "humanoid"
-  if self.profile then
-    name = self.profile.name
-  end
-
   print("-----------------------------------")
-  print("Clicked on ".. name, self)
-  print("Class: ", self.humanoid_class)
-  if self.humanoid_class == "Doctor" then
-    print(string.format("Skills: (%.3f)  Surgeon (%.3f)  Psych (%.3f)  Researcher (%.3f)",
-      self.profile.skill or 0,
-      self.profile.is_surgeon or 0,
-      self.profile.is_psychiatrist or 0,
-      self.profile.is_researcher or 0))
-  end
-  print(string.format("Warmth: %.3f   Happiness: %.3f   Fatigue: %.3f  Thirst: %.3f  Toilet_Need: %.3f   Health: %.3f",
-    self.attributes["warmth"] or 0,
-    self.attributes["happiness"] or 0,
-    self.attributes["fatigue"] or 0,
-    self.attributes["thirst"] or 0,
-    self.attributes["toilet_need"] or 0,
-    self.attributes["health"] or 0))
-
-  print("")
-  print("Actions:")
-  for i = 1, #self.action_queue do
-    local action = self.action_queue[i]
-    local flag =
-      (action.must_happen and "  must_happen" or "  ") ..
-      (action.todo_interrupt and "  " or "  ")
-    if action.room_type then
-      print(action.name .. " - " .. action.room_type .. flag)
-    elseif action.object then
-      print(action.name .. " - " .. action.object.object_type.id .. flag)
-    elseif action.name == "walk" then
-      print(action.name .. " - going to " .. action.x .. ":" .. action.y .. flag)
-    elseif action.name == "queue" then
-      local distance = action.current_bench_distance
-      if distance == nil then
-        distance = "nil"
-      end
-      local standing = "false"
-      if action:isStanding() then
-        standing = "true"
-      end
-      print(action.name .. " - Bench distance: " .. distance .. " Standing: " .. standing)
-    else
-      print(action.name .. flag)
-    end
-  end
+  print("Clicked on: ")
+  print(self:tostring())
   print("-----------------------------------")
 end
 
@@ -502,78 +460,18 @@ function Humanoid:getCurrentMood()
   end
 end
 
-local function Humanoid_startAction(self)
+--! Start the next (always first) action in the queue.
+function Humanoid:startAction()
   local action = self.action_queue[1]
 
   -- Handle an empty action queue in some way instead of crashing.
   if not action then
-    -- if this is a patient that is going home, an empty
-    -- action queue is not a problem
-    if class.is(self, Patient) and self.going_home then
-      return
-    end
+    self:_handleEmptyActionQueue() -- Inserts an action into the action queue.
 
-    ---- Empty action queue! ----
-    -- First find out if this humanoid is in a room.
-    local room = self:getRoom()
-    if room then
-      room:makeHumanoidLeave(self)
-    end
-    -- Is it a member of staff, grim or a patient?
-    if class.is(self, Staff) then
-      self:queueAction(MeanderAction())
-    elseif class.is(self,GrimReaper) then
-      self:queueAction(IdleAction())
-    else
-      self:queueAction(SeekReceptionAction())
-    end
-    -- Open the dialog of the humanoid.
-    local ui = self.world.ui
-    if class.is(self, Patient) then
-      ui:addWindow(UIPatient(ui, self))
-    elseif class.is(self, Staff) then
-      ui:addWindow(UIStaff(ui, self))
-    end
-    -- Pause the game.
-    self.world:setSpeed("Pause")
-
-    -- Tell the player what just happened.
-    self.world:gameLog("")
-    self.world:gameLog("Empty action queue!")
-    self.world:gameLog("Last action: " .. self.previous_action.name)
-    self.world:gameLog(debug.traceback())
-
-    ui:addWindow(UIConfirmDialog(ui,
-      "Sorry, a humanoid just had an empty action queue,"..
-      " which means that he or she didn't know what to do next."..
-      " Please consult the command window for more detailed information. "..
-      "A dialog with "..
-      "the offending humanoid has been opened. "..
-      "Would you like him/her to leave the hospital?",
-      --[[persistable:humanoid_leave_hospital]] function()
-        self.world:gameLog("The humanoid was told to leave the hospital...")
-        if class.is(self, Staff) then
-          self:fire()
-        else
-          -- Set these variables to increase the likelihood of the humanoid managing to get out of the hospital.
-          self.going_home = false
-          self.hospital = self.world:getLocalPlayerHospital()
-          self:goHome("kicked")
-        end
-        if TheApp.world:isCurrentSpeed("Pause") then
-          TheApp.world:setSpeed(TheApp.world.prev_speed)
-        end
-      end,
-      --[[persistable:humanoid_stay_in_hospital]] function()
-        if TheApp.world:isCurrentSpeed("Pause") then
-          TheApp.world:setSpeed(TheApp.world.prev_speed)
-        end
-      end
-    ))
     action = self.action_queue[1]
-
+    assert(action)
   end
-  ---- There is an action to start ----
+
   -- Call the action start handler
   TheApp.humanoid_actions[action.name](action, self)
 
@@ -622,6 +520,15 @@ function Humanoid:setNextAction(action, high_priority)
       if removed.object and removed.object:isReservedFor(self) then
         removed.object:removeReservedUser(self)
       end
+      if removed.is_entering then
+        local dest_room = self.world:getRoom(removed.x, removed.y)
+        self:unexpectFromRoom(dest_room)
+        if dest_room and removed.reserve_on_resume and
+            removed.reserve_on_resume:isReservedFor(self) then
+          removed.reserve_on_resume:removeReservedUser(self)
+          dest_room:tryAdvanceQueue()
+        end
+      end
     end
   end
 
@@ -642,7 +549,7 @@ function Humanoid:setNextAction(action, high_priority)
     end
   else
     -- Start the action if it has become the current action
-    Humanoid_startAction(self)
+    self:startAction()
   end
   return self
 end
@@ -651,7 +558,7 @@ function Humanoid:queueAction(action, pos)
   if pos then
     table.insert(self.action_queue, pos + 1, action)
     if pos == 0 then
-      Humanoid_startAction(self)
+      self:startAction()
     end
   else
     self.action_queue[#self.action_queue + 1] = action
@@ -667,7 +574,7 @@ function Humanoid:finishAction(action)
   -- Save the previous action just a while longer.
   self.previous_action = self.action_queue[1]
   table.remove(self.action_queue, 1)
-  Humanoid_startAction(self)
+  self:startAction()
 end
 
 -- Check if the humanoid is running actions intended to leave the room, as indicated by the flag
@@ -683,6 +590,59 @@ function Humanoid:hasLeavingAction()
     end
   end
   return false
+end
+
+--! Handle an empty action queue in some way instead of crashing.
+function Humanoid:_handleEmptyActionQueue()
+  -- if this is a patient that is going home, an empty
+  -- action queue is not a problem
+  if class.is(self, Patient) and self.going_home then
+    return
+  end
+
+  -- First find out if this humanoid is in a room.
+  local room = self:getRoom()
+  if room then
+    room:makeHumanoidLeave(self)
+  end
+
+  -- Give the humanoid an action to avoid crashing.
+  if class.is(self, Staff) then
+    self:queueAction(MeanderAction())
+  elseif class.is(self, GrimReaper) then
+    self:queueAction(IdleAction())
+  else
+    self:queueAction(SeekReceptionAction())
+  end
+
+  -- Open the dialog of the humanoid as feedback to the user.
+  local ui = self.world.ui
+  if class.is(self, Patient) then
+    ui:addWindow(UIPatient(ui, self))
+  elseif class.is(self, Staff) then
+    ui:addWindow(UIStaff(ui, self))
+  end
+
+  -- Tell the player what just happened.
+  self.world:gameLog("")
+  self.world:gameLog("Empty action queue!")
+  self.world:gameLog("Last action: " .. self.previous_action.name)
+  self.world:gameLog(debug.traceback())
+
+  ui:addWindow(UIConfirmDialog(ui, true, _S.errors.dialog_empty_queue,
+    --[[persistable:humanoid_leave_hospital]] function()
+      self.world:gameLog("The humanoid was told to leave the hospital...")
+      if class.is(self, Staff) then
+        self:fire()
+      else
+        -- Set these variables to increase the likelihood of the humanoid managing to get out of the hospital.
+        self.going_home = false
+        self.hospital = self.world:getLocalPlayerHospital()
+        self:goHome("kicked")
+      end
+    end,
+    nil -- Do nothing on cancel
+  ))
 end
 
 function Humanoid:setType(humanoid_class)
@@ -717,9 +677,9 @@ end
 -- Helper function for the common case of instructing a `Humanoid` to walk to
 -- a position on the map. Equivalent to calling `setNextAction` with a walk
 -- action.
---!param tile_x (integer) The X-component of the Lua tile co-ordinates of the
+--!param tile_x (integer) The X-component of the Lua tile coordinates of the
 -- tile to walk to.
---!param tile_y (integer) The Y-component of the Lua tile co-ordinates of the
+--!param tile_y (integer) The Y-component of the Lua tile coordinates of the
 -- tile to walk to.
 --!param must_happen (boolean, nil) If true, then the walk action will not be
 -- interrupted.
@@ -777,10 +737,18 @@ end
 --!param amount (number) This amount is added to the existing value for the attribute,
 --  and is then capped to be between 0 and 1.
 function Humanoid:changeAttribute(attribute, amount)
-  -- Receptionist is always 100% happy
-  if self.humanoid_class and self.humanoid_class == "Receptionist" and attribute == "happiness" then
-    self.attributes[attribute] = 1
-    return true
+  -- Handle some happiness special cases
+  if attribute == "happiness" and self.humanoid_class then
+    local max_salary = self.world.map.level_config.payroll.MaxSalary
+    if self.humanoid_class == "Receptionist" then
+      -- A receptionist is never unhappy
+      self.attributes[attribute] = 1
+      return true
+    elseif self.profile and self.profile.wage >= max_salary then
+      -- A maximum salaried staff member is never unhappy
+      self.attributes[attribute] = 1
+      return true
+    end
   end
 
   if self.attributes[attribute] then
@@ -796,8 +764,8 @@ end
 -- Check if it is cold or hot around the humanoid and increase/decrease the
 -- feeling of warmth accordingly. Returns whether the calling function should proceed.
 function Humanoid:tickDay()
-  -- No use doing anything if we're going home
-  if self.going_home then
+  -- No use doing anything if we're going home/fired (or dead)
+  if self.going_home or self.dead then
     return false
   end
 
@@ -806,8 +774,8 @@ function Humanoid:tickDay()
 
   -- If it is too hot or too cold, start to decrease happiness and
   -- show the corresponding icon. Otherwise we could get happier instead.
-  local min_comfort_temp = 0.22 -- 11 degrees Celcius.
-  local max_comfort_temp = 0.36 -- 18 degrees Celcius.
+  local min_comfort_temp = 0.22 -- 11 degrees Celsius.
+  local max_comfort_temp = 0.36 -- 18 degrees Celsius.
   local decrease_factor = 0.10
   local increase_happiness = 0.005
 
@@ -856,13 +824,19 @@ function Humanoid:unregisterRoomBuildCallback(callback)
   if self.build_callbacks[callback] then
     self.build_callbacks[callback] = nil
   else
-    self.world:gameLog("Warning: Trying to remove nonexistant room build callback (" .. tostring(callback) .. ") from humanoid (" .. tostring(self) .. ").")
+    self.world:gameLog("Warning: Trying to remove nonexistent room build callback (" .. tostring(callback) .. ") from humanoid (" .. tostring(self) .. ").")
   end
 end
 
 function Humanoid:notifyNewRoom(room)
   for callback, _ in pairs(self.build_callbacks) do
     callback(room)
+  end
+end
+
+function Humanoid:notifyOfStaffChange(staff)
+  for callback, _ in pairs(self.staff_change_callbacks) do
+    callback(staff)
   end
 end
 
@@ -884,9 +858,32 @@ function Humanoid:unregisterRoomRemoveCallback(callback)
     self.world:unregisterRoomRemoveCallback(callback)
     self.remove_callbacks[callback] = nil
   else
-    self.world:gameLog("Warning: Trying to remove nonexistant room remove callback (" .. tostring(callback) .. ") from humanoid (" .. tostring(self) .. ").")
+    self.world:gameLog("Warning: Trying to remove nonexistent room remove callback (" .. tostring(callback) .. ") from humanoid (" .. tostring(self) .. ").")
   end
 end
+
+
+-- Registers a new staff change callback for this humanoid.
+--!param callback (function) The callback to call when a staff member has been hired or fired
+function Humanoid:registerStaffChangeCallback(callback)
+  if self.staff_change_callbacks and not self.staff_change_callbacks[callback] then
+    self.staff_change_callbacks[callback] = true
+  else
+    self.world:gameLog("Warning: Trying to re-add staff callback (" .. tostring(callback) .. ") for humanoid (" .. tostring(self) .. ").")
+  end
+end
+
+-- Unregisters a staff change callback for this humanoid.
+--!param callback (function) The callback to remove.
+function Humanoid:unregisterStaffChangeCallback(callback)
+
+  if self.staff_change_callbacks and self.staff_change_callbacks[callback] then
+    self.staff_change_callbacks[callback] = nil
+  else
+    self.world:gameLog("Warning: Trying to remove nonexistent staff callback (" .. tostring(callback) .. ") from humanoid (" .. tostring(self) .. ").")
+  end
+end
+
 
 -- Function called when a humanoid is sent away from the hospital to prevent
 -- further actions taken as a result of a callback
@@ -899,6 +896,10 @@ function Humanoid:unregisterCallbacks()
   for cb, _ in pairs(self.remove_callbacks) do
     self:unregisterRoomRemoveCallback(cb)
   end
+  -- Remove callbacks for removed rooms
+  for cb, _ in pairs(self.staff_change_callbacks) do
+    self:unregisterStaffChangeCallback(cb)
+  end
   -- Remove any message related to the humanoid.
   if self.message_callback then
     self:message_callback(true)
@@ -909,3 +910,85 @@ end
 function Humanoid:getDrawingLayer()
   return 4
 end
+
+function Humanoid:getCurrentAction()
+  if next(self.action_queue) == nil then
+    error("Action queue was empty. This should never happen.\n" .. self:tostring())
+  end
+
+  return self.action_queue[1]
+end
+
+--[[ Return string representation
+! Returns string representation of the humanoid like status and action queue
+!return (string)
+]]
+function Humanoid:tostring()
+  local name = self.profile and self.profile:getFullName() or nil
+  local class = self.humanoid_class and self.humanoid_class or "N/A"
+  local full_name = "humanoid"
+  if (name) then
+    full_name = full_name .. " (" .. name .. ")"
+  end
+
+  local result = string.format("%s - class: %s", full_name, class)
+
+  result = result .. string.format("\nWarmth: %.3f   Happiness: %.3f   Fatigue: %.3f  Thirst: %.3f  Toilet_Need: %.3f   Health: %.3f   Service Quality: %.3f",
+    self.attributes["warmth"] or 0,
+    self.attributes["happiness"] or 0,
+    self.attributes["fatigue"] or 0,
+    self.attributes["thirst"] or 0,
+    self.attributes["toilet_need"] or 0,
+    self.attributes["health"] or 0,
+    self.attributes["fatigue"] and self:getServiceQuality() or 0)
+
+  result = result .. "\nActions: ["
+  for i = 1, #self.action_queue do
+    local action = self.action_queue[i]
+    local action_string = action.name
+    if action.room_type then
+      action_string = action_string .. " - " .. action.room_type
+    elseif action.object then
+      action_string = action_string .. " - " .. action.object.object_type.id
+    elseif action.name == "walk" then
+      action_string = action_string .. " - going to " .. action.x .. ":" .. action.y
+    elseif action.name == "queue" then
+      local distance = action.current_bench_distance
+      if distance == nil then
+        distance = "nil"
+      end
+      local standing = "false"
+      if action.isStanding and action:isStanding() then
+        standing = "true"
+      end
+      action_string = action_string .. " - Bench distance: " .. distance .. " Standing: " .. standing
+    end
+    local flag = action.must_happen and "  must_happen" or ""
+    if flag ~= "" then
+      action_string = action_string .. " " .. flag
+    end
+
+    if i ~= 1 then
+      result = result .. ", "
+    end
+    result = result .. action_string
+  end
+  result = result .. "]"
+  return result
+end
+
+--! Unexpects humanoid from a room, if validly entering this room
+--!param dest_room (Room) The room the humanoid maybe expected at
+function Humanoid:unexpectFromRoom(dest_room)
+  -- Unexpect the patient from a possible destination room.
+  if dest_room and dest_room.door.queue then
+    -- 1st condition checks normal room routing
+    -- 2nd checks patients going to toilets, doctors and nurses
+    -- and redundantly checks patients routed between rooms
+    if self.next_room_to_visit == dest_room or
+        (dest_room ~= self.next_room_to_visit and (not self:getRoom() or class.is(self, Staff))) then
+      dest_room.door.queue:unexpect(self)
+      dest_room.door:updateDynamicInfo()
+    end
+  end
+ end

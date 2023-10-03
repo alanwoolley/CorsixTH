@@ -18,6 +18,10 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE. --]]
 
+corsixth.require("announcer")
+
+local AnnouncementPriority = _G["AnnouncementPriority"]
+
 class "UIFax" (UIFullscreen)
 
 ---@type UIFax
@@ -26,9 +30,8 @@ local UIFax = _G["UIFax"]
 function UIFax:UIFax(ui, icon)
   self:UIFullscreen(ui)
   local gfx = ui.app.gfx
-  self.background = gfx:loadRaw("Fax01V", 640, 480)
-  local palette = gfx:loadPalette("QData", "Fax01V.pal")
-  palette:setEntry(255, 0xFF, 0x00, 0xFF) -- Make index 255 transparent
+  self.background = gfx:loadRaw("Fax01V", 640, 480, "QData", "QData", "Fax01V.pal", true)
+  local palette = gfx:loadPalette("QData", "Fax01V.pal", true)
   self.panel_sprites = gfx:loadSpriteTable("QData", "Fax02V", true, palette)
   self.fax_font = gfx:loadFont("QData", "Font51V", false, palette)
   self.icon = icon
@@ -82,6 +85,11 @@ function UIFax:UIFax(ui, icon)
   self:addPanel(0, 217, 382):makeButton(0, 0, 45, 12, 11, button("*"))
   self:addPanel(0, 271, 382):makeButton(0, 0, 44, 11, 12, button("0")):setSound("Fax_0.wav")
   self:addPanel(0, 326, 382):makeButton(0, 0, 44, 11, 13, button("#"))
+end
+
+-- Faxes pause the game
+function UIFax:mustPause()
+  return true
 end
 
 function UIFax:updateChoices()
@@ -139,20 +147,20 @@ function UIFax:choice(choice_number)
       owner:goHome("kicked")
       if owner.diagnosed then
         -- No treatment rooms
-        owner:updateDynamicInfo(_S.dynamic_info.patient.actions.no_treatment_available)
+        owner:setDynamicInfoText(_S.dynamic_info.patient.actions.no_treatment_available)
       else
         -- No diagnosis rooms
-        owner:updateDynamicInfo(_S.dynamic_info.patient.actions.no_diagnoses_available)
+        owner:setDynamicInfoText(_S.dynamic_info.patient.actions.no_diagnoses_available)
       end
     elseif choice == "wait" then
       -- Wait two months before going home
       owner.waiting = 60
       if owner.diagnosed then
         -- Waiting for treatment room
-        owner:updateDynamicInfo(_S.dynamic_info.patient.actions.waiting_for_treatment_rooms)
+        owner:setDynamicInfoText(_S.dynamic_info.patient.actions.waiting_for_treatment_rooms)
       else
         -- Waiting for diagnosis room
-        owner:updateDynamicInfo(_S.dynamic_info.patient.actions.waiting_for_diagnosis_rooms)
+        owner:setDynamicInfoText(_S.dynamic_info.patient.actions.waiting_for_diagnosis_rooms)
       end
     elseif choice == "guess_cure" then
       owner:setDiagnosed()
@@ -162,15 +170,16 @@ function UIFax:choice(choice_number)
         owner:goHome("over_priced", owner.disease.id)
       end
     elseif choice == "research" then
+      owner:unregisterCallbacks()
       owner:setMood("idea", "activate")
       owner:setNextAction(SeekRoomAction("research"))
     end
   end
   local vip_ignores_refusal = math.random(1, 2)
   if choice == "accept_emergency" then
-    self.ui.app.world:newObject("helicopter", self.ui.hospital, "north")
+    self.ui.app.world:newObject("helicopter", "north")
     self.ui:addWindow(UIWatch(self.ui, "emergency"))
-    self.ui:playAnnouncement(self.ui.hospital.emergency.disease.emergency_sound)
+    self.ui:playAnnouncement(self.ui.hospital.emergency.disease.emergency_sound, AnnouncementPriority.Critical)
     self.ui.adviser:say(_A.information.emergency)
   elseif choice == "refuse_emergency" then
     self.ui.app.world:nextEmergency()
@@ -199,7 +208,9 @@ function UIFax:choice(choice_number)
     -- Set the new salary.
     self.ui.hospital.player_salary = self.ui.hospital.salary_offer
     if tonumber(self.ui.app.world.map.level_number) then
-      self.ui.app:loadLevel(self.ui.app.world.map.level_number + 1, self.ui.app.map.difficulty)
+      local next_level = self.ui.app.world.map.level_number + 1
+      self.ui.app:loadLevel(next_level, self.ui.app.map.difficulty)
+      self.ui.app.moviePlayer:playAdvanceMovie(next_level)
     else
       for i, level in ipairs(self.ui.app.world.campaign_info.levels) do
         if self.ui.app.world.map.level_number == level then
@@ -216,6 +227,8 @@ function UIFax:choice(choice_number)
   elseif choice == "return_to_main_menu" then
     self.ui.app.moviePlayer:playWinMovie()
     self.ui.app:loadMainMenu()
+  elseif choice == "stay_on_level" then
+    self.ui.hospital.win_declined = true
   end
   self.icon:removeMessage()
   self:close()
@@ -239,6 +252,7 @@ function UIFax:validate()
   self.code = ""
   local code_n = (tonumber(code) or 0) / 10^5
   local x = math.abs((code_n ^ 5.00001 - code_n ^ 5) * 10^5 - code_n ^ 5)
+  local cheats = self.ui.hospital.hosp_cheats
   print("Code typed on fax:", code)
   if code == "24328" then
     -- Original game cheat code
@@ -246,21 +260,15 @@ function UIFax:validate()
     self.ui:addWindow(UICheats(self.ui))
   elseif code == "112" then
     -- simple, unobfuscated cheat for everyone :)
-    self.ui:playAnnouncement("rand*.wav")
-  elseif 27868.3 < x and x < 27868.4 then
-    -- Roujin's challenge cheat
-    local hosp = self.ui.hospital
-    if not hosp.spawn_rate_cheat then
-      self.ui.adviser:say(_A.cheats.roujin_on_cheat)
-      hosp.spawn_rate_cheat = true
-    else
-      self.ui.adviser:say(_A.cheats.roujin_off_cheat)
-      hosp.spawn_rate_cheat = nil
-    end
-  else
-    -- no valid cheat entered
+    -- not that critical, but we want to make to make sure it's played fairly soon
+    self.ui:playAnnouncement("rand*.wav", AnnouncementPriority.Critical)
+
+  -- Pass cheat code to the Cheats system to handle
+  elseif not cheats:processCheatCode(x) then
+    -- no valid cheat code entered
     self.ui:playSound("fax_no.wav")
     return
+  -- else Cheat executed, nothing to do here
   end
   self.ui:playSound("fax_yes.wav")
 
@@ -272,16 +280,19 @@ function UIFax:appendNumber(number)
 end
 
 function UIFax:close()
-  local world = self.ui.app.world
   self.icon.fax = nil
   self.icon:adjustToggle()
   UIFullscreen.close(self)
-  if world and world:isCurrentSpeed("Pause") then
-    world:setSpeed(world.prev_speed)
-  end
 end
 
 function UIFax:afterLoad(old, new)
+  if old < 179 then
+    local gfx = TheApp.gfx
+    self.background = gfx:loadRaw("Fax01V", 640, 480, "QData", "QData", "Fax01V.pal", true)
+    local palette = gfx:loadPalette("QData", "Fax01V.pal", true)
+    self.panel_sprites = gfx:loadSpriteTable("QData", "Fax02V", true, palette)
+    self.fax_font = gfx:loadFont("QData", "Font51V", false, palette)
+  end
   UIFullscreen.afterLoad(self, old, new)
   if old < 59 then
     -- self.choice_buttons added, changes to disabled buttons.

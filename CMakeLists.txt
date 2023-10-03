@@ -1,39 +1,37 @@
 # Cmake File for CorsixTH
 # OPTIONS AVAILABLE:
-# At most, one of the following:
-#   - WITH_SDL     : Activate SDL Renderer (default)
-# Any of the following:
-#   - WITH_AUDIO   : Activate Sound (enabled by default)
-#   - WITH_FREETYPE2
-#   - WITH_MOVIES  : Activate movies (requires Sound)
-#   - BUILD_ANIMVIEWER
-#   - WITH_LUAJIT  : Whether to use LuaJIT 2 instead of Lua51 (default is LuaJIT 2)
-#   - WITH_LIBAV   : Whether to use LibAV (as opposed to FFMEPG) when building movies
-#   - WITH_VLD     : Build with Visual Leak Detector (requires Visual Studio)
+# Any of the following: (default)
+#   - WITH_AUDIO      : Activate sound (yes)
+#   - WITH_FREETYPE2  : Active support for non-Latin script alphabets (yes)
+#   - WITH_MOVIES     : Activate movies (requires with_audio, FFmpeg) (yes)
+#   - WITH_LUAJIT     : Use LuaJIT instead of Lua (must specify library path) (no)
+#   - USE_SOURCE_DATADIRS : Use the source directory for loading resources. Incompatible with the install target (no)
+#   - SEARCH_LOCAL_DATADIRS : Search resources in the working directory and the
+#       program directory where the executable stores. Makes the executable
+#       portable (yes for Apple)
 
-cmake_minimum_required(VERSION 3.2)
+#   - WITH_VLD        : Build with Visual Leak Detector (requires Visual Studio) (no)
+#   - USE_PRECOMPILED_DEPS : Use precompiled dependencies on *nix (no)
+#   - USE_VCPKG_DEPS : Build vcpkg dependencies locally (requires Visual Studio) (no)
+#   - WITH_LUAROCKS : Install required luarocks in the macOS app (requires luarocks)
+
+#   - ENABLE_UNIT_TESTS : Enable Unit Testing Target (requires Catch2) (no)
+#   - BUILD_ANIMVIEW : Generate AnimViewer build files (no)
+#   - BUILD_TOOLS : Generate cli tools
+
+cmake_minimum_required(VERSION 3.10)
 
 set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/CMake)
 
-if(CMAKE_GENERATOR MATCHES "^Visual Studio 14 2015" OR CMAKE_GENERATOR MATCHES "^Visual Studio 15 2017")
-  option(USE_VCPKG_DEPS "Build vcpkg dependencies locally" OFF)
-endif()
+option(USE_VCPKG_DEPS "Build vcpkg dependencies locally" OFF)
 
 if(USE_VCPKG_DEPS)
+  # This must be before the project for the tool-chain to work correctly
   message("Note: Using locally built vcpkg dependencies.")
   include(VcpkgDeps)
 endif()
 
 project(CorsixTH_Top_Level)
-
-include(CheckCXXCompilerFlag)
-check_cxx_compiler_flag("-std=c++11" COMPILER_SUPPORTS_CXX11)
-check_cxx_compiler_flag("-std=c++0x" COMPILER_SUPPORTS_CXX0X)
-if(COMPILER_SUPPORTS_CXX11)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
-elseif(COMPILER_SUPPORTS_CXX0X)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++0x")
-endif()
 
 if(MINGW)
   set(CMAKE_EXE_LINKER_FLAGS "-static-libgcc -static-libstdc++")
@@ -43,22 +41,39 @@ include(CheckIncludeFiles)
 
 set(CORSIX_TH_DONE_TOP_LEVEL_CMAKE ON)
 
+# Define our options
+option(BUILD_CORSIXTH "Builds the main game" ON)
+option(WITH_AUDIO "Activate sound" ON)
+option(WITH_FREETYPE2 "Enhanced font support" ON)
+option(WITH_MOVIES "Activate in game movies" ON)
+option(WITH_LUAJIT "Use LuaJIT instead of Lua" OFF)
+option(USE_SOURCE_DATADIRS "Use the source directory for loading resources. Incompatible with the install target" OFF)
+
+if(APPLE)
+  set(SEARCH_LOCAL_DATADIRS_DEFAULT ON)
+else()
+  set(SEARCH_LOCAL_DATADIRS_DEFAULT OFF)
+endif()
+
+option(SEARCH_LOCAL_DATADIRS
+  "Search resources in the working directory and the program directory where the executable stores."
+  ${SEARCH_LOCAL_DATADIRS_DEFAULT})
+
+if(MSVC)
+  option(WITH_VLD "Build with Visual Leak Detector for Visual Studio" OFF)
+endif()
 # Dependency management
 if(UNIX AND CMAKE_COMPILER_IS_GNU)
   option(USE_PRECOMPILED_DEPS "Use Precompiled Dependencies" OFF) # Make *nix systems opt in
 endif()
 
-# Define our options
-option(WITH_SDL "Activate SDL Renderer" ON) # our default option
-option(WITH_AUDIO "Activate Sound" ON) # enabled by default
-option(WITH_MOVIES "Activate in game movies" ON)
-option(WITH_FREETYPE2 "Enhanced Font Support" ON)
-option(WITH_LUAJIT "Use LuaJIT instead of Lua" OFF)
-option(WITH_LIBAV "Use LibAV instead of FFmpeg" OFF)
-option(BUILD_ANIMVIEWER "Build the animation viewer as part of the build process" OFF)
-if(MSVC)
-  option(WITH_VLD "Build with Visual Leak Detector for Visual Studio" OFF)
+if(APPLE)
+  option(WITH_LUAROCKS "Install required luarocks in the app" OFF)
 endif()
+
+option(ENABLE_UNIT_TESTS "Enables Unit Testing Targets" OFF)
+option(BUILD_ANIMVIEW "Build the animation viewer as part of the build process" OFF)
+option(BUILD_TOOLS "Build additional CLI tools (rnc_decode)" OFF)
 
 if(WITH_AUDIO)
   set(CORSIX_TH_USE_SDL_MIXER ON)
@@ -70,24 +85,15 @@ endif()
 
 if(WITH_MOVIES)
   if(WITH_AUDIO)
-    if(WITH_LIBAV)
-      set(CORSIX_TH_USE_FFMPEG OFF)
-      set(CORSIX_TH_USE_LIBAV ON)
-      message("Note: LibAV video is enabled")
-    else()
-      set(CORSIX_TH_USE_FFMPEG ON)
-      set(CORSIX_TH_USE_LIBAV OFF)
-      message("Note: FFMPEG video is enabled (default)")
-    endif()
+    set(CORSIX_TH_USE_FFMPEG ON)
+    message("Note: FFmpeg video is enabled (default)")
   else()
     set(CORSIX_TH_USE_FFMPEG OFF)
-    set(CORSIX_TH_USE_LIBAV OFF)
-    message("Note: FFMPEG video disabled since it requires SDL audio.")
+    message("Note: FFmpeg video disabled since it requires SDL audio.")
   endif()
 else()
   set(CORSIX_TH_USE_FFMPEG OFF)
-  set(CORSIX_TH_USE_LIBAV OFF)
-  message("Note: FFMPEG video is disabled")
+  message("Note: FFmpeg video is disabled")
 endif()
 
 if(WITH_FREETYPE2)
@@ -116,40 +122,32 @@ if(USE_PRECOMPILED_DEPS)
   include(PrecompiledDeps)
 endif()
 
+include(GNUInstallDirs)
+
 # Include individual projects
 message("")
-# We always build CorsixTH otherwise we would miss the generated header
-message("Building CorsixTH")
-add_subdirectory(CorsixTH)
 
-if(BUILD_ANIMVIEWER)
+message("Building common libraries")
+add_subdirectory("libs")
+
+# We build CorsixTH if BUILD_CORSIXTH is set. This is set by default and should generally be set.
+if(BUILD_CORSIXTH)
+  message("Building CorsixTH")
+  add_subdirectory(CorsixTH)
+  set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT CorsixTH)
+endif()
+
+if(BUILD_ANIMVIEW)
   message("Building AnimView")
   add_subdirectory(AnimView)
 endif()
 
-# Documentation generation, construct 'doc' target (or a message it is disabled).
-
-# Try to find 'lua'
-if(WITH_LUAJIT)
-  set(LUA_PROGRAM_NAMES luajit-2.0.3 luajit)
-else()
-  set(LUA_PROGRAM_NAMES lua53 lua5.3 lua-5.3 lua52 lua5.2 lua-5.2 lua51 lua5.1 lua-5.1 lua)
+if(BUILD_TOOLS)
+  message("Building Tools")
+  add_subdirectory("tools")
 endif()
 
-find_program(LUA_PROGRAM_PATH ${LUA_PROGRAM_NAMES}
-  PATHS
-    ENV LUA_DIR
-    /opt
-    /opt/local
-    ~
-    ~/Library/Frameworks
-    /Library/Frameworks
-)
+message("")
 
-if(LUA_PROGRAM_PATH)
-  set(LUA_PROGRAM_FOUND TRUE)
-else()
-  set(LUA_PROGRAM_FOUND FALSE)
-endif()
-
+# Documentation generation, construct 'doc' target
 include(GenerateDoc)

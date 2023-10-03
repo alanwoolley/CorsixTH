@@ -29,16 +29,14 @@ function UIBankManager:UIBankManager(ui)
   local gfx = ui.app.gfx
   self.world = ui.app.world
   if not pcall(function()
-    self.background = gfx:loadRaw("Bank01V", 640, 480)
-    self.stat_background = gfx:loadRaw("Stat01V", 640, 480)
-    local palette = gfx:loadPalette("QData", "Bank01V.pal")
-    palette:setEntry(255, 0xFF, 0x00, 0xFF) -- Make index 255 transparent
+    self.background = gfx:loadRaw("Bank01V", 640, 480, "QData", "QData", "Bank01V.pal", true)
+    self.stat_background = gfx:loadRaw("Stat01V", 640, 480, "QData", "QData", "Stat01V.pal", true)
+    local palette = gfx:loadPalette("QData", "Bank01V.pal", true)
     self.panel_sprites = gfx:loadSpriteTable("QData", "Bank02V", true, palette)
     self.font = gfx:loadFont("QData", "Font36V", false, palette)
 
     -- The statistics font
-    palette = gfx:loadPalette("QData", "Stat01V.pal")
-    palette:setEntry(255, 0xFF, 0x00, 0xFF) -- Make index 255 transparent
+    palette = gfx:loadPalette("QData", "Stat01V.pal", true)
     self.stat_font = gfx:loadFont("QData", "Font37V", false, palette)
   end) then
     ui:addWindow(UIInformation(ui, {_S.errors.dialog_missing_graphics}))
@@ -120,6 +118,17 @@ function UIBankManager:afterLoad(old, new)
     self.smiles = self:addPanel(12, 303, 199)
     self.eyesblink = self:addPanel(7, 298, 173)
     self.browslift = self:addPanel(9, 296, 165)
+  end
+  if old < 179 then
+    local gfx = TheApp.gfx
+    self.background = gfx:loadRaw("Bank01V", 640, 480, "QData", "QData", "Bank01V.pal", true)
+    self.stat_background = gfx:loadRaw("Stat01V", 640, 480, "QData", "QData", "Stat01V.pal", true)
+    local palette = gfx:loadPalette("QData", "Bank01V.pal", true)
+    self.panel_sprites = gfx:loadSpriteTable("QData", "Bank02V", true, palette)
+    self.font = gfx:loadFont("QData", "Font36V", false, palette)
+
+    palette = gfx:loadPalette("QData", "Stat01V.pal", true)
+    self.stat_font = gfx:loadFont("QData", "Font37V", false, palette)
   end
   UIFullscreen.afterLoad(self, old, new)
 end
@@ -232,14 +241,18 @@ function UIBankManager:draw(canvas, x, y)
     font:draw(canvas, _S.bank_manager.statistics_page.money_in, x + 449, y + 41, 70, 0)
     font:draw(canvas, _S.bank_manager.statistics_page.balance, x + 525, y + 40, 70, 0)
 
-    -- Lua < 5.3 stored integer money amount in floating point values.
-    -- Lua 5.3 introduced an integer representation, and started printing
-    -- integer floating point numbers with a trailing .0 .
-    --
-    -- As a result, CorsixTH games converted from earlier Lua versions print a
-    -- trailing .0 in the bank manager window. The "math.floor" around all
-    -- numbers printed below avoids that problem by converting to integer
-    -- representation for Lua 5.3, and doing nothing in Lua < 5.3.
+    --[[
+      Lua < 5.3 stored integer money amount in floating point values.
+      Lua 5.3 introduced an integer representation, and started printing
+      integer floating point numbers with a trailing .0 .
+
+      As a result, CorsixTH games converted from earlier Lua versions print a
+      trailing .0 in the bank manager window. The "math.floor" around all
+      numbers printed below avoids that problem by converting to integer
+      representation for Lua 5.3, and doing nothing in Lua < 5.3.
+      Note: hospital.balance is a special case and needs string conversion to
+      persist as an integer
+    --]]
 
     -- Each transaction
     -- A for loop going backwards
@@ -258,7 +271,7 @@ function UIBankManager:draw(canvas, x, y)
 
     -- Summary
     font:draw(canvas, _S.bank_manager.statistics_page.current_balance, x + 373, y + 420, 140, 0)
-    font:draw(canvas, "$ " .. hospital.balance, x + 526, y + 421, 70, 0)
+    font:draw(canvas, string.format("$%.0f", hospital.balance), x + 526, y + 421, 70, 0)
   else
     local font = self.font
     self.background:draw(canvas, self.x + x, self.y + y)
@@ -295,7 +308,7 @@ function UIBankManager:draw(canvas, x, y)
   end
 end
 
-function UIBankManager:onMouseMove(x, y, ...)
+function UIBankManager:onMouseMove(x, y, dx, dy)
     local ui = self.ui
     if x > 0 and x < 640 and y > 0 and y < 480 then
       if self.showingStatistics then

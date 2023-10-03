@@ -19,16 +19,17 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE. --]]
 
 local pathsep = package.config:sub(1, 1)
-local rnc = require "rnc"
-local lfs = require "lfs"
-local TH = require "TH"
-local SDL = require "sdl"
-local runDebugger = dofile "run_debugger"
+local rnc = require("rnc")
+local lfs = require("lfs")
+local TH = require("TH")
+local SDL = require("sdl")
+local runDebugger = corsixth.require("run_debugger")
 
 -- Increment each time a savegame break would occur
 -- and add compatibility code in afterLoad functions
+-- Recommended: Also replace/Update the summary comment
 
-local SAVEGAME_VERSION = 123
+local SAVEGAME_VERSION = 180 -- CorsixTH 0.67 release
 
 class "App"
 
@@ -38,6 +39,7 @@ local App = _G["App"]
 function App:App()
   self.command_line = {}
   self.config = {}
+  self.hotkeys = {}
   self.runtime_config = {}
   self.running = false
   self.key_modifiers = {}
@@ -64,6 +66,7 @@ function App:App()
   self.strings = {}
   self.savegame_version = SAVEGAME_VERSION
   self.check_for_updates = true
+  self.idle_tick = 0
 end
 
 --! Starts a Lua DBGp client & connects it to a DBGp server.
@@ -73,13 +76,23 @@ function App:connectDebugger()
 end
 
 function App:setCommandLine(...)
-  self.command_line = {...}
+  self.command_line = { ... }
   for _, arg in ipairs(self.command_line) do
     local setting, value = arg:match("^%-%-([^=]*)=(.*)$") --setting=value
     if value then
       self.command_line[setting] = value
     end
   end
+end
+
+--! Returns the full path of the local path given
+--!param folders (string or table) A string of one segment or an set of many segments of the path
+--!param trailing_slash (boolean) Whether the path needs to end with a local path separator
+--!return fullpath (string) The OS dependent full path
+function App:getFullPath(folders, trailing_slash)
+  if type(folders) ~= "table" then folders = {folders} end
+  local ending = trailing_slash and pathsep or ""
+  return debug.getinfo(1, "S").source:sub(2, -12) .. table.concat(folders, pathsep) .. ending
 end
 
 function App:init()
@@ -97,34 +110,38 @@ function App:init()
   print("")
   print("---------------------------------------------------------------")
   print("")
+
   -- Prereq 1: Config file (for screen width / height / TH folder)
   -- Note: These errors cannot be translated, as the config file specifies the language
   local conf_path = self.command_line["config-file"] or "config.txt"
   local conf_chunk, conf_err = loadfile_envcall(conf_path)
   if not conf_chunk then
     error("Unable to load the config file. Please ensure that CorsixTH " ..
-        "has permission to read/write " .. conf_path .. ", or use the " ..
-        "--config-file=filename command line option to specify a writable file. " ..
-        "For reference, the error loading the config file was: " .. conf_err)
+      "has permission to read/write " .. conf_path .. ", or use the " ..
+      "--config-file=filename command line option to specify a writable file. " ..
+      "For reference, the error loading the config file was: " .. conf_err)
   else
     conf_chunk(self.config)
   end
   self:fixConfig()
-  dofile "filesystem"
+  corsixth.require("filesystem")
   local good_install_folder, error_message = self:checkInstallFolder()
   self.good_install_folder = good_install_folder
-  -- self:checkLanguageFile()
-  self.level_dir = debug.getinfo(1, "S").source:sub(2, -12) .. "Levels" .. pathsep
-  self:initUserLevelDir()
+  self.level_dir = self:getFullPath("Levels", true)
+  self.campaign_dir = self:getFullPath("Campaigns", true)
+  self:initUserDirectories()
   self:initSavegameDir()
   self:initScreenshotsDir()
 
   -- Create the window
-  if not SDL.init("audio", "video", "timer") then
+  if not SDL.init("video", "timer") then
     return false, "Cannot initialise SDL"
   end
   local compile_opts = TH.GetCompileOptions()
-  local api_version = dofile "api_version"
+  if compile_opts.audio then
+    SDL.init("audio")
+  end
+  local api_version = corsixth.require("api_version")
   if api_version ~= compile_opts.api_version then
     api_version = api_version or 0
     compile_opts.api_version = compile_opts.api_version or 0
@@ -132,14 +149,16 @@ function App:init()
       print("Notice: Compiled binary is more recent than Lua scripts.")
     elseif api_version > compile_opts.api_version then
       print("Warning: Compiled binary is out of date. CorsixTH will likely" ..
-      " fail to run until you recompile the binary.")
+        " fail to run until you recompile the binary.")
     end
   end
 
-  local modes = {}
-  if compile_opts.renderer == "OpenGL" then
-    modes[#modes + 1] = "opengl"
+  -- Report operating system
+  if compile_opts.os then
+    self.os = compile_opts.os
   end
+
+  local modes = {}
   self.fullscreen = false
   if self.config.fullscreen then
     self.fullscreen = true
@@ -148,28 +167,23 @@ function App:init()
   if self.config.track_fps then
     modes[#modes + 1] = "present immediate"
   end
+  if self.config.direct_zoom == nil or self.config.direct_zoom then
+    modes[#modes + 1] = "direct zoom"
+  end
   self.modes = modes
   self.video = assert(TH.surface(self.config.width, self.config.height, unpack(modes)))
   self.video:setBlueFilterActive(false)
   SDL.wm.setIconWin32()
 
   self:setCaptureMouse()
+  self.caption = "CorsixTH"
 
-  local caption_descs = {self.video:getRendererDetails()}
-  if compile_opts.jit then
-    caption_descs[#caption_descs + 1] = compile_opts.jit
-  else
-    caption_descs[#caption_descs + 1] = _VERSION
-  end
-  if compile_opts.arch_64 then
-    caption_descs[#caption_descs + 1] = "64 bit"
-  end
-  self.caption = "CorsixTH (" .. table.concat(caption_descs, ", ") .. ")"
-  self.video:setCaption(self.caption)
+  -- Create gamelog file if missing
+  self:initGamelogFile()
 
   -- Prereq 2: Load and initialise the graphics subsystem
-  dofile "persistance"
-  dofile "graphics"
+  corsixth.require("persistance")
+  corsixth.require("graphics")
   self.gfx = Graphics(self)
 
   -- Put up the loading screen
@@ -199,12 +213,34 @@ function App:init()
   -- App initialisation 2nd goal: Load remaining systems and data in an appropriate order
 
   math.randomseed(os.time() + SDL.getTicks())
+  -- The following psuedo-random number generators are based on different
+  -- disritubtion algorithms. For explanations and how to use them see the Wiki
+
+  -- Add math.t_random globally.
+  -- It generates pseudo random triangular distributed numbers in interval (a, b)
+  -- mostly around c between a and b.
+  strict_declare_global "math.t_random"
+  math.t_random = function(a, c, b)
+    assert(a < c, "Left boundary a should be less than center c.")
+    assert(c < b, "Right boundary b should more than center c.")
+    -- normalize c (a -> 0, b -> 1)
+    local range = b - a
+    c = (c - a) / range
+
+    local u = math.random()
+    if u <= c then
+      return a + math.sqrt(c * u) * range
+    else
+      return a + (1 - math.sqrt((1 - c) * (1 - u))) * range
+    end
+  end
+
   -- Add math.n_random globally. It generates pseudo random normally distributed
   -- numbers using the Box-Muller transform.
   strict_declare_global "math.n_random"
   math.n_random = function(mean, variance)
     return mean + math.sqrt(-2 * math.log(math.random()))
-    * math.cos(2 * math.pi * math.random()) * variance
+        * math.cos(2 * math.pi * math.random()) * variance
   end
   -- Also add the nice-to-have function math.round
   strict_declare_global "math.round"
@@ -212,20 +248,20 @@ function App:init()
     return math.floor(input + 0.5)
   end
   -- Load audio
-  dofile "audio"
+  corsixth.require("audio")
   self.audio = Audio(self)
   self.audio:init()
 
   -- Load movie player
-  dofile "movie_player"
+  corsixth.require("movie_player")
   self.moviePlayer = MoviePlayer(self, self.audio, self.video)
   if good_install_folder then
     self.moviePlayer:init()
   end
 
   -- Load strings before UI and before additional Lua
-  dofile "strings"
-  dofile "string_extensions"
+  corsixth.require("strings")
+  corsixth.require("string_extensions")
   self.strings = Strings(self)
   self.strings:init()
   local language_load_success = self:initLanguage()
@@ -235,18 +271,28 @@ function App:init()
     self:dumpStrings()
   end
 
+  -- Load/setup hotkeys.
+  local hotkeys_path = self.command_line["hotkeys-file"] or "hotkeys.txt"
+  local hotkeys_chunk, hotkeys_err = loadfile_envcall(hotkeys_path)
+  if not hotkeys_chunk then
+    error(_S.hotkeys_file_err.file_err_01 .. hotkeys_path .. _S.hotkeys_file_err.file_err_02 .. hotkeys_err)
+  else
+    hotkeys_chunk(self.hotkeys)
+  end
+  self:fixHotkeys()
+
   -- Load map before world
-  dofile "map"
+  corsixth.require("map")
 
   -- Load additional Lua before world
   if good_install_folder then
     self.anims = self.gfx:loadAnimations("Data", "V")
     self.animation_manager = AnimationManager(self.anims)
     self.walls = self:loadLuaFolder("walls")
-    dofile "entity"
-    dofile "entities/humanoid"
-    dofile "entities/object"
-    dofile "entities/machine"
+    corsixth.require("entity")
+    corsixth.require("entities.humanoid")
+    corsixth.require("entities.object")
+    corsixth.require("entities.machine")
 
     local objects = self:loadLuaFolder("objects")
     self.objects = self:loadLuaFolder("objects/machines", nil, objects)
@@ -261,23 +307,23 @@ function App:init()
       Object.processTypeDefinition(v)
     end
 
-    dofile "room"
+    corsixth.require("room")
     self.rooms = self:loadLuaFolder("rooms")
 
-    dofile "humanoid_action"
+    corsixth.require("humanoid_action")
     self.humanoid_actions = self:loadLuaFolder("humanoid_actions")
 
     local diseases = self:loadLuaFolder("diseases")
     self.diseases = self:loadLuaFolder("diagnosis", nil, diseases)
 
     -- Load world before UI
-    dofile "world"
+    corsixth.require("world")
   end
 
   -- Load UI
-  dofile "ui"
+  corsixth.require("ui")
   if good_install_folder then
-    dofile "game_ui"
+    corsixth.require("game_ui")
     self.ui = UI(self, true)
   else
     self.ui = UI(self, true)
@@ -288,9 +334,11 @@ function App:init()
       debug.getregistry()._RESTART = true
       TheApp.running = false
     end
+
     self.ui:addWindow(UIDirectoryBrowser(self.ui, nil, _S.install.th_directory, "InstallDirTreeNode", callback))
     return true
   end
+
 
   -- Load main menu (which creates UI)
   local function callback_after_movie()
@@ -299,18 +347,30 @@ function App:init()
     if not language_load_success then
       -- At this point we know the language is english, so no use having
       -- localized strings.
-      self.ui:addWindow(UIInformation(self.ui, {"The game language has been reverted" ..
+      self.ui:addWindow(UIInformation(self.ui, { "The game language has been reverted" ..
           " to English because the desired language could not be loaded. " ..
-          "Please make sure you have specified a font file in the config file."}))
+          "Please make sure you have specified a font file in the config file." }))
     end
 
+    -- If the player wants to continue then load the youngest file in the Autosaves folder
+    -- If they give a month number then load that month's autosave
+    if self.command_line.continue then
+      local num = self.command_line.continue
+      local file = "Autosaves" .. pathsep .. "Autosave" .. num .. ".sav"
+      if num >= "1" and num <= "12" and lfs.attributes(self.savegame_dir .. file, "size") then
+        self.command_line.load = file
+      else
+        self.command_line.load = "Autosaves" .. pathsep ..
+            FileTreeNode(self.savegame_dir .. "Autosaves"):getMostRecentlyModifiedChildFile(".sav").label
+      end
+    end
     -- If a savegame was specified, load it
     if self.command_line.load then
       local status, err = pcall(self.load, self, self.savegame_dir .. self.command_line.load)
       if not status then
         err = _S.errors.load_prefix .. err
         print(err)
-        self.ui:addWindow(UIInformation(self.ui, {err}))
+        self.ui:addWindow(UIInformation(self.ui, { err }))
       end
     end
     -- There might also be a message from the earlier initialization process that should be shown.
@@ -319,6 +379,7 @@ function App:init()
       self.ui:addWindow(UIInformation(self.ui, error_message, true))
     end
   end
+
   if self.config.play_intro then
     self.moviePlayer:playIntro(callback_after_movie)
   else
@@ -327,26 +388,52 @@ function App:init()
   return true
 end
 
---! Tries to initialize the user and built in level directories, returns true on
---! success and false on failure.
-function App:initUserLevelDir()
+--! Works out the intended location of the gamelog file.
+--!return full path gamelog should exist at
+function App:getGamelogPath()
+  local config_path = self.command_line["config-file"] or ""
+  config_path = config_path:match("^(.-)[^" .. pathsep .. "]*$")
+  return config_path .. "gamelog.txt"
+end
+
+--! Checks and creates the gamelog file if it does not exist.
+function App:initGamelogFile()
+  local gamelog_path = self:getGamelogPath()
+  local gamelog = io.open(gamelog_path, "r")
+  if gamelog then gamelog:close() return end
+
+  local fi = self:writeToFileOrTmp(gamelog_path)
+  local sysinfo = self:gamelogHeader()
+  fi:write(sysinfo)
+  fi:close()
+end
+
+--! Tries to initialize the user level and campaign directories
+-- TODO: Integrate other directory initialisations into this function
+function App:initUserDirectories()
   local conf_path = self.command_line["config-file"] or "config.txt"
+
+  -- Attempt to set the user's directory choice
+  -- param dir (path) The defined path of the folder by the user
+  -- param label (string) What folder was being set if there was an error
+  -- return The fully qualified path
+  local function setUserDir(dir, label)
+    dir = dir:sub(-1, -1) == pathsep and dir:sub(1, -2) or dir
+    if lfs.attributes(dir, "mode") ~= "directory" and not lfs.mkdir(dir) then
+      -- A failed directory creation does not result in a crash. But the user may lose
+      -- the ability to load/save properly.
+      print("Warning: " .. label .. " directory does not exist and could not be created.")
+    end
+    dir = dir:sub(-1, -1) ~= pathsep and dir .. pathsep or dir
+    return dir
+  end
+
   self.user_level_dir = self.config.levels or
       conf_path:match("^(.-)[^" .. pathsep .. "]*$") .. "Levels"
-
-  if self.user_level_dir:sub(-1, -1) == pathsep then
-    self.user_level_dir = self.user_level_dir:sub(1, -2)
-  end
-  if lfs.attributes(self.user_level_dir, "mode") ~= "directory" then
-    if not lfs.mkdir(self.user_level_dir) then
-       print("Notice: Level directory does not exist and could not be created.")
-       return false
-    end
-  end
-  if self.user_level_dir:sub(-1, -1) ~= pathsep then
-    self.user_level_dir = self.user_level_dir .. pathsep
-  end
-  return true
+  self.user_level_dir = setUserDir(self.user_level_dir, "User Levels")
+  self.user_campaign_dir = self.config.campaigns or
+      conf_path:match("^(.-)[^" .. pathsep .. "]*$") .. "Campaigns"
+  self.user_campaign_dir = setUserDir(self.user_campaign_dir, "User Campaigns")
 end
 
 --! Tries to initialize the savegame directory, returns true on success and
@@ -361,8 +448,8 @@ function App:initSavegameDir()
   end
   if lfs.attributes(self.savegame_dir, "mode") ~= "directory" then
     if not lfs.mkdir(self.savegame_dir) then
-       print("Notice: Savegame directory does not exist and could not be created.")
-       return false
+      print("Notice: Savegame directory does not exist and could not be created.")
+      return false
     end
   end
   if self.savegame_dir:sub(-1, -1) ~= pathsep then
@@ -381,8 +468,8 @@ function App:initScreenshotsDir()
   end
   if lfs.attributes(self.screenshot_dir, "mode") ~= "directory" then
     if not lfs.mkdir(self.screenshot_dir) then
-       print("Notice: Screenshot directory does not exist and could not be created.")
-       return false
+      print("Notice: Screenshot directory does not exist and could not be created.")
+      return false
     end
   end
   if self.screenshot_dir:sub(-1, -1) ~= pathsep then
@@ -416,7 +503,7 @@ function App:initLanguage()
   -- For immediate compatibility:
   getmetatable(_S).__call = function(_, sec, str, ...)
     assert(_S.deprecated[sec] and _S.deprecated[sec][str],
-           "_S(" .. sec .. ", " .. str .. ") does not exist!")
+      "_S(" .. sec .. ", " .. str .. ") does not exist!")
 
     str = _S.deprecated[sec][str]
     if ... then
@@ -445,6 +532,8 @@ function App:worldExited()
   self.audio:clearCallbacks()
 end
 
+--! Initialise CorsixTH's main menu screen including relevant windows
+--!param message (string) Something to display to the user
 function App:loadMainMenu(message)
   if self.world then
     self:worldExited()
@@ -470,6 +559,9 @@ function App:loadMainMenu(message)
   if message then
     self.ui:addWindow(UIInformation(self.ui, message))
   end
+
+  -- Reset the idle tick counter
+  self:resetIdle()
 end
 
 --! Sets the mouse capture to the state set within
@@ -486,24 +578,24 @@ function App:loadCampaign(campaign_file)
 
   campaign_info, errors = self:readCampaignFile(campaign_file)
   if not campaign_info then
-    self.ui:addWindow(UIInformation(self.ui, {_S.errors.could_not_load_campaign:format(errors)}))
+    self.ui:addWindow(UIInformation(self.ui, { _S.errors.could_not_load_campaign:format(errors) }))
     return
   end
 
   level_info, errors = self:readLevelFile(campaign_info.levels[1])
   if not level_info then
-    self.ui:addWindow(UIInformation(self.ui, {_S.errors.could_not_find_first_campaign_level:format(errors)}))
+    self.ui:addWindow(UIInformation(self.ui, { _S.errors.could_not_find_first_campaign_level:format(errors) }))
     return
   end
 
   _, errors = self:readMapDataFile(level_info.map_file)
   if errors then
-    self.ui:addWindow(UIInformation(self.ui, {errors}))
+    self.ui:addWindow(UIInformation(self.ui, { errors }))
     return
   end
 
   self:loadLevel(campaign_info.levels[1], nil, level_info.name,
-                 level_info.map_file, level_info.briefing)
+    level_info.map_file, level_info.briefing)
   -- The new world needs to know which campaign to continue on.
   self.world.campaign_info = campaign_info
 end
@@ -513,12 +605,10 @@ end
 --!param campaign_file (string) Name of the file to read.
 --!return (table) Definitions found in the campaign file.
 function App:readCampaignFile(campaign_file)
-  local local_path = debug.getinfo(1, "S").source:sub(2, -12)
-  local dir = "Campaigns" .. pathsep
-  local path = local_path .. dir
-  local chunk, err = loadfile_envcall(path .. campaign_file)
+  local path = self:getFullPath({"Campaigns", campaign_file})
+  local chunk, err = loadfile_envcall(path)
   if not chunk then
-    return nil, "Error loading " .. path ..  campaign_file .. ":\n" .. tostring(err)
+    return nil, "Error loading " .. path .. ":\n" .. tostring(err)
   else
     local result = {}
     chunk(result)
@@ -549,7 +639,7 @@ function App:readLevelFile(level)
     level_info.map_file = contents:match("%LevelFile ?= ?\"(.-)\"")
     if level_info.map_file then
       print("\nWarning: The level '" .. level_info.name .. "' contains a deprecated variable definition in the level file." ..
-      "'%LevelFile' has been renamed to '%MapFile'. Please advise the map creator to update the level.\n")
+        "'%LevelFile' has been renamed to '%MapFile'. Please advise the map creator to update the level.\n")
     end
     level_info.deprecated_variable_used = true
   end
@@ -564,10 +654,13 @@ end
 --!return (string, error) Returns the found absolute path, or nil if not found. Then
 --!       a second variable is returned with an error message.
 function App:getAbsolutePathToLevelFile(level)
-  local path = debug.getinfo(1, "S").source:sub(2, -12)
-  -- First look in Campaigns. If not found there, fall back to Levels.
-  local list_of_possible_paths = {self.user_level_dir, path .. "Campaigns", self.level_dir}
-  for _, parent_path in ipairs(list_of_possible_paths) do
+  local paths_to_search = {
+    self.user_campaign_dir,
+    self.user_level_dir,
+    self.campaign_dir,
+    self.level_dir,
+  }
+  for _, parent_path in ipairs(paths_to_search) do
     local check_path = parent_path .. pathsep .. level
     local file, _ = io.open(check_path, "rb")
     if file then
@@ -590,25 +683,11 @@ function App:loadLevel(level, difficulty, level_name, level_file, level_intro, m
   local new_map = Map(self)
   local map_objects, errors = new_map:load(level, difficulty, level_name, level_file, level_intro, map_editor)
   if not map_objects then
-    self.world.ui:addWindow(UIInformation(self.ui, {errors}))
+    self.world.ui:addWindow(UIInformation(self.ui, { errors }))
     return
   end
   -- If going from another level, save progress.
-  local carry_to_next_level
-  if self.world and self.world.campaign_info then
-    carry_to_next_level = {
-      world = {
-        room_built = self.world.room_built,
-        campaign_info = self.world.campaign_info,
-        },
-      hospital = {
-        player_salary = self.ui.hospital.player_salary,
-        message_popup = self.ui.hospital.message_popup,
-        hospital_littered = self.ui.hospital.hospital_littered,
-        has_seen_pay_rise = self.ui.hospital.has_seen_pay_rise,
-      },
-    }
-  end
+  local campaign_data = self.world and self.world:getCampaignData()
 
   -- Make sure there is no blue filter active.
   self.video:setBlueFilterActive(false)
@@ -634,14 +713,14 @@ function App:loadLevel(level, difficulty, level_name, level_file, level_intro, m
   self.ui = GameUI(self, self.world:getLocalPlayerHospital(), map_editor)
   self.world:setUI(self.ui) -- Function call allows world to set up its keyHandlers
 
-  if tonumber(level) then
-    self.moviePlayer:playAdvanceMovie(level)
+  -- Now restore progress from previous levels.
+  if campaign_data then
+    self.world:setCampaignData(campaign_data)
   end
 
-  -- Now restore progress from previous levels.
-  if carry_to_next_level then
-    self.world:initFromPreviousLevel(carry_to_next_level)
-  end
+  -- Log if we're playing with the demo or full graphics set
+  -- TODO: Adjust for new_gfx set when implemented
+  self.world.gfx_set = self.using_demo_files and "demo" or "full"
 end
 
 -- This is a useful debug and development aid
@@ -655,9 +734,11 @@ function App:dumpStrings()
       return o
     end
   end
+
   local function is_table(o)
     return type(val(o)) == "table"
   end
+
   local dir = self.command_line["config-file"] or ""
   dir = string.sub(dir, 0, -11)
   local fi = assert(io.open(dir .. "debug-strings-orig.txt", "w"))
@@ -718,7 +799,7 @@ function App:dumpStrings()
 
   self:checkMissingStringsInLanguage(dir, self.config.language)
   -- Uncomment these lines to get diffs for all languages in the game
-  -- for _, lang in ipairs(self.strings.languages_english) do
+  -- for _, lang in pairs(self.strings.languages_english) do
   --   self:checkMissingStringsInLanguage(dir, lang)
   -- end
   print("")
@@ -734,7 +815,6 @@ end
 --!param dir The directory where the file to write to should be.
 --!param language The language to check against.
 function App:checkMissingStringsInLanguage(dir, language)
-
   -- Accessors to reach through the userdata proxies on strings
   local LUT = debug.getregistry().StringProxyValues
   local function val(o)
@@ -744,6 +824,7 @@ function App:checkMissingStringsInLanguage(dir, language)
       return o
     end
   end
+
   local function is_table(o)
     return type(val(o)) == "table"
   end
@@ -776,7 +857,7 @@ function App:checkMissingStringsInLanguage(dir, language)
 
     -- if possible, use the English name of the language for the file name.
     local language_english = language
-    for _, lang_eng in ipairs(self.strings.languages_english) do
+    for _, lang_eng in pairs(self.strings.languages_english) do
       if ltc[language] == ltc[lang_eng:lower()] then
         language_english = lang_eng
         break
@@ -798,7 +879,7 @@ end
 
 function App:fixConfig()
   -- Fill in default values for things which don't exist
-  local _, config_defaults = dofile "config_finder"
+  local config_defaults = select(3, corsixth.require("config_finder"))
   for k, v in pairs(config_defaults) do
     if self.config[k] == nil then
       self.config[k] = v
@@ -841,7 +922,8 @@ end
 
 function App:saveConfig()
   -- Load lines from config file
-  local fi = io.open(self.command_line["config-file"] or "config.txt", "r")
+  local config_file = self.command_line["config-file"] or "config.txt"
+  local fi = io.open(config_file, "r")
   local lines = {}
   local handled_ids = {}
   if fi then
@@ -892,10 +974,115 @@ function App:saveConfig()
     lines[#lines] = nil
   end
 
-  fi = io.open(self.command_line["config-file"] or "config.txt", "w")
+  fi = self:writeToFileOrTmp(config_file)
   for _, line in ipairs(lines) do
     fi:write(line .. "\n")
   end
+  fi:close()
+end
+
+--! Tries to open the given file or a file in OS's temp dir.
+-- Returns the file handler
+--!param file The full path of the intended file
+--!param mode The mode in which the file is opened, defaults to write
+function App:writeToFileOrTmp(file, mode)
+  local f, err = io.open(file, mode or "w")
+  if err then
+    local tmp_file = os.tmpname()
+    f = io.open(tmp_file, mode or "w")
+    if self.ui then self.ui:addWindow(UIInformation(self.ui,
+        { _S.errors.save_to_tmp:format(file, tmp_file, err) }))
+    else
+      print("Attempt to write to " .. file .. " failed. File was written instead to temporary location " .. tmp_file .. " because of the error: " .. err)
+    end
+  end
+  assert(f, "Error: cannot write to filesystem")
+  return f
+end
+
+function App:fixHotkeys()
+  -- Fill in default values for things which don't exist
+  local hotkeys_defaults = select(6, corsixth.require("config_finder"))
+
+  for k, v in pairs(hotkeys_defaults) do
+    if self.hotkeys[k] == nil then
+      self.hotkeys[k] = v
+    end
+  end
+
+  for key, value in pairs(self.hotkeys) do
+    -- Trim whitespace from beginning and end string values - it shouldn't be
+    -- there (at least in any current configuration options).
+    if type(value) == "string" then
+      if value:match("^[%s]") or value:match("[%s]$") then
+        self.hotkeys[key] = value:match("^[%s]*(.-)[%s]*$")
+      end
+    end
+  end
+end
+
+function App:saveHotkeys()
+  -- Load lines from config file
+  local hotkeys_filename = self.command_line["hotkeys-file"] or "hotkeys.txt"
+  local fi = io.open(hotkeys_filename, "r")
+  local lines = {}
+  local handled_ids = {}
+
+  if fi then
+    for line in fi:lines() do
+      lines[#lines + 1] = line
+      if not (string.find(line, "^%s*$") or string.find(line, "^%s*%-%-")) then -- empty lines or comments
+        -- Look for identifiers we want to save
+        local _, _, identifier, value = string.find(line, "^%s*([_%a][_%w]*)%s*=%s*(.-)%s*$")
+        if identifier then
+          local _, temp
+          -- Trim possible trailing comment from value
+          _, _, temp = string.find(value, "^(.-)%s*%-%-.*")
+          value = temp or value
+          -- Remove enclosing [[]], if necessary
+          _, _, temp = string.find(value, "^%[%[(.*)%]%]$")
+          value = temp or value
+
+          -- If identifier also exists in runtime options, compare their values and
+          -- replace the line, if needed
+          handled_ids[identifier] = true
+
+          if value ~= serialize(self.hotkeys[identifier]) then
+            local new_value = self.hotkeys[identifier]
+            if type(new_value) == "string" then
+              new_value = string.format("[[%s]]", new_value)
+            else
+              new_value = serialize(new_value)
+            end
+            lines[#lines] = string.format("%s = %s", identifier, new_value)
+          end
+        end
+      end
+    end
+    fi:close()
+  end
+
+  -- Append options that were not found
+  for identifier, value in pairs(self.hotkeys) do
+    if not handled_ids[identifier] then
+      if type(value) == "string" then
+        value = string.format("[[%s]]", value)
+      else
+        value = tostring(value)
+      end
+      lines[#lines + 1] = string.format("%s = %s", identifier, value)
+    end
+  end
+  -- Trim trailing newlines
+  while lines[#lines] == "" do
+    lines[#lines] = nil
+  end
+
+  fi = self:writeToFileOrTmp(hotkeys_filename)
+  for _, line in ipairs(lines) do
+    fi:write(line .. "\n")
+  end
+
   fi:close()
 end
 
@@ -938,6 +1125,7 @@ function App:run()
   local e, where = SDL.mainloop(co)
   debug.sethook(co, nil)
   self.running = false
+  self.video:setCaptureMouse(false) -- Free the mouse, so the user can eg close the window.
   if e ~= nil then
     if where then
       -- Errors from an asynchronous callback done on the dispatcher coroutine
@@ -948,7 +1136,7 @@ function App:run()
     end
     print("An error has occurred!")
     print("Almost anything can be the cause, but the detailed information " ..
-        "below can help the developers find the source of the error.")
+      "below can help the developers find the source of the error.")
     print("Running: The " .. self.last_dispatch_type .. " handler.")
     print("A stack trace is included below, and the handler has been disconnected.")
     print(debug.traceback(co, e, 0))
@@ -970,14 +1158,14 @@ function App:run()
       elseif class.is(entity, Staff) then
         self.ui:addWindow(UIStaff(self.ui, entity))
       end
-      self.ui:addWindow(UIConfirmDialog(self.ui,
-          "Sorry, but an error has occurred. There can be many reasons - see the " ..
-          "log window for details. Would you like to attempt a recovery?",
-          --[[persistable:app_attempt_recovery]] function()
-            self.world:gameLog("Recovering from error in timer handler...")
-            entity.ticks = false
-            self.eventHandlers.timer = handler
-          end
+      self.ui:addWindow(UIConfirmDialog(self.ui, true,
+        "Sorry, but an error has occurred. There can be many reasons - see the " ..
+        "log window for details. Would you like to attempt a recovery?",
+        --[[persistable:app_attempt_recovery]] function()
+        self.world:gameLog("Recovering from error in timer handler...")
+        entity.ticks = false
+        self.eventHandlers.timer = handler
+      end
       ))
     end
     self.eventHandlers[self.last_dispatch_type] = nil
@@ -1009,13 +1197,38 @@ function App:dispatch(evt_type, ...)
 end
 
 function App:onTick(...)
-  if(not self.moviePlayer.playing) then
+  if (not self.moviePlayer.playing) then
     if self.world then
       self.world:onTick(...)
     end
     self.ui:onTick(...)
   end
   return true -- tick events always result in a repaint
+end
+
+--! Function for handling idle time in the main menu, which leads to playing the
+--! demo gameplay trailer if left long enough
+function App:idle()
+  if not self.config.play_demo then return end
+  -- Check if we are in a proper 'idle' state and solely on the main menu
+  if not self.ui:getWindow(UIMainMenu) or self.ui:getWindow(UIUpdate)
+      or self.ui:getWindow(UIConfirmDialog) then
+    self:resetIdle()
+    return
+  end
+  -- Have we been idle enough (~30s)
+  if self.idle_tick > 1000 then
+    -- User is idle, play the demo gameplay movie
+    self.moviePlayer:playDemoMovie()
+    self:resetIdle()
+  else
+    self.idle_tick = self.idle_tick + 1
+  end
+end
+
+-- Reset the idle count
+function App:resetIdle()
+  self.idle_tick = 0
 end
 
 local fps_history = {} -- Used to average FPS over the last thirty frames
@@ -1025,7 +1238,7 @@ local fps_next = 1 -- Used to loop through fps_history when [over]writing
 
 function App:drawFrame()
   self.video:startFrame()
-  if(self.moviePlayer.playing) then
+  if (self.moviePlayer.playing) then
     self.key_modifiers = {}
     self.moviePlayer:refresh()
   else
@@ -1106,6 +1319,21 @@ function App:onMultiGesture(...)
   return self.ui:onMultiGesture(...)
 end
 
+function App:isThemeHospitalPath(path)
+  local ngot = 0
+  for obj, _ in lfs.dir(path) do
+    for _, thing in ipairs({ "data", "levels", "qdata" }) do
+      if obj:lower() == thing and
+          lfs.attributes(path .. pathsep .. obj, "mode") == "directory" then
+        ngot = ngot + 1
+      end
+    end
+  end
+  if ngot == 3 then
+    return true
+  end
+end
+
 function App:checkInstallFolder()
   self.fs = FileSystem()
   local status, _
@@ -1116,10 +1344,55 @@ function App:checkInstallFolder()
       " a valid copy of the data files from the original game," ..
       " as said files are required for graphics and sounds."
   if not status then
-    -- If the given directory didn't exist, then likely the config file hasn't
-    -- been changed at all from the default, so we continue to initialise the
-    -- app, and give the user a dialog asking for the correct directory.
-    return false
+    -- Table of predictable places. First three are platform independent,
+    -- then macOS app and its parent folder, GOG bundle,
+    -- then linux Filesystem Hierarchy Standard, then Windows Program Files
+    -- mac_app_dir is the macOS app base directory named CorsixTH.app
+    local mac_app_dir = debug.getinfo(1).short_src:match("(.*)/Contents/.")
+    local user_dir = os.getenv("HOME") or os.getenv("USERPROFILE")
+    local win_home_dir = nil;
+    if os.getenv("HOMEDRIVE") and os.getenv("HOMEPATH") then
+      win_home_dir = os.getenv("HOMEDRIVE") .. os.getenv("HOMEPATH")
+      if win_home_dir == user_dir then win_home_dir = nil; end
+    end
+    local possible_locations = {
+      user_dir,
+      user_dir and (user_dir .. pathsep .. "Documents"),
+      win_home_dir,
+      select(1, corsixth.require("config_finder")):match("(.*[/\\])"):sub(1, -2),
+      mac_app_dir,
+      mac_app_dir and mac_app_dir:match("(.*)/.*%.app"),
+      "/Applications/Theme Hospital.app/Contents/Resources/game/Theme Hospital.app/" ..
+          "Contents/Resources/Theme Hospital.boxer/C.harddisk",
+      "/usr/share/games/corsix-th",
+      "/usr/local/share/games/corsix-th",
+      os.getenv("ProgramFiles"),
+      os.getenv("ProgramFiles(x86)"),
+      [[C:]], [[D:]], [[E:]], [[F:]], [[G:]], [[H:]] }
+    local possible_folders = { "ThemeHospital", "Theme Hospital", "HOSP", "TH97",
+      [[GOG.com\Theme Hospital]], [[GOG Games\Theme Hospital]],
+      [[Origin Games\Theme Hospital\data\Game]], [[EA Games\Theme Hospital\data\Game]]
+    }
+    for _, dir in pairs(possible_locations) do
+      if status then break end
+      for _, folder in pairs(possible_folders) do
+        local path = dir .. pathsep .. folder
+        if lfs.attributes(path, "mode") == "directory" and self:isThemeHospitalPath(path) then
+          print("Game data found at: " .. path)
+          print("This will be written to the config file")
+          self.config.theme_hospital_install = path
+          status, _ = self.fs:setRoot(path)
+          break
+        end
+      end
+    end
+    if not status then
+      -- If the given directory didn't exist, then likely the config file hasn't
+      -- been changed at all from the default, and we looked unsuccessfully in
+      -- some likely folders for the game data, so we continue to initialise the
+      -- app, and give the user a dialog asking for the correct directory.
+      return false
+    end
   end
 
   -- Check that a few core files are present
@@ -1129,9 +1402,10 @@ function App:checkInstallFolder()
       missing[#missing + 1] = path
     end
   end
-  check("Data"   .. pathsep .. "VBlk-0.tab")
+
+  check("Data" .. pathsep .. "VBlk-0.tab")
   check("Levels" .. pathsep .. "Level.L1")
-  check("QData"  .. pathsep .. "SPointer.dat")
+  check("QData" .. pathsep .. "SPointer.dat")
   if #missing ~= 0 then
     missing = table.concat(missing, ", ")
     message = "Invalid Theme Hospital folder specified in config file, " ..
@@ -1139,7 +1413,7 @@ function App:checkInstallFolder()
         message
     print(message)
     print("Trying to let the user select a new one.")
-    return false, {message}
+    return false, { message }
   end
 
   -- Check for demo version
@@ -1152,34 +1426,61 @@ function App:checkInstallFolder()
   -- Do a few more checks to make sure that commonly corrupted files are OK.
   local corrupt = {}
 
-  if not self.using_demo_files then
-    local function check_corrupt(path, correct_size)
-      local real_path = self.fs:getFilePath(path)
-      -- If the file exists but is smaller than usual it is probably corrupt
-      if real_path then
-        local real_size = lfs.attributes(real_path, "size")
-        if real_size + 1024 < correct_size or real_size - 1024 > correct_size then
-          corrupt[#corrupt + 1] = path .. " (Size: " .. math.floor(real_size/1024) .. " kB / Correct: about " .. math.floor(correct_size/1024) .. " kB)"
-        end
-      else
-        corrupt[#corrupt + 1] = path .. " (This file is missing)"
+  -- Check for file corruption for local files.
+  -- No check is done if the game is loaded from an ISO
+  local function check_corrupt(path, correct_size)
+    -- If the file exists but is smaller than usual it is probably corrupt
+    if self.fs:fileExists(path) then
+      local real_size = self.fs:fileSize(path)
+      if real_size + 1024 < correct_size or real_size - 1024 > correct_size then
+        corrupt[#corrupt + 1] = path .. " (Size: " .. math.floor(real_size / 1024) .. " kB / Correct: about " .. math.floor(correct_size / 1024) .. " kB)"
       end
+    else
+      corrupt[#corrupt + 1] = path .. " (This file is missing)"
     end
+  end
+
+  if self.using_demo_files then
+    check_corrupt("ANIMS" .. pathsep .. "WINLEVEL.SMK", 243188)
+    check_corrupt("LEVELS" .. pathsep .. "LEVEL.L1", 163948)
+    check_corrupt("DATA" .. pathsep .. "BUTTON01.DAT", 252811)
+  else
     check_corrupt("ANIMS" .. pathsep .. "AREA01V.SMK", 251572)
     check_corrupt("ANIMS" .. pathsep .. "WINGAME.SMK", 2066656)
     check_corrupt("ANIMS" .. pathsep .. "WINLEVEL.SMK", 335220)
     check_corrupt("INTRO" .. pathsep .. "INTRO.SM4", 33616520)
     check_corrupt("QDATA" .. pathsep .. "FONT00V.DAT", 1024)
     check_corrupt("ANIMS" .. pathsep .. "LOSE1.SMK", 1009728)
+  end
 
-    if #corrupt ~= 0 then
-      table.insert(corrupt, 1, "There appears to be corrupt files in your Theme Hospital folder, " ..
+  if #corrupt ~= 0 then
+    table.insert(corrupt, 1, "There appears to be corrupt files in your Theme Hospital folder, " ..
       "so don't be surprised if CorsixTH crashes. At least the following files are wrong:")
-      table.insert(corrupt, message)
-    end
+    table.insert(corrupt, message)
   end
 
   return true, #corrupt ~= 0 and corrupt or nil
+end
+
+function App:findSoundFont()
+  local data_dir = self:getFullPath()
+
+  local possible_locations = {
+    self.config.soundfont or false,
+    data_dir .. "FluidR3_GM.sf2",
+    data_dir .. "FluidR3.sf3",
+    "/usr/share/soundfonts/default.sf2", -- default linux
+    "/usr/share/sounds/sf2/FluidR3_GM.sf2", -- debian based
+    "/usr/share/soundfonts/FluidR3_GM.sf2" -- archlinux and others
+  }
+
+  for _, sf_path in ipairs(possible_locations) do
+    if sf_path and lfs.attributes(sf_path) then
+      return sf_path
+    end
+  end
+
+  return nil
 end
 
 --! Get the directory containing the bitmap files.
@@ -1217,6 +1518,7 @@ function App:readDataFile(dir, filename)
   if filename == nil then
     dir, filename = "Data", dir
   end
+
   local data = assert(self.fs:readContents(dir .. pathsep .. filename))
   if data:sub(1, 3) == "RNC" then
     data = assert(rnc.decompress(data))
@@ -1254,15 +1556,15 @@ function App:readMapDataFile(filename)
 end
 
 function App:loadLuaFolder(dir, no_results, append_to)
-  local ourpath = debug.getinfo(1, "S").source:sub(2, -8)
-  dir = dir .. pathsep
-  local path = ourpath .. dir
+  if dir:sub(-1) ~= pathsep then dir = dir .. pathsep end
+  local path = self:getFullPath({"Lua", dir}, true)
   local results = no_results and "" or (append_to or {})
+
   for file in lfs.dir(path) do
     if file:match("%.lua$") then
-      local status, result = pcall(dofile, dir .. file:sub(1, -5))
+      local status, result = pcall(corsixth.require, dir .. file:sub(1, -5))
       if not status then
-        print("Error loading " .. dir ..  file .. ":\n" .. tostring(result))
+        print("Error loading " .. dir .. file .. ":\n" .. tostring(result))
       else
         if result == nil then
           if not no_results then
@@ -1294,11 +1596,23 @@ end
 --! which save game version it is. This was added after the Beta 8
 --! release, which is why the checks prior to that version aren't made.
 --!param version An optional value if you want to find what game version
--- a specific savegame verion is from.
+-- a specific savegame version is from.
 function App:getVersion(version)
   local ver = version or self.savegame_version
-  if ver > 122 then
+  if ver > 180 then
     return "Trunk"
+  elseif ver > 170 then
+    return "v0.67"
+  elseif ver > 156 then
+    return "v0.66"
+  elseif ver > 138 then
+    return "v0.65"
+  elseif ver > 134 then
+    return "v0.64"
+  elseif ver > 127 then
+    return "v0.63"
+  elseif ver > 122 then
+    return "v0.62"
   elseif ver > 111 then
     return "v0.61"
   elseif ver > 105 then
@@ -1330,7 +1644,7 @@ end
 
 -- Omit the usual file extension so this file cannot be seen from the normal load and save screen and cannot be overwritten
 function App:quickSave()
-  local filename = "quicksave"
+  local filename = "quicksave.qs"
   return SaveGameFile(self.savegame_dir .. filename)
 end
 
@@ -1342,20 +1656,45 @@ function App:load(filepath)
 end
 
 function App:quickLoad()
-  local filename = "quicksave"
+  local filename = "quicksave.qs"
   if lfs.attributes(self.savegame_dir .. filename) then
-    self:load(filename)
+    self:load(self.savegame_dir .. filename)
   else
     self:quickSave()
-    self.ui:addWindow(UIInformation(self.ui, {_S.errors.load_quick_save}))
+    self.ui:addWindow(UIInformation(self.ui, { _S.errors.load_quick_save }))
   end
+end
+
+--! Function to check the loaded game is compatible with the program
+--!param save_version (num)
+--!param gfx_set (string) What graphics set is used
+--!return true if compatible, otherwise false
+function App:checkCompatibility(save_version, gfx_set)
+  local app_version = self.savegame_version
+  local err
+
+  -- First check the graphics set matches with the game files
+  if (gfx_set == "demo" and not self.using_demo_files) then
+    err = _S.errors.compatibility_error.demo_in_full
+  elseif (gfx_set == "full" and self.using_demo_files) then
+    err = _S.errors.compatibility_error.full_in_demo
+
+    -- if that's all good, check the save and app version
+  elseif app_version >= save_version or self.config.debug then
+    return true
+  else -- savegame newer than application
+    err = _S.errors.compatibility_error.new_in_old
+  end
+
+  UILoadGame:loadError(err)
+  return false
 end
 
 --! Restarts the current level (offers confirmation window first)
 function App:restart()
   assert(self.map, "Trying to restart while no map is loaded.")
-  self.ui:addWindow(UIConfirmDialog(self.ui, _S.confirmation.restart_level,
-  --[[persistable:app_confirm_restart]] function()
+  self.ui:addWindow(UIConfirmDialog(self.ui, false, _S.confirmation.restart_level,
+    --[[persistable:app_confirm_restart]] function()
     self:worldExited()
     local level = self.map.level_number
     local difficulty = self.map.difficulty
@@ -1366,14 +1705,14 @@ function App:restart()
       intro = self.map.level_intro
     end
     if level and name and not file then
-      self.ui:addWindow(UIInformation(self.ui, {_S.information.cannot_restart}))
+      self.ui:addWindow(UIInformation(self.ui, { _S.information.cannot_restart }))
       return
     end
     local status, err = pcall(self.loadLevel, self, level, difficulty, name, file, intro)
     if not status then
       err = "Error while loading level: " .. err
       print(err)
-      self.ui:addWindow(UIInformation(self.ui, {err}))
+      self.ui:addWindow(UIInformation(self.ui, { err }))
     end
   end))
 end
@@ -1390,7 +1729,7 @@ function App:exit()
   self.running = false
 end
 
---! Exits the game completly without saving the config i.e. Alt+F4 for Quit Application
+--! Exits the game completely without saving the config i.e. Alt+F4 for Quit Application
 function App:abandon()
   self.running = false
 end
@@ -1410,40 +1749,55 @@ function App:afterLoad()
     self.world.original_savegame_version = old
   end
   local first = self.world.original_savegame_version
+
+  -- Generate the human-readable version number (old [loaded save], new [program], first [original])
+  local first_version = first .. " (" .. self:getVersion(first) .. ")"
+  local old_version = old .. " (" .. self:getVersion(old) .. ")"
+  local new_version = new .. " (" .. self:getVersion() .. ")"
+
   if new == old then
-    self.world:gameLog("Savegame version is " .. new .. " (" .. self:getVersion() ..
-        "), originally it was " .. first .. " (" .. self:getVersion(first) .. ")")
+    local msg_same = "Savegame version is %s, originally it was %s."
+    self.world:gameLog(msg_same:format(new_version, first_version))
     self.world:playLoadedEntitySounds()
-    return
   elseif new > old then
-    self.world:gameLog("Savegame version changed from " .. old .. " (" .. self:getVersion(old) ..
-                       ") to " .. new .. " (" .. self:getVersion() ..
-                       "). The save was created using " .. first ..
-                       " (" .. self:getVersion(first) .. ")")
-  else
-    -- TODO: This should maybe be forbidden completely.
-    self.world:gameLog("Warning: loaded savegame version " .. old .. " (" .. self:getVersion(old) ..
-                       ")" .. " in older version " .. new .. " (" .. self:getVersion() .. ").")
+    local msg_older = "Savegame changed from %s to %s. The save was created using %s."
+    self.world:gameLog(msg_older:format(old_version, new_version, first_version))
+  else -- Save is newer than the game and can only proceed in debug mode
+    local get_old_release_version = self.world.release_version or "Trunk" -- For compatibility
+    old_version = old .. " (" .. get_old_release_version .. ")"
+    local msg_newer = "Warning: loaded savegame version %s in older version %s."
+    self.world:gameLog(msg_newer:format(old_version, new_version))
+    self.ui:addWindow(UIInformation(self.ui, { _S.warnings.newersave }))
   end
+  self.world.release_version = self:getVersion()
   self.world.savegame_version = new
 
   if old < 87 then
-    local new_object = dofile "objects/gates_to_hell"
+    local new_object = corsixth.require("objects.gates_to_hell")
     Object.processTypeDefinition(new_object)
     self.objects[new_object.id] = new_object
     self.world:newObjectType(new_object)
   end
 
   if old < 114 then
-    local rathole_type = dofile "objects/rathole"
+    local rathole_type = corsixth.require("objects.rathole")
     Object.processTypeDefinition(rathole_type)
     self.objects[rathole_type.id] = rathole_type
     self.world:newObjectType(rathole_type)
   end
 
+  --[[Information only:
+  if old < 166 then
+    Graphics set type was introduced at this version.
+    Nothing to do here as it is handled by persistance.
+    However, it introduces compatibility limitations between the demo and full game
+    and should be noted.
+  end
+  ]] --
+
   self.map:afterLoad(old, new)
-  self.world:afterLoad(old, new)
   self.ui:afterLoad(old, new)
+  self.world:afterLoad(old, new)
 end
 
 function App:checkForUpdates()
@@ -1453,11 +1807,11 @@ function App:checkForUpdates()
 
   -- Default language to use for the changelog if no localised version is available
   local default_language = "en"
-  local update_url = 'http://www.corsixth.com/check-for-updates'
-  local current_version = self:getVersion()
+  local update_url = 'https://corsixth.com/CorsixTH/check-for-updates'
+  local current_version = string.gsub(self:getVersion(), "v", "") -- drop the 'v'
 
   -- Only URLs that match this list of trusted domains will be accepted.
-  local trusted_domains = { 'corsixth.com', 'code.google.com' }
+  local trusted_domains = { 'corsixth.com', 'github.com', 'corsixth.github.io' }
 
   -- Only check for updates against released versions
   if current_version == "Trunk" then
@@ -1465,28 +1819,26 @@ function App:checkForUpdates()
     return
   end
 
-  local success, _ = pcall(require, "socket")
-
-  if not success then
-    -- LuaSocket is not available, just return
-    print("Cannot check for updates since LuaSocket is not available.")
+  local luasocket, _ = pcall(require, "socket")
+  local luasec, _ = pcall(require, "ssl.https")
+  if not (luasocket and luasec) then
+    print("Cannot check for updates since LuaSocket and/or LuaSec are not available.")
     return
-  else
-    self.lua_socket_available = true
   end
-  local http = require "socket.http"
-  local url = require "socket.url"
+  local http = require("socket.http")
+  local url = require("socket.url")
+  http.TIMEOUT = 2
 
   print("Checking for CorsixTH updates...")
   local update_body, status, _ = http.request(update_url)
 
-  if not update_body or not (status == 200) then
+  if not update_body or (status ~= 200) then
     print("Couldn't check for updates. Server returned code: " .. status)
     print("Check that you have an active internet connection and that CorsixTH is allowed in your firewall.")
     return
   end
 
-  local update_table = loadstring_envcall(update_body, "@updatechecker"){}
+  local update_table = loadstring_envcall(update_body, "@updatechecker") {}
   local changelog = update_table["changelog_" .. default_language]
   local new_version = update_table["major"] .. '.' .. update_table["minor"] .. update_table["revision"]
 
@@ -1498,7 +1850,7 @@ function App:checkForUpdates()
   -- Check to make sure download URL is trusted
   local download_url = url.parse(update_table["download_url"])
   local valid_url = false
-  for _,v in ipairs(trusted_domains) do
+  for _, v in ipairs(trusted_domains) do
     if download_url.host == v then
       valid_url = true
       break
@@ -1535,6 +1887,29 @@ function App:finishVideoUpdate()
   self.moviePlayer:updateRenderer()
   self.moviePlayer:allocatePictureBuffer()
   self.video:startFrame()
+end
+
+function App:isAudioEnabled()
+  return TH.GetCompileOptions().audio
+end
+
+--! Generate information about user's system and the program
+--!return System and program info as a string
+function App:gamelogHeader()
+  local gen_date = os.date("%Y-%m-%d %H:%M:%S")
+  gen_date = string.format("Gamelog generated on %s\n", gen_date)
+  local compile_opts = TH.GetCompileOptions()
+  local comp_details = {}
+  for key, value in pairs(compile_opts) do
+    table.insert(comp_details, key .. ": " .. tostring(value))
+  end
+  table.sort(comp_details)
+  local compiled = string.format("Compiled with %s\nSDL renderer: %s\n",
+      table.concat(comp_details, ", "), self.video:getRendererDetails())
+  local running = string.format("%s run with api version: %s, game version: %s, savegame version: %s\n",
+      compile_opts.jit or _VERSION, tostring(corsixth.require("api_version")),
+      self:getVersion(), tostring(SAVEGAME_VERSION))
+  return (gen_date .. compiled .. running)
 end
 
 -- Do not remove, for savegame compatibility < r1891

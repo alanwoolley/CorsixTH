@@ -18,6 +18,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE. --]]
 
+-- luacheck: globals _
 strict_declare_global "_"
 _ = nil
 
@@ -122,6 +123,7 @@ function UILuaConsole:buttonExecute()
     print("Error while executing UserFunction:")
     print(err)
   end
+  _ = nil -- Clean up the global after use or it'll corrupt saves
 end
 
 function UILuaConsole:buttonClose()
