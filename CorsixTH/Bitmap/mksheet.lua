@@ -27,12 +27,31 @@ end
 package.path = (debug.getinfo(1, "S").source:match("@(.*[" .. package.config
                :sub(1, 1) .. "])") or "") .. "lib_" .. package.config:sub(5, 5)
                .. ".lua" .. package.config:sub(3, 3) .. package.path
-require("bmp")
-require("spritesheet")
+local bmp = require("bmp")
+local spritesheet = require("spritesheet")
+
+local function setfenv(fn, env)
+  local i = 1
+  while true do
+    local name = debug.getupvalue(fn, i)
+    if name == "_ENV" then
+      debug.upvaluejoin(fn, i, (function()
+        return env
+      end), 1)
+      break
+    elseif not name then
+      break
+    end
+
+    i = i + 1
+  end
+
+  return fn
+end
 
 local specfile = ...
 specfile = assert(loadfile(specfile))
-local spec = {}
+local spec = { }
 setfenv(specfile, spec)()
 
 assert(type(spec.sprites) == "table", "spec is missing sprite list")
@@ -60,10 +79,11 @@ end
 
 local ss = spritesheet.open(spec.output_tab, spec.output_dat, spec.complex)
 
-for i = 0, table.maxn(spec.sprites) do
+local spriteCount = #(spec.sprites)
+for i = 0, spriteCount do
   local filename = spec.sprites[i]
   if not filename then
-    ss:writeDummy()
+    spritesheet.writeDummy(ss)
   else
     local function err(msg, ...)
       error("Error processing " .. filename .. ":\n" .. msg:format(...))
@@ -76,7 +96,7 @@ for i = 0, table.maxn(spec.sprites) do
     if width > 0xFF or height > 0xFF then
       err "Image too big (maximum size is 255x255)"
     end
-    ss:write(width, height, bitmap:getPixels())
+    spritesheet.write(ss, width, height, bmp.getPixels(bitmap))
   end
 end
-ss:close()
+spritesheet.close(ss)

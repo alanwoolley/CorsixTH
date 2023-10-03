@@ -21,10 +21,9 @@ SOFTWARE. --]]
 local io_open, assert, setmetatable, string_char, table_concat
     = io.open, assert, setmetatable, string.char, table.concat
 
-module "spritesheet"
 local mt = {__index = _M}
 
-function open(filename_tab, filename_dat, is_complex)
+function mt.open(filename_tab, filename_dat, is_complex)
   return setmetatable({
     tab = assert(io_open(filename_tab, "wb")),
     dat = assert(io_open(filename_dat, "wb")),
@@ -32,13 +31,13 @@ function open(filename_tab, filename_dat, is_complex)
   }, mt)
 end
 
-function close(ss)
+function mt.close(ss)
   ss.tab:close()
   ss.dat:close()
   return ss
 end
 
-function writeDummy(ss)
+function mt.writeDummy(ss)
   ss.tab:write"\0\0\0\0\0\0"
   return ss
 end
@@ -55,7 +54,7 @@ local function uint4(value)
   return string_char(b0, b1, b2, value)
 end
 
-function write(ss, width, height, pixels)
+function mt.write(ss, width, height, pixels)
   ss.tab:write(uint4(ss.dat:seek()))
   ss.tab:write(string_char(width, height))
   ss.dat:write(ss.encode(width, height, pixels))
@@ -131,3 +130,5 @@ function encodeComplex(width, height, data)
   flush_run(#data + 1)
   return table_concat(result)
 end
+
+return mt

@@ -27,7 +27,7 @@ end
 package.path = (debug.getinfo(1, "S").source:match("@(.*[" .. package.config
                :sub(1, 1) .. "])") or "") .. "lib_" .. package.config:sub(5, 5)
                .. ".lua" .. package.config:sub(3, 3) .. package.path
-require("bmp")
+local bmp = require("bmp")
 
 local filename = ...
 if not filename:match("%.bmp$") then
@@ -44,7 +44,8 @@ pal = assert(io.open(pal, "wb"))
 pal:write(bitmap.palette)
 
 -- image data
-dat:write(assert(bitmap:getPixels()))
+
+dat:write(assert(bmp.getPixels(bitmap)))
 
 if bitmap.pal_size ~= 256 then
   print("Warning: palette size is " .. bitmap.pal_size .. ". Currently only palettes of size 256 will work in CorsixTH.")

@@ -23,7 +23,6 @@ local io_open, table_concat, setmetatable, ipairs, string_reverse, string_char
 local math_floor
     = math.floor
 
-module "bmp"
 local mt = {__index = _M}
 
 -- Convert a little endian byte string into an integer
@@ -35,7 +34,7 @@ local function LE(s)
   return value
 end
 
-function open(filename)
+function mt.open(filename)
   local file, err = io_open(filename, "rb")
   if not file then
     return nil, err
@@ -81,7 +80,7 @@ function open(filename)
   }, mt)
 end
 
-function getPixel(bmp, x, y)
+function mt.getPixel(bmp, x, y)
   local file, width = bmp.file, bmp.width
   if x < 0 or y < 0 or x >= width or y >= bmp.height then
     return nil, "Invalid pixel"
@@ -94,7 +93,7 @@ function getPixel(bmp, x, y)
   return file:read(1)
 end
 
-function getPixels(bmp)
+function mt.getPixels(bmp)
   local file, width = bmp.file, bmp.width
   if not file:seek("set", bmp.bits_offset) then
     return nil, "Invalid data offset"
@@ -108,7 +107,7 @@ function getPixels(bmp)
   return table_concat(rows)
 end
 
-function getSubPixels(bmp, x, y, w, h)
+function mt.getSubPixels(bmp, x, y, w, h)
   local file, width = bmp.file, bmp.width
   local stride = width + ((4 - (width % 4)) % 4)
   local offset = (bmp.height - y - h) * stride + x
@@ -129,3 +128,5 @@ function convertPal(data)
     return string_char(math_floor(c:byte() / 255 * 63 + 0.5))
   end))
 end
+
+return mt
