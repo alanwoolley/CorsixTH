@@ -74,6 +74,7 @@ function App:App()
     configupdate = self.updateConfig,
     showcheats = self.showCheats,
     showjukebox = self.showJukebox,
+    userinfo = self.updateUserInfo
   }
   self.strings = {}
   self.savegame_version = SAVEGAME_VERSION
@@ -568,6 +569,9 @@ function App:loadMainMenu(message)
   self.ui:setMenuBackground()
   self.ui:addWindow(UIMainMenu(self.ui))
   self.ui:addWindow(UITipOfTheDay(self.ui))
+
+  -- ANDROID: Show Play menu
+  self.ui:addWindow(UIAndroidPlayMenu(self.ui))
 
   -- Show update window if there's an update
   self:checkForUpdates()

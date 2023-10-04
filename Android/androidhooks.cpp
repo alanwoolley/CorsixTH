@@ -10,7 +10,8 @@ static JavaVM *jvm = nullptr;
 static jclass gameActivityClass, gameConfigClass, eventsClass;
 static jobject gameActivitySingleton, gameEventHandler;
 
-static jmethodID midShowSettings, midShowLoad, midShowSave, midUpdateSaveGameDatabase;
+static jmethodID midShowSettings, midShowLoad, midShowSave, midUpdateSaveGameDatabase,
+        midShowAchievements, midSignIn;
 static jmethodID midConfigGetAdvisorEnabled, midConfigGetAudioEnabled, midConfigGetSfxEnabled,
         midConfigGetMusicEnabled, midConfigGetLanguage, midConfigGetAnnouncerEnabled,
         midConfigGetAnnouncerVolume, midConfigGetSfxVolume, midConfigGetMusicVolume,
@@ -19,7 +20,7 @@ static jmethodID midEventOnCure, midEventOnKill, midEventOnCampaignLevelComplete
         midEventOnBankBalanceChanged, midEventOnLoanTaken;
 static jmethodID midReportError;
 
-static void ensureEnv(JNIEnv** env) {
+static void ensureEnv(JNIEnv **env) {
     int result = jvm->GetEnv((void **) env, JNI_VERSION_1_4);
     if (result == JNI_EDETACHED) {
         if (jvm->AttachCurrentThread(env, nullptr) != 0) {
@@ -59,6 +60,8 @@ jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
     midUpdateSaveGameDatabase = env->GetStaticMethodID(gameActivityClass, "onSaveGameChanged",
                                                        "([BIJ[B[B)V");
     midReportError = env->GetStaticMethodID(gameActivityClass, "onGameError", "([B[B)V");
+    midShowAchievements = env->GetStaticMethodID(gameActivityClass, "showAchievements", "()V");
+    midSignIn = env->GetStaticMethodID(gameActivityClass, "signIn", "()V");
 
     // Configuration Methods
     midConfigGetAdvisorEnabled = env->GetMethodID(gameConfigClass, "getAdvisorEnabled", "()Z");
@@ -84,8 +87,10 @@ jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
 
     // Game Event handler
 
-    jmethodID midGetGameEventHandler = env->GetMethodID(gameActivityClass, "getGameEventHandler", "()Luk/co/armedpineapple/cth/GameEventHandler;");
-    jobject localGameEventHandler = env->CallObjectMethod(gameActivitySingleton, midGetGameEventHandler);
+    jmethodID midGetGameEventHandler = env->GetMethodID(gameActivityClass, "getGameEventHandler",
+                                                        "()Luk/co/armedpineapple/cth/GameEventHandler;");
+    jobject localGameEventHandler = env->CallObjectMethod(gameActivitySingleton,
+                                                          midGetGameEventHandler);
     gameEventHandler = env->NewGlobalRef(localGameEventHandler);
 
     return JNI_VERSION_1_4;
@@ -160,6 +165,20 @@ static int showSave(lua_State *L) {
     JNIEnv *env;
     ensureEnv(&env);
     env->CallStaticVoidMethod(gameActivityClass, midShowSave);
+    return 0;
+}
+
+static int signIn(lua_State *L) {
+    JNIEnv *env;
+    ensureEnv(&env);
+    env->CallStaticVoidMethod(gameActivityClass, midSignIn);
+    return 0;
+}
+
+static int showAchievements(lua_State *L) {
+    JNIEnv *env;
+    ensureEnv(&env);
+    env->CallStaticVoidMethod(gameActivityClass, midShowAchievements);
     return 0;
 }
 
@@ -305,6 +324,8 @@ void registerAndroidLuaFunctions(const lua_register_state *pState) {
     add_lua_function(pState, showSave, "showSave");
     add_lua_function(pState, updateSaveGameDatabase, "updateSaveGameDatabase");
     add_lua_function(pState, reportError, "reportError");
+    add_lua_function(pState, signIn, "signIn");
+    add_lua_function(pState, showAchievements, "showAchievements");
 
     lua_setfield(pState->L, pState->main_table, "android");
 }
