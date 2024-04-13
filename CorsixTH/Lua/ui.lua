@@ -954,35 +954,41 @@ end
 --!param height (integer) New window height
 function UI:onWindowResize(width, height)
   print ("UI resized to " .. width .. "x" .. height)
-  if not self.app.config.fullscreen then
+  if (not self.app.config.fullscreen) then
     self:changeResolution(width, height)
   else
+    -- ANDROID: Apply the configuration's resolution.
     -- calculate the aspect ratio of the window
 
     local configWidth = self.app.config.originalWidth
     local configHeight = self.app.config.originalHeight
-
     print ("Original config resolution: " .. configWidth .. "x" .. configHeight)
-
-    print ("Config resolution: " .. configWidth .. "x" .. configHeight)
-    local windowRatio = width/height
-    local configRatio = configWidth/configHeight
-
     local newHeight = 0
     local newWidth = 0
-    if (windowRatio > configRatio) then
+    if (self.app.config.keep_display_aspect_ratio) then
+      local windowRatio = width/height
+      local configRatio = configWidth/configHeight
+
+
+      if (windowRatio > configRatio) then
         newHeight = configHeight
         newWidth = (configHeight/height) * width
-    else
+      else
         newWidth = configWidth
         newHeight = (configWidth/width) * height
+      end
+
+      newHeight =  math.floor(newHeight)
+      newWidth = math.floor(newWidth)
+
+    else
+      newHeight = configHeight
+      newWidth = configWidth
     end
 
-    newHeight =  math.floor(newHeight)
-    newWidth = math.floor(newWidth)
     print ("Resizing to: " .. newWidth .. "x" .. newHeight)
-    self:changeResolution(math.floor(newWidth), math.floor(newHeight))
-  end
+    self:changeResolution(newWidth, newHeight)
+    end
 end
 
 function UI:onMouseMove(x, y, dx, dy)
