@@ -69,7 +69,7 @@ LOCAL_SRC_FILES := $(CORSIX_TH_SRC)/main.cpp \
 
 
 LOCAL_SHARED_LIBRARIES := libLUA SDL2 SDL2_mixer
-LOCAL_STATIC_LIBRARIES := libc++_static libfreetype2 libSDL2_gfx libLFS libLPEG libavformat libavcodec libswscale libavutil libswscale libswresample liblodepng
+LOCAL_STATIC_LIBRARIES := libfreetype2 libSDL2_gfx libLFS libLPEG libavformat libavcodec libswscale libavutil libswscale libswresample liblodepng
 
 LOCAL_LDLIBS := -llog -lGLESv2 -lz
 LOCAL_CPPFLAGS := -std=c++17
